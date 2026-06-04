@@ -1,0 +1,18 @@
+[tool.pyright]
+include = ["core-ppt-master-engine/skills/ppt-master/scripts"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+extraPaths = [
+    "core-ppt-master-engine/skills/ppt-master/scripts",
+    "core-ppt-master-engine/skills/ppt-master/scripts/image_backends",
+    "core-ppt-master-engine/skills/ppt-master/scripts/image_sources",
+    "core-ppt-master-engine/skills/ppt-master/scripts/pptx_to_svg",
+    "core-ppt-master-engine/skills/ppt-master/scripts/source_to_md",
+    "core-ppt-master-engine/skills/ppt-master/scripts/svg_editor",
+    "core-ppt-master-engine/skills/ppt-master/scripts/svg_finalize",
+    "core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx"
+]
+pythonVersion = "3.10"
+useLibraryCodeForTypes = true

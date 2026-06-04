@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv
+env
+*.pptx
+core-ppt-master-engine/projects/*/svg_output
+core-ppt-master-engine/projects/*/svg_final
+core-ppt-master-engine/projects/*/backup
+temp/
