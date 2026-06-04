@@ -244,6 +244,8 @@ The AI handles everything — content analysis, visual design, SVG generation, a
 
 > **Output:** Native-shapes `.pptx` (directly editable) saved to `exports/<name>_<timestamp>.pptx`. A copy of `svg_output/` is always snapshotted to `backup/<timestamp>/svg_output/` for re-export / archival. Pass `--svg-snapshot` to additionally emit an SVG-image preview pptx alongside the native pptx in `exports/` (see [FAQ](core-ppt-master-engine/docs/faq.md)). Requires Office 2016+.
 
+> **Already have a `.pptx` you want to reuse?** Hand the AI that deck plus your material and ask it to "fill this deck with the new content" — it fills text, table, and chart data into your existing design and exports only the pages you pick, staying natively editable. See the [FAQ](core-ppt-master-engine/docs/faq.md) and [template-fill workflow](core-ppt-master-engine/skills/ppt-master/workflows/template-fill-pptx.md).
+
 > **AI lost context?** Ask it to read `core-ppt-master-engine/skills/ppt-master/SKILL.md`.
 
 > **Something went wrong?** Check the **[FAQ](core-ppt-master-engine/docs/faq.md)** — it covers model selection, layout issues, export problems, and more. Continuously updated from real user reports.
@@ -273,6 +275,7 @@ PPT Master reads the current process environment first, then the first `.env` fo
 
 | | Document | Description |
 |---|----------|-------------|
+| 📘 | [Getting Started](core-ppt-master-engine/docs/getting-started.md) | First deck in 3 steps, plus how to use templates, live preview, animations, narration, voice cloning (**new users start here**) |
 | 🆚 | [Why PPT Master](core-ppt-master-engine/docs/why-ppt-master.md) | How it compares to Gamma, Copilot, and other AI tools |
 | 🪟 | [Windows Installation](core-ppt-master-engine/docs/windows-installation.md) | Step-by-step setup guide for Windows users |
 | 📖 | [SKILL.md](core-ppt-master-engine/skills/ppt-master/SKILL.md) | Core workflow and rules |

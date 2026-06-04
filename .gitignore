@@ -95,7 +95,6 @@ temp_files/
 # Visual-review renderer writes per-project preview PNGs and the render lock
 core-ppt-master-engine/projects/*/.preview/
 core-ppt-master-engine/projects/*/.review/
-
 # Stray top-level screenshots created when MCP filename was a bare relative path
 # (the agreed convention is to always pass an absolute /tmp/... path)
 /probe-*.png
@@ -119,7 +118,6 @@ core-ppt-master-engine/projects/*/.review/
 core-ppt-master-engine/docs/_build/
 core-ppt-master-engine/docs/.doctrees/
 site/
-
 
 # Python (if you add Python tools later)
 __pycache__/
@@ -174,6 +172,9 @@ yarn.lock
 *.lock
 .lock
 
+# Live preview direct-edit history (per-project, regenerated on edit)
+.live_edits.jsonl
+
 # Personal notes
 TODO.md
 PERSONAL_NOTES.md
@@ -184,8 +185,10 @@ PERSONAL_NOTES.md
 core-ppt-master-engine/projects/*
 !core-ppt-master-engine/projects/README.md
 
+claude-plugin/*
+.claude-plugin/*
+docs/zh
+README_CN.md
+docs
 
-./temp
-./agno-artifacts
-
-*.txt
+.github/

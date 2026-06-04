@@ -63,6 +63,10 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/project_manager.py vali
 
 # Image tools and SVG quality check
 python3 core-ppt-master-engine/skills/ppt-master/scripts/analyze_images.py <project_path>/images
+# Formula rendering — manifest written by Strategist after typography confirmation:
+python3 core-ppt-master-engine/skills/ppt-master/scripts/latex_render.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/latex_render.py <project_path> --dry-run
+python3 core-ppt-master-engine/skills/ppt-master/scripts/latex_render.py <project_path> --providers codecogs,quicklatex,mathpad,wikimedia
 # In-pipeline AI image generation — manifest mode (required, even for 1 image):
 python3 core-ppt-master-engine/skills/ppt-master/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json
 python3 core-ppt-master-engine/skills/ppt-master/scripts/image_gen.py --render-md <project_path>/images/image_prompts.json
@@ -92,4 +96,34 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx.py <project
 - `core-ppt-master-engine/docs/rules/` — repo-wide style rules.
 - `core-ppt-master-engine/examples/` — example projects.
 - `core-ppt-master-engine/projects/` — user project workspace.
+
+## Repo Sync & Pre-Merge Guidelines
+
+When merging updates from the upstream remote repository (`https://github.com/cloudbloqavi/ppt-master`), the agent MUST follow these strict rules to preserve this repository's custom directory structure, cleanups, and logic adjustments:
+
+### 1. Directory & Path Mapping
+* **Upstream root** corresponds to the local `core-ppt-master-engine/` subdirectory. All upstream files in subfolders (e.g. `skills/`, `docs/`, `projects/`, and root pages `index.html`, `viewer.html`) must be copied to `core-ppt-master-engine/`.
+* **Root documentation files** (`AGENTS.md`, `CLAUDE.md`, `README.md`, `SECURITY.md`) reside at the local root. When updated, their internal links and path strings MUST be prefixed with `core-ppt-master-engine/` to match the local structure.
+
+### 2. Cleaned Up Directories (Always Skip)
+* Do **NOT** copy or sync the `examples/` directory from the remote.
+* Do **NOT** copy or sync the `docs/zh/` directory and the root `README_CN.md` (Chinese documentation and readme files are cleaned up/removed).
+
+### 3. Preserved Local Configurations (Never Overwrite)
+* **Root `requirements.txt`**: Do not overwrite this file; it contains local path mappings (`-r core-ppt-master-engine/...`).
+* **`core-ppt-master-engine/skills/ppt-master/SKILL.md`**:
+  * **Eight Confirmations**: MUST remain **Non-blocking by default** (the agent makes all planning/design decisions autonomously and runs continuously without stopping to wait for user confirmation).
+  * **Live Preview**: MUST remain **Disabled by default** (do not start the preview server server.py by default).
+* **`.env.example` Files**: Do **NOT** blindly overwrite `.env.example` (both at the root and inside the skill directory). Preserve local custom configurations (e.g. root mandatory runtime variables and optional agent prompt config) and merge them with incoming remote parameters. Translate all Chinese comments, headers, or explanations to English during the merge.
+* **CLAUDE.md and AGENTS.md Sync**: If any changes are detected in the remote `CLAUDE.md` during a sync, they must be merged into the local `AGENTS.md` as custom rules or quick references. `CLAUDE.md` itself must always be kept clean and contain only a reference link to `AGENTS.md` to keep documentation fully in sync and avoid duplication.
+
+### 4. Gitignore Filtering
+* **Check against `.gitignore`**: Prior to merging or copying any incoming files from the remote, check their destination path against the local `.gitignore` rules (using a command like `git check-ignore`). Any file matching an ignore pattern must NOT be merged or copied.
+
+### 5. Safe Sync Workflow
+1. Add the remote if missing and checkout/export files to a temporary workspace.
+2. Selectively copy files to their mapped target paths. Prior to copying any file, check its destination path against local `.gitignore` rules (using `git check-ignore <path>`). If it is flagged as ignored, skip copying it.
+3. Re-apply path prefixing (`core-ppt-master-engine/`) to any root documentation changes.
+4. Run `git reset` to unstage everything, ensuring all synced changes remain in the working tree for manual review and commit.
+
 

@@ -1,0 +1,35 @@
+# PPT Master - Root Dependencies
+# =============================================
+#
+# Install everything needed to run the autonomous agent:
+#   pip install -r requirements.txt
+#
+# ─────────────────────────────────────────────────────────────
+# PREREQUISITE: Google Antigravity SDK
+# ─────────────────────────────────────────────────────────────
+# The core runtime SDK that drives the autonomous agent loop.
+# Must be installed before run_agent.py can be executed.
+# PyPI: https://pypi.org/project/google-antigravity/
+google-antigravity
+
+# ─────────────────────────────────────────────────────────────
+# PREREQUISITE: SVG → PNG rendering (CairoSVG)
+# ─────────────────────────────────────────────────────────────
+# Required for converting SVG slides to PNG fallback images
+# used in Office-compatible PPTX export.
+# System dependency: libcairo2 must also be installed.
+#   Ubuntu/WSL:  sudo apt-get install -y libcairo2 libcairo2-dev
+#   macOS:       brew install cairo
+#   Windows:     https://cairographics.org/download/
+cairosvg>=2.7.0
+
+# ─────────────────────────────────────────────────────────────
+# PREREQUISITE: Environment variable loading
+# ─────────────────────────────────────────────────────────────
+# Loads .env file into the process environment at startup.
+python-dotenv>=1.0.0
+
+# ─────────────────────────────────────────────────────────────
+# Core PPT Master skill dependencies
+# ─────────────────────────────────────────────────────────────
+-r core-ppt-master-engine/skills/ppt-master/requirements.txt

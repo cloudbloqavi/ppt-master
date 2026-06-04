@@ -1,13 +1,11 @@
 {
   "meta": {
-    "total": 81,
+    "total": 71,
     "defaultViewBox": "0 0 1280 720",
-    "formats": [
-      "ppt169"
-    ],
+    "formats": ["ppt169"],
     "filePattern": "{key}.svg",
-    "libraryPositioning": "Visualization template library covering charts, infographics, diagrams, and strategic frameworks. The `charts/` path is retained for backward compatibility. Templates are named by visual structure, not by business-model name \u2014 model-specific frameworks (SWOT, BCG, PEST, OKR, Porter's Five Forces, Value Chain, etc.) are matched via keywords in `summary`.",
-    "summaryGrammar": "Each chart's `summary` is a selection rule, not a description. Format: 'Pick for <content shape + scale>. Skip if <reason \u2192 alternative>'. Strategist matches every page's content shape against all 71 summaries; no category/keyword index \u2014 full-read is intentional.",
+    "libraryPositioning": "Visualization template library covering charts, infographics, diagrams, and strategic frameworks. The `charts/` path is retained for backward compatibility. Templates are named by visual structure, not by business-model name — model-specific frameworks (SWOT, BCG, PEST, OKR, Porter's Five Forces, Value Chain, etc.) are matched via keywords in `summary`.",
+    "summaryGrammar": "Each chart's `summary` is a selection rule, not a description. Format: 'Pick for <content shape + scale>. Skip if <reason → alternative>'. Strategist matches every page's content shape against all 71 summaries; no category/keyword index — full-read is intentional.",
     "updated": "2026-05-13"
   },
   "charts": {
@@ -57,7 +55,7 @@
       "summary": "Pick for ranking 5-12 items, especially with long labels. Skip if <=8 short-label items (use bar_chart)."
     },
     "kpi_cards": {
-      "summary": "Pick for 4-8 standalone numeric metrics shown as overview cards (2x2 or 1x4) \u2014 exec summary opener, dashboard headline, quarterly recap, results-at-a-glance. Skip if metrics have target baselines (use bullet_chart) or single hero number (use gauge_chart)."
+      "summary": "Pick for 4-8 standalone numeric metrics shown as overview cards (2x2 or 1x4) — exec summary opener, dashboard headline, quarterly recap, results-at-a-glance. Skip if metrics have target baselines (use bullet_chart) or single hero number (use gauge_chart)."
     },
     "line_chart": {
       "summary": "Pick for 1-3 time-series on a continuous axis showing direction. Skip if cumulative volume matters (use area_chart) or different units (use dual_axis_line_chart)."
@@ -66,10 +64,10 @@
       "summary": "Pick for items plotted on Impact x Effort or similar generic 2-axis prioritization. Skip for named-quadrant text frameworks (use quadrant_text_bullets) or bubble-sized portfolios (use quadrant_bubble_scatter)."
     },
     "quadrant_text_bullets": {
-      "summary": "Pick for any 2\u00d72 framework where each quadrant holds a titled bullet list \u2014 SWOT (Strengths/Weaknesses/Opportunities/Threats, internal-external \u00d7 helpful-harmful), Ansoff (Existing/New Markets \u00d7 Existing/New Products), or any named two-axis matrix with text content. Skip for items plotted as points (use matrix_2x2) or bubble-sized portfolios (use quadrant_bubble_scatter)."
+      "summary": "Pick for any 2×2 framework where each quadrant holds a titled bullet list — SWOT (Strengths/Weaknesses/Opportunities/Threats, internal-external × helpful-harmful), Ansoff (Existing/New Markets × Existing/New Products), or any named two-axis matrix with text content. Skip for items plotted as points (use matrix_2x2) or bubble-sized portfolios (use quadrant_bubble_scatter)."
     },
     "quadrant_bubble_scatter": {
-      "summary": "Pick for 2\u00d72 portfolio where items are plotted as bubbles sized by a third metric \u2014 BCG Growth \u00d7 Share with Stars/Cash Cows/Question Marks/Dogs, revenue-weighted portfolio matrix. Skip for textual named quadrants (use quadrant_text_bullets) or generic prioritization without bubble size (use matrix_2x2)."
+      "summary": "Pick for 2×2 portfolio where items are plotted as bubbles sized by a third metric — BCG Growth × Share with Stars/Cash Cows/Question Marks/Dogs, revenue-weighted portfolio matrix. Skip for textual named quadrants (use quadrant_text_bullets) or generic prioritization without bubble size (use matrix_2x2)."
     },
     "pareto_chart": {
       "summary": "Pick to show 80/20 contribution: descending bars + cumulative line. Skip if cumulative line is not the message (use bar_chart)."
@@ -78,10 +76,10 @@
       "summary": "Pick for simple 3-6 part proportions of one whole. Skip for >=7 parts (use donut_chart or treemap_chart) or hierarchical composition (use treemap_chart)."
     },
     "hub_inward_arrows": {
-      "summary": "Pick for 1 center subject + 4-5 surrounding forces with arrows pointing inward \u2014 Porter's Five Forces (central rivalry, threat of new entrants/substitutes, bargaining power of buyers/suppliers), threat-model with central asset, pressure-on-core diagrams. Skip for outward radiation from center capability (use hub_spoke) or non-directional cluster (use mind_map)."
+      "summary": "Pick for 1 center subject + 4-5 surrounding forces with arrows pointing inward — Porter's Five Forces (central rivalry, threat of new entrants/substitutes, bargaining power of buyers/suppliers), threat-model with central asset, pressure-on-core diagrams. Skip for outward radiation from center capability (use hub_spoke) or non-directional cluster (use mind_map)."
     },
     "process_flow": {
-      "summary": "Pick for 3-8 sequential steps connected by simple arrows \u2014 approval workflows, customer onboarding, request handling, lifecycle stages. Skip if cyclical (use circular_stages) or stages produce named outputs (use pipeline_with_stages)."
+      "summary": "Pick for 3-8 sequential steps connected by simple arrows — approval workflows, customer onboarding, request handling, lifecycle stages. Skip if cyclical (use circular_stages) or stages produce named outputs (use pipeline_with_stages)."
     },
     "progress_bar_chart": {
       "summary": "Pick for 3-8 items each with a completion %. Skip if items have explicit target+actual values (use bullet_chart)."
@@ -111,7 +109,7 @@
       "summary": "Pick for stepwise additive/subtractive breakdown bridging a starting value to an ending value. Skip if no running total (use bar_chart)."
     },
     "pyramid_chart": {
-      "summary": "Pick for 3-6 stratified hierarchy layers in flat 2D side-view \u2014 Maslow's hierarchy, maturity models, value hierarchy, capability tiers, market segments, audience pyramid. Skip for dramatic tone (use pyramid_isometric), flat priority list (use vertical_list), or org reporting (use top_down_tree)."
+      "summary": "Pick for 3-6 stratified hierarchy layers in flat 2D side-view — Maslow's hierarchy, maturity models, value hierarchy, capability tiers, market segments, audience pyramid. Skip for dramatic tone (use pyramid_isometric), flat priority list (use vertical_list), or org reporting (use top_down_tree)."
     },
     "pyramid_isometric": {
       "summary": "Pick for 4-tier maturity/achievement model with presentation drama (review reports, capability tiers). Tier count fixed at 4 (hand-tuned vertices). Skip for documentary tone (use pyramid_chart) or tier count != 4."
@@ -123,13 +121,13 @@
       "summary": "Pick for bilateral pros/cons list, 2-5 items per side. Skip for full feature comparison (use comparison_table) or numeric A/B mirror data (use butterfly_chart)."
     },
     "circular_stages": {
-      "summary": "Pick for 4-6 stage closed loop where stages compose a cycle \u2014 PDCA, flywheel compounding loops (Attract \u2192 Engage \u2192 Delight), lifecycle, continuous improvement. Skip for linear flow (use process_flow), one-shot sequence (use numbered_steps), or wedge-based central topic (use segmented_wheel)."
+      "summary": "Pick for 4-6 stage closed loop where stages compose a cycle — PDCA, flywheel compounding loops (Attract → Engage → Delight), lifecycle, continuous improvement. Skip for linear flow (use process_flow), one-shot sequence (use numbered_steps), or wedge-based central topic (use segmented_wheel)."
     },
     "numbered_steps": {
-      "summary": "Pick for 3-6 horizontal sequential steps with numeric emphasis \u2014 how-it-works section, getting-started guide, methodology overview, implementation phases. Skip if steps need connector arrows (use process_flow) or named output artifacts (use pipeline_with_stages)."
+      "summary": "Pick for 3-6 horizontal sequential steps with numeric emphasis — how-it-works section, getting-started guide, methodology overview, implementation phases. Skip if steps need connector arrows (use process_flow) or named output artifacts (use pipeline_with_stages)."
     },
     "icon_grid": {
-      "summary": "Pick for 4-9 parallel features/capabilities/services as icon cards \u2014 feature grid, service lineup, benefits matrix, brand values, product highlights. Skip for sequential ordering (use numbered_steps) or hierarchical layers (use pyramid_chart)."
+      "summary": "Pick for 4-9 parallel features/capabilities/services as icon cards — feature grid, service lineup, benefits matrix, brand values, product highlights. Skip for sequential ordering (use numbered_steps) or hierarchical layers (use pyramid_chart)."
     },
     "isometric_stairs": {
       "summary": "Pick for 4-7 ascending stages emphasizing growth/maturity progression visually. Skip for flat sequential steps (use numbered_steps) or formal hierarchy (use pyramid_chart)."
@@ -150,7 +148,7 @@
       "summary": "Pick for 20-30 keywords sized by frequency/weight. Skip if individual keyword position carries meaning (use icon_grid)."
     },
     "concentric_circles": {
-      "summary": "Pick for 3-5 priority rings from core to periphery \u2014 bullseye/onion model, sphere of influence, stakeholder rings, core-to-ecosystem priority layers, target-vs-extended audience. Skip for non-prioritized layers (use pyramid_chart)."
+      "summary": "Pick for 3-5 priority rings from core to periphery — bullseye/onion model, sphere of influence, stakeholder rings, core-to-ecosystem priority layers, target-vs-extended audience. Skip for non-prioritized layers (use pyramid_chart)."
     },
     "segmented_wheel": {
       "summary": "Pick for one central topic split into 4-8 equally-weighted parallel dimensions (5W1H, 4P, 5S, 6-aspect review), each wedge paired with a description card. Skip for sequential cycles (use circular_stages), proportional shares (use pie_chart), or hub with non-wedge spokes (use hub_spoke)."
@@ -162,7 +160,7 @@
       "summary": "Pick for 3-6 phase methodology with chunky arrow-chain progression and deliverables per phase. Skip for <=2 phases or non-linear flow (use process_flow), or chain ending in an aggregate outcome wedge (use chevron_chain_with_tail)."
     },
     "chevron_chain_with_tail": {
-      "summary": "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome \u2014 Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result. Skip for plain chevron flow without summary tail (use chevron_process) or non-chevron pipeline (use pipeline_with_stages)."
+      "summary": "Pick for 4-6 sequential chevron blocks plus a final wedge representing aggregate outcome — Porter's value chain (primary + support activities mapped to margin), process leading to a summary deliverable, contribution chain to a result. Skip for plain chevron flow without summary tail (use chevron_process) or non-chevron pipeline (use pipeline_with_stages)."
     },
     "comparison_columns": {
       "summary": "Pick for 2-4 pricing/service tier cards in side-by-side columns (marketing layout). Skip for dense feature comparison (use comparison_table)."
@@ -174,16 +172,16 @@
       "summary": "Pick for 1 core capability + 4-8 surrounding capabilities (platform/ecosystem); each spoke = title or title + 1-2 line description. Skip if center is a system containing parts with their own descriptions (use module_composition), or surroundings exert inward pressure on the center (use hub_inward_arrows)."
     },
     "vertical_list": {
-      "summary": "Pick for 3-6 numbered key points each with a short description \u2014 design principles, core tenets, action items, key takeaways, recommendations, executive summary points. Skip for icon-style cards (use icon_grid) or sequential steps (use numbered_steps)."
+      "summary": "Pick for 3-6 numbered key points each with a short description — design principles, core tenets, action items, key takeaways, recommendations, executive summary points. Skip for icon-style cards (use icon_grid) or sequential steps (use numbered_steps)."
     },
     "vertical_pillars": {
-      "summary": "Pick for 1\u00d73 / 1\u00d74 / 1\u00d75 vertical column layout where each pillar = one independent category with title + bullets \u2014 PEST (Political/Economic/Social/Technological), four-pillar strategy overview, side-by-side independent categories. Skip for 2\u00d72 quadrant (use quadrant_text_bullets), pricing tiers (use comparison_columns), or 2\u00d72 parallel aspects (use labeled_card)."
+      "summary": "Pick for 1×3 / 1×4 / 1×5 vertical column layout where each pillar = one independent category with title + bullets — PEST (Political/Economic/Social/Technological), four-pillar strategy overview, side-by-side independent categories. Skip for 2×2 quadrant (use quadrant_text_bullets), pricing tiers (use comparison_columns), or 2×2 parallel aspects (use labeled_card)."
     },
     "layered_architecture": {
       "summary": "Pick for 3-4 horizontal architecture layers (presentation/service/data), 2-4 module cards per layer, each card = title + 1-line description (description required, even if source brief). Skip if no per-module descriptions (use icon_grid) or no horizontal layering (use module_composition)."
     },
     "module_composition": {
-      "summary": "Pick for one parent container wrapping 3-N child module cards, each = title + 2-3 bullets \u2014 fits 'Feature X contains 3 parts, each with its own description'. Skip if source has only labels without descriptions (use numbered_steps or icon_grid)."
+      "summary": "Pick for one parent container wrapping 3-N child module cards, each = title + 2-3 bullets — fits 'Feature X contains 3 parts, each with its own description'. Skip if source has only labels without descriptions (use numbered_steps or icon_grid)."
     },
     "pipeline_with_stages": {
       "summary": "Pick for 3-5 horizontal pipeline stages, each = title + 1-line description + output artifact, connected by arrows (data pipelines, ETL, build pipelines). Skip if any stage lacks an artifact (use process_flow or numbered_steps)."
@@ -213,46 +211,16 @@
       "summary": "Pick for 3-12 leadership/team profile cards (photo + name + title + short bio). Skip for reporting hierarchy (use top_down_tree)."
     },
     "top_down_tree": {
-      "summary": "Pick for hierarchical top-down tree 2-4 levels deep with parent\u2192children reporting/decomposition lines \u2014 org charts (CEO \u2192 VPs \u2192 Directors), OKR cascades (Objective \u2192 Key Results \u2192 Initiatives), WBS decomposition. Skip for non-hierarchical brainstorm (use mind_map) or flat team showcase (use team_roster)."
+      "summary": "Pick for hierarchical top-down tree 2-4 levels deep with parent→children reporting/decomposition lines — org charts (CEO → VPs → Directors), OKR cascades (Objective → Key Results → Initiatives), WBS decomposition. Skip for non-hierarchical brainstorm (use mind_map) or flat team showcase (use team_roster)."
     },
     "journey_map": {
       "summary": "Pick for multi-phase customer experience matrix with actions, emotion curve, and pain points per phase. Skip for simple linear funnel (use funnel_chart)."
     },
     "agenda_list": {
-      "summary": "Pick for table of contents, meeting agendas, or presentation roadmap \u2014 numbered items + brief description + duration / owner per row. Skip for substantive content lists (use vertical_list) or single-page section dividers (use a cover layout)."
+      "summary": "Pick for table of contents, meeting agendas, or presentation roadmap — numbered items + brief description + duration / owner per row. Skip for substantive content lists (use vertical_list) or single-page section dividers (use a cover layout)."
     },
     "labeled_card": {
       "summary": "Pick for 3-4 parallel aspects of one subject with per-aspect titles + short body (self-introduction, four-pillar overview, capability quadrant). Skip for plain feature lists (use icon_grid), sequential steps (use numbered_steps), or strategic quadrants (use quadrant_text_bullets / matrix_2x2)."
-    },
-    "quarterly_product_roadmap": {
-      "summary": "Pick for quarterly product roadmap or feature release timeline covering 3-6 quarters (e.g. Q2 2022 to Q2 2023) detailing feature rollouts like User Growth, Auto Sync, and Major Releases. Skip for simple vertical roadmaps (use roadmap_vertical) or horizontal milestones without quarters (use timeline)."
-    },
-    "monthly_strategic_roadmap": {
-      "summary": "Pick for monthly initiative roadmap or strategic action plan spanning 4-6 months (e.g. Month 1 to Month 5) mapping key initiatives, program design, and council establishment. Skip for multi-year timelines (use multi_year_growth_strategy) or project schedules with daily tasks (use project_schedule_table)."
-    },
-    "yearly_strategic_goals_roadmap": {
-      "summary": "Pick for year-by-year strategic plan mapping multiple high-level goals (e.g. 5 goals) across Year 1 and Year 2. Skip for simple horizontal timelines (use timeline) or tabular trackers (use project_schedule_table)."
-    },
-    "annual_roles_targets_roadmap": {
-      "summary": "Pick for three-year executive roles and annual targets plan (e.g. 2023-2025) mapping roles (CFO, CRO, CIO) to strategic targets and timelines. Skip if role mapping is not required (use three_year_project_lifecycle)."
-    },
-    "three_year_project_lifecycle": {
-      "summary": "Pick for three-year project lifecycle or stages (Year 1 to Year 3) covering Planning, Execution, and Monitoring phases with sequential steps (Action, Implement, Document, Review, Report, Modify). Skip for detailed Gantt timelines (use gantt_chart)."
-    },
-    "monthly_marketing_calendar": {
-      "summary": "Pick for 30-day marketing campaign calendar mapping focus areas, tasks, KPIs, and outcomes. Skip if displaying a generic timeline or list (use timeline or vertical_list)."
-    },
-    "cross_functional_status_board": {
-      "summary": "Pick for cross-functional department status matrix (Kanban style) mapping tasks across departments (Product, Finance, Sales, Marketing) into Proposed and In Progress stages. Skip for simple tabular lists (use basic_table)."
-    },
-    "marketing_milestones_matrix": {
-      "summary": "Pick for marketing milestone matrix mapping multiple channels (e.g. Content, Search, Email) across sequential milestones (e.g. 01 to 09). Skip if showing a flat checklist (use feature_matrix_table)."
-    },
-    "maturity_transformation_roadmap": {
-      "summary": "Pick for maturity transformation roadmap or evolution model mapping the journey from current challenges to a strategic, agile organization. Skip for simple vertical lists (use vertical_list) or hierarchy structures (use pyramid_chart)."
-    },
-    "multi_year_growth_strategy": {
-      "summary": "Pick for multi-year growth strategy roadmap (e.g. 2022-2027) outlining strategic goals across multiple blocks. Skip for vertical roadmaps (use roadmap_vertical) or horizontal milestones without growth buckets (use timeline)."
     }
   }
 }
