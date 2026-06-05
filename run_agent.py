@@ -429,14 +429,19 @@ def copy_output_artifacts(
         )
         return
 
-    source = Path(".").resolve() / "core-ppt-master-engine" / "projects"
+    source_candidates = list(dict.fromkeys([
+        Path(".").resolve() / "core-ppt-master-engine" / "projects",
+        Path(".").resolve() / "projects"
+    ]))
     destination = Path(output_dir_str)
     timestamp_utc = datetime.now(timezone.utc).isoformat()
 
     logger.info("")
     logger.info("═" * 60)
     logger.info("ARTIFACT COPY STAGE")
-    logger.info("  Source dir:      %s", source)
+    logger.info("  Source dirs checked:")
+    for src in source_candidates:
+        logger.info("    - %s", src)
     logger.info("  Destination dir: %s", destination)
     logger.info("  Run status:      %s", run_status)
     logger.info("  Timestamp (UTC): %s", timestamp_utc)
@@ -449,44 +454,66 @@ def copy_output_artifacts(
 
     copied = 0
     copy_errors: list[str] = []
+    found_files = False
+    copied_projects: set[str] = set()
 
-    if source.exists() and any(source.iterdir()):
-        for item in source.rglob("*"):
-            if item.is_file():
-                rel = item.relative_to(source)
-                dest_file = destination / rel
-                try:
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(item, dest_file)
-                    copied += 1
-                except Exception as exc:
-                    msg = f"{rel}: {exc}"
-                    copy_errors.append(msg)
-                    logger.error("  Copy error — %s", msg)
+    for source in source_candidates:
+        if source.exists() and any(source.iterdir()):
+            for item in source.rglob("*"):
+                if item.is_file():
+                    rel = item.relative_to(source)
+                    # Skip root-level files directly under the projects directory (like README.md)
+                    if len(rel.parts) <= 1:
+                        continue
+
+                    found_files = True
+                    dest_file = destination / rel
+                    try:
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(item, dest_file)
+                        copied += 1
+                        copied_projects.add(rel.parts[0])
+                    except Exception as exc:
+                        msg = f"{rel}: {exc}"
+                        copy_errors.append(msg)
+                        logger.error("  Copy error — %s", msg)
+
+    if found_files:
         logger.info("  Files copied: %d", copied)
         if copy_errors:
             logger.warning("  Copy errors:  %d file(s) failed", len(copy_errors))
     else:
-        logger.info("  No project output files found in source — skipping file copy.")
+        logger.info("  No project output files found in checked source dirs — skipping file copy.")
 
     # ── Write run manifest ───────────────────────────────────
-    # Always written so the output bucket has a record of every run,
-    # including failed ones with 0 copied files.
+    # Written inside each copied project folder. If no project files were
+    # copied (e.g. agent failed early), written to the root as a fallback.
     manifest = {
         "run_status": run_status,
         "timestamp_utc": timestamp_utc,
         "prompt": prompt[:500] if prompt else "",
-        "source_projects_dir": str(source),
+        "source_projects_dirs": [str(src) for src in source_candidates],
+        "source_projects_dir": ", ".join(str(src) for src in source_candidates),
         "output_artifacts_dir": str(destination),
         "files_copied": copied,
         "copy_errors": copy_errors,
     }
-    manifest_path = destination / "run_manifest.json"
-    try:
-        manifest_path.write_text(_json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-        logger.info("  Manifest written: %s", manifest_path)
-    except Exception as exc:
-        logger.error("  Failed to write run manifest: %s", exc)
+
+    if copied_projects:
+        for project_dir in copied_projects:
+            manifest_path = destination / project_dir / "run_manifest.json"
+            try:
+                manifest_path.write_text(_json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+                logger.info("  Manifest written: %s", manifest_path)
+            except Exception as exc:
+                logger.error("  Failed to write run manifest inside project %s: %s", project_dir, exc)
+    else:
+        manifest_path = destination / "run_manifest.json"
+        try:
+            manifest_path.write_text(_json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+            logger.info("  Manifest written to root (fallback): %s", manifest_path)
+        except Exception as exc:
+            logger.error("  Failed to write fallback run manifest: %s", exc)
 
     logger.info("ARTIFACT COPY STAGE COMPLETE")
     logger.info("═" * 60)
