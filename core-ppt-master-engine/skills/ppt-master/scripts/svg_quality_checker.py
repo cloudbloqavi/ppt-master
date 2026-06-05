@@ -980,7 +980,7 @@ class SVGQualityChecker:
 
     def _check_template_contract(self, dir_path: Path,
                                  svg_files: List[Path]) -> None:
-        """Template-mode-only checks: roster ↔ design_spec consistency and
+        """Template-mode-only checks: roster ↔ design_spec.md consistency and
         per-page placeholder hints.
 
         - **Roster mismatch (orphan / missing)** is reported as an *error*: a
@@ -1417,7 +1417,7 @@ def print_usage() -> None:
     print("  python3 scripts/svg_quality_checker.py examples/project/svg_output")
     print("  python3 scripts/svg_quality_checker.py examples/project")
     print("  python3 scripts/svg_quality_checker.py templates/layouts/academic_defense --template-mode")
-    print("  python3 scripts/svg_quality_checker.py templates/decks/招商银行 --template-mode")
+    print("  python3 scripts/svg_quality_checker.py templates/decks/china_merchants_bank --template-mode")
     print("\nOptions:")
     print("  --format <ppt169|ppt43|...>   Expected canvas format")
     print("  --template-mode               Validate a templates/{layouts,decks}/<id> directory:")

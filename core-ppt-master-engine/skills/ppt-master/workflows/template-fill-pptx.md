@@ -1,4 +1,3 @@
----
 description: PPTX template fill workflow — use a native PowerPoint template deck, select fitting pages, and fill new material back without SVG conversion
 ---
 
@@ -187,16 +186,16 @@ Each `notes` value is **pure spoken narration**: write only what a presenter wou
 | Rule | Detail |
 |---|---|
 | Length | 2–5 natural sentences carrying the page's core message; cover / chapter / ending pages can be one or two sentences |
-| Transitions | Carry page-to-page flow in the opening sentence as natural prose ("在明确了背景之后……" / "Having framed X, let's turn to Y") — never bracketed `[过渡]` / `[Transition]` tags |
-| Plain prose only | No `#` heading line, no `- ` bullet lists, no `要点：① …` / `Key points:` lines, no `时长：2分钟` / `Duration:` annotations — embedded notes keep them verbatim and TTS would read them aloud |
-| Number readability | Spell out figures when literal TTS pronunciation is awkward (Chinese "百分之六十八" over "68%"; plain English integers and percentages are fine) |
+| Transitions | Carry page-to-page flow in the opening sentence as natural prose ("After clarifying the background..." / "Having framed X, let's turn to Y") — never bracketed `[Transition]` / `[Transition]` tags |
+| Plain prose only | No `#` heading line, no `- ` bullet lists, no `Key points: ① ...` / `Key points:` lines, no `Duration: 2 minutes` / `Duration:` annotations — embedded notes keep them verbatim and TTS would read them aloud |
+| Number readability | Spell out figures when literal TTS pronunciation is awkward (Chinese "sixty-eight percent" over "68%"; plain English integers and percentages are fine) |
 | One language | Match the deck's language; do not mix languages inside one note |
 | Source-bound | Every substantive claim comes from the user material, same as `replacements` |
 
 Example `notes` value for a Chinese content slide:
 
 ```json
-"notes": "在看清整体市场格局之后，我们把镜头拉近到成都二手房的头部板块。当前挂牌均价同比上涨约百分之十二，但成交周期反而拉长到九十天以上，说明买方观望情绪在加重。这组数据是后面定价策略的基础，请重点留意。"
+"notes": "After gaining a clear view of the overall market landscape, we zoom in on the leading segments of Chengdu's second-hand housing market. The current average listing price has increased by about twelve percent year-on-year, but the transaction cycle has extended to over ninety days, indicating a growing wait-and-see sentiment among buyers. This dataset forms the basis for the subsequent pricing strategy; please pay close attention to it."
 ```
 
 ---

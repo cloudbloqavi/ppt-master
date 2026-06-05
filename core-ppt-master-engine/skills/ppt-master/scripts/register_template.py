@@ -2,7 +2,7 @@
 """Register a brand / layout / deck template into the global template index.
 
 Three kinds, three physical directories, three index files (see
-``docs/zh/templates-architecture.md`` for the data model):
+``docs/en/templates-architecture.md`` for the data model):
 
 | --kind  | Source dir              | Index file                    |
 |---------|-------------------------|-------------------------------|
@@ -122,7 +122,7 @@ def _extract_section_field(body: str, section_title: str, labels: list[str]) -> 
             return _clean_field_value(row.group(1))
 
         bullet = re.search(
-            rf"^[-*]\s*\*?\*?{re.escape(label)}\*?\*?\s*[:：]\s*(.+?)\s*$",
+            rf"^[-*]\s*\*?\*?{re.escape(label)}\*?\*?\s*[:\uff1a]\s*(.+?)\s*$", # \uff1a is the full-width colon
             section, re.MULTILINE | re.IGNORECASE,
         )
         if bullet:
@@ -195,7 +195,7 @@ def _extract_entry(kind: str, template_id: str, template_dir: Path) -> dict:
     if declared_kind not in (None, kind):
         raise SpecParseError(
             f"design_spec.md frontmatter declares kind={declared_kind!r}; "
-            f"expected kind={kind!r} — use --kind {declared_kind} instead"
+            f"expected kind={kind!r} \u2014 use --kind {declared_kind} instead" # \u2014 is an em dash
         )
 
     summary = (fm.get("summary") or "").strip()
@@ -218,7 +218,7 @@ def _extract_entry(kind: str, template_id: str, template_dir: Path) -> dict:
     elif kind == "layout":
         page_types = fm.get("page_types") or _derive_page_types(pages)
         if isinstance(page_types, str):
-            page_types = [t.strip() for t in re.split(r"[,，]", page_types) if t.strip()]
+            page_types = [t.strip() for t in re.split(r"[,,\uff0c]", page_types) if t.strip()] # \uff0c is the full-width comma
         entry = OrderedDict(
             summary=summary,
             canvas_format=str(fm.get("canvas_format", "ppt169")),
@@ -283,14 +283,14 @@ def _print_completion_card(kind: str, template_id: str, entry: dict, extras: dic
     print(f"**{pretty_kind} ID**: {template_id}")
     print(f"**Path**: `templates/{dir_name}/{template_id}/`")
     if kind in ("brand", "deck"):
-        primary = entry.get("primary_color") or "—"
+        primary = entry.get("primary_color") or "\u2014" # \u2014 is an em dash
         print(f"**Primary Color**: {primary}")
     if kind in ("layout", "deck"):
-        canvas = entry.get("canvas_format") or "—"
-        pc = entry.get("page_count") or "—"
+        canvas = entry.get("canvas_format") or "\u2014" # \u2014 is an em dash
+        pc = entry.get("page_count") or "\u2014" # \u2014 is an em dash
         print(f"**Canvas**: {canvas}")
         print(f"**Pages**: {pc}")
-    print(f"**Summary**: {entry.get('summary') or '—'}")
+    print(f"**Summary**: {entry.get('summary') or '\u2014'}") # \u2014 is an em dash
     print("**Index Registration**: Done")
     print()
     if kind != "brand":

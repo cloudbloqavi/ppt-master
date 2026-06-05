@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+    <!-- Template: Content Page - POWERCHINA Modern Style (POWERCHINA Modern) -->
+
+    <defs>
+        <!-- Tag Background Gradient -->
+        <linearGradient id="tagGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#00418D;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#003270;stop-opacity:1" />
+        </linearGradient>
+    </defs>
+
+    <!-- Background: Engineering White -->
+    <rect width="1280" height="720" fill="#F8F9FA"/>
+    
+    <!-- Decorative Grid (Subtle Grid) -->
+    <defs>
+        <pattern id="lightGrid" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+            <line x1="100" y1="0" x2="100" y2="100" stroke="#000000" stroke-opacity="0.03" stroke-width="1"/>
+            <line x1="0" y1="100" x2="100" y2="100" stroke="#000000" stroke-opacity="0.03" stroke-width="1"/>
+        </pattern>
+    </defs>
+    <rect width="1280" height="720" fill="url(#lightGrid)"/>
+
+    <!-- Top Navigation Bar (Console Style) -->
+    <rect width="1280" height="60" fill="#FFFFFF" stroke="#E9ECEF" stroke-width="1"/>
+    <rect width="1280" height="4" fill="#00418D"/>
+
+    <!-- Chapter Tag (Tag) -->
+    <path d="M40,0 L160,0 L140,50 L40,50 Z" fill="url(#tagGrad)"/>
+    <text x="100" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">
+        0{{CHAPTER_NUM}}
+    </text>
+
+    <!-- Page Title -->
+    <text x="180" y="38" font-family="Microsoft YaHei, SimHei, sans-serif" font-size="28" font-weight="bold" fill="#1A202C">
+        {{PAGE_TITLE}}
+    </text>
+
+    <!-- Decorative Separator -->
+    <rect x="160" y="15" width="2" height="30" fill="#C41E3A"/>
+
+    <!-- Logo (Top Right Corner) -->
+    <rect x="1100" y="10" width="160" height="40" fill="#F1F3F5" rx="4"/>
+    <text x="1180" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#495057">
+        POWERCHINA
+    </text>
+
+    <!-- Content Area Frame (Frame) -->
+    <rect x="40" y="80" width="1200" height="580" fill="#FFFFFF" stroke="#DEE2E6" stroke-width="1" rx="4"/>
+    
+    <!-- Corner Marks Decoration (Corner Marks) -->
+    <path d="M40,100 L40,80 L60,80" fill="none" stroke="#00418D" stroke-width="3"/>
+    <path d="M1240,100 L1240,80 L1220,80" fill="none" stroke="#00418D" stroke-width="3"/>
+    <path d="M40,640 L40,660 L60,660" fill="none" stroke="#00418D" stroke-width="3"/>
+    <path d="M1240,640 L1240,660 L1220,660" fill="none" stroke="#00418D" stroke-width="3"/>
+
+    <!-- Content Area Text -->
+    <text x="640" y="360" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#CED4DA">
+        {{CONTENT_AREA}}
+    </text>
+
+    <!-- Bottom Status Bar -->
+    <rect x="0" y="680" width="1280" height="40" fill="#F8F9FA"/>
+    <rect x="0" y="680" width="300" height="4" fill="#0066CC"/>
+    
+    <!-- Page Number -->
+    <text x="1240" y="705" text-anchor="end" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#495057">
+        {{PAGE_NUM}}
+    </text>
+
+    <!-- Source -->
+    <text x="40" y="705" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#ADB5BD">
+        Source：{{SOURCE}}
+    </text>
+
+</svg>

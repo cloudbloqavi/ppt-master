@@ -82,7 +82,7 @@ CONFIG = {
     "output_dir": "./projects",
     "timeout": 30,
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    # Specific content identifiers often found in Chinese CMS (Gov/News)
+    # Specific content identifiers often found in CMS (Government/News) sites
     "content_selectors": [
         {"class_": re.compile(r"tys-main-zt-show", re.I)},
         {"class_": re.compile(r"tys-main", re.I)},
@@ -123,7 +123,7 @@ def fetch_url(url: str) -> str:
     headers = {
         "User-Agent": CONFIG["user_agent"],
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+        "Accept-Language": "en-US,en;q=0.9"
     }
 
     try:
@@ -131,7 +131,7 @@ def fetch_url(url: str) -> str:
                              timeout=CONFIG["timeout"], verify=False)
         response.raise_for_status()
 
-        # Enhanced encoding detection (requests handles this well usually, but we force apparent_encoding for Chinese)
+        # Enhanced encoding detection (requests handles this well usually, but we force apparent_encoding for better compatibility)
         # curl_cffi exposes the same .apparent_encoding attribute
         if hasattr(response, "apparent_encoding") and response.apparent_encoding:
             response.encoding = response.apparent_encoding
@@ -145,8 +145,8 @@ def clean_title(title: str) -> str:
     """Remove common site suffixes from a title."""
     if not title:
         return ""
-    # Remove site name suffixes often found in Chinese titles
-    clean = re.sub(r"[-_|].*?(政府|门户|网站|委员会).*$", "", title)
+    # Remove site name suffixes often found in titles
+    clean = re.sub(r"[-_|].*?(Government|Portal|Website|Committee).*$", "", title)
     return clean.strip()
 
 
@@ -154,8 +154,8 @@ def sanitize_filename(name: str) -> str:
     """Sanitize a string for filesystem-safe filenames."""
     # Replace whitespace with underscore first
     clean = re.sub(r'\s+', '_', name)
-    # Remove all except Chinese, English, Numbers, Underscore
-    clean = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9_]', '', clean)
+    # Remove all except English, Numbers, Underscore
+    clean = re.sub(r'[^a-zA-Z0-9_]', '', clean)
     # Collapse repeating underscores
     clean = re.sub(r'_+', '_', clean)
     return clean[:80]  # Truncate
@@ -353,16 +353,21 @@ def extract_metadata(soup: BeautifulSoup, url: str) -> dict[str, str]:
         # Try matching date patterns in the text
         text_content = soup.get_text()
         date_patterns = [
-            r"发布[时日]间[：:]\s*(\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}[日]?)",
-            r"日期[：:]\s*(\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}[日]?)",
-            r"(\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}[日]?)\s*(?:发布|来源)",
-            r"时间[：:]\s*(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})"
+            # English-like date patterns (YYYY-MM-DD or YYYY/MM/DD)
+            r"Published\s*(?:Date|Time)?[\s:]*(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})",
+            r"Date[\s:]*(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})",
+            r"(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})\s*(?:Published|Source)",
+            r"Time[\s:]*(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})",
+            # Chinese date patterns (e.g., YYYY-MM-DD format)
+            r"(\d{4})\s*[\u5e74]\s*(\d{1,2})\s*[\u6708]\s*(\d{1,2})\s*[\u65e5]?"
         ]
         for pattern in date_patterns:
             match = re.search(pattern, text_content)
             if match:
-                date = match.group(1).replace(
-                    "年", "-").replace("月", "-").replace("日", "")
+                if len(match.groups()) == 3:  # Matched Chinese date pattern
+                    date = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
+                else:  # Matched English-like pattern
+                    date = match.group(1)
                 break
 
     if not date:
@@ -388,8 +393,8 @@ def extract_metadata(soup: BeautifulSoup, url: str) -> dict[str, str]:
     if not author:
         # Try common patterns
         source_patterns = [
-            r"来源[：:]\s*([^\s<]+)",
-            r"发布(?:单位|机构)[：:]\s*([^\s<]+)"
+            r"Source[\s:]*([^\s<]+)",
+            r"Published\s*(?:By|Unit|Organization)?[\s:]*([^\s<]+)"
         ]
         for pattern in source_patterns:
             match = re.search(pattern, soup.get_text())
@@ -425,14 +430,15 @@ def find_main_content(soup: BeautifulSoup) -> Tag | None:
             elements = soup.find_all(attrs=selector)
 
         for el in elements:
-            # Score based on text length and chinese character count
+            # Score based on text length and letter count
             text = el.get_text(strip=True)
             length = len(text)
             if length < 100:
                 continue
 
-            chinese_count = len(re.findall(r'[\u4e00-\u9fa5]', text))
-            score = length + (chinese_count * 2)
+            # Count English letters as a proxy for meaningful content
+            letter_count = len(re.findall(r'[a-zA-Z]', text))
+            score = length + (letter_count * 2)
 
             if score > max_score:
                 max_score = score
@@ -451,8 +457,8 @@ def find_main_content(soup: BeautifulSoup) -> Tag | None:
             text = div.get_text(strip=True)
             if len(text) > 200 and p_count >= 1:
                 # Recalculate deep score
-                chinese_count = len(re.findall(r'[\u4e00-\u9fa5]', text))
-                score = len(text) + (chinese_count * 2) + (p_count * 50)
+                letter_count = len(re.findall(r'[a-zA-Z]', text))
+                score = len(text) + (letter_count * 2) + (p_count * 50)
                 if score > max_score:
                     max_score = score
                     best_element = div

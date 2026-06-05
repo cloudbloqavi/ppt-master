@@ -14,7 +14,7 @@ This workflow edits the global brand library, not any specific `projects/<x>/`. 
 
 | User signal | Action |
 |---|---|
-| "set up brand" / "extract brand from this logo" / 建立品牌 / 做品牌规范 | Run this workflow |
+| "set up brand" / "extract brand from this logo" / set up brand / create brand guidelines | Run this workflow |
 | User provides a brand asset (logo / brand site URL / branded PPTX / brand PDF) and wants it locked across future projects | Run this workflow |
 | User mentions brand color or font once for a single deck only | Skip — handle inline via Strategist h.5 |
 | `templates/brands/<requested_id>/` already exists | Ask: update / replace / use a new id — never silently overwrite |
@@ -194,7 +194,7 @@ Emit the confirmation card:
 - Provenance: <fact / approx / user counts>
 
 How to use in a project:
-- Include the brand directory path in your initial Step 3 input — e.g. "做一个 Q4 总结 PPT, 用 skills/ppt-master/templates/brands/<brand_id>/ 这个品牌"
+- Include the brand directory path in your initial Step 3 input — e.g. "Create a Q4 summary PPT, using the brand at skills/ppt-master/templates/brands/<brand_id>/ "
 - Same explicit-path rule as layout templates: bare brand names never trigger
 - May be supplied together with a layout template path; Step 3 fuses both into a single `design_spec.md` (brand wins on identity tokens, layout wins on page structure) — see `SKILL.md` Step 3
 - To list available brands: open `templates/brands/brands_index.json`
@@ -219,8 +219,8 @@ Brand application happens in [`SKILL.md` Step 3](../SKILL.md) under the **same e
 
 ## Notes
 
-1. **Brand is identity, not layout** — colors / typography / logo / voice / icon style only. Page roster, canvas spec, and signature design elements belong to layout templates; do not duplicate them here.
-2. **Self-contained package** — all brand assets (logo, images, illustrations, icons) live inside `templates/brands/<brand_id>/`. Nothing leaks to workspace root or `projects/`.
-3. **No script dependency** — Step 2A reuses existing converters plus AI inline reading. A dedicated `brand_extract.py` is not introduced unless future user feedback demands batch processing or precise color picking from raster logos.
-4. **Multi-brand support** — `templates/brands/` accepts any number of brands; agency / freelancer / multi-client workflows are natural.
-5. **Precedence rule** — when a brand and a layout template both apply, Step 3 fuses them into one `design_spec.md`: brand wins on color / typography / logo / voice / icon style; layout wins on canvas / page roster / spacing / font-size hierarchy / signature visual elements. See `SKILL.md` Step 3 for the full precedence table.
+1.  **Brand is identity, not layout** — colors / typography / logo / voice / icon style only. Page roster, canvas spec, and signature design elements belong to layout templates; do not duplicate them here.
+2.  **Self-contained package** — all brand assets (logo, images, illustrations, icons) live inside `templates/brands/<brand_id>/`. Nothing leaks to workspace root or `projects/`.
+3.  **No script dependency** — Step 2A reuses existing converters plus AI inline reading. A dedicated `brand_extract.py` is not introduced unless future user feedback demands batch processing or precise color picking from raster logos.
+4.  **Multi-brand support** — `templates/brands/` accepts any number of brands; agency / freelancer / multi-client workflows are natural.
+5.  **Precedence rule** — when a brand and a layout template both apply, Step 3 fuses them into one `design_spec.md`: brand wins on color / typography / logo / voice / icon style; layout wins on canvas / page roster / spacing / font-size hierarchy / signature visual elements. See `SKILL.md` Step 3 for the full precedence table.

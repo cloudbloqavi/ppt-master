@@ -1,139 +1,139 @@
 # Chart SVG Style Guide
 
-> 本文档定义了 `templates/charts/` 下所有 SVG 图表模板的视觉规范。  
-> 新增或修改图表时 **必须** 遵循以下标准，确保全库视觉一致性。
+> This document defines the visual specifications for all SVG chart templates under `templates/charts/`.
+> When adding or modifying charts, the following standards **must** be adhered to to ensure visual consistency across the entire library.
 
-## 0. 上游规范引用
+## 0. Upstream Specification Reference
 
-本文档是 **图表模板专用** 的美学与实现规范。所有图表同时必须遵守项目级通用技术约束：
+This document is an aesthetic and implementation specification **dedicated to chart templates**. All charts must also comply with project-level general technical constraints:
 
-> **[`references/shared-standards.md`](../../references/shared-standards.md)** — SVG 禁用特性黑名单、PPT 兼容性替代、Canvas 格式、tspan 内联规则、分组规范、阴影/叠加技术、后处理管线
+> **[`references/shared-standards.md`](../../references/shared-standards.md)** — SVG disabled features blacklist, PPT compatibility alternatives, Canvas format, tspan inline rules, grouping specifications, shadow/overlay techniques, post-processing pipeline
 
-以下章节摘录了 shared-standards 中与图表模板最密切相关的条目。完整细节（如 marker 条件约束、clipPath 条件约束、弧线路径计算公式等）请查阅上游文档。
+The following sections excerpt the most relevant items from shared-standards for chart templates. For complete details (e.g., marker conditional constraints, clipPath conditional constraints, arc path calculation formulas, etc.), please refer to the upstream document.
 
 ---
 
-## 1. 色彩系统 (Tailwind CSS Palette)
+## 1. Color System (Tailwind CSS Palette)
 
-### 1.1 文本颜色
+### 1.1 Text Colors
 
-| 用途 | 色值 | Tailwind Token | 示例 |
+| Purpose | Color Value | Tailwind Token | Example |
 |------|------|----------------|------|
-| **主标题** | `#0F172A` | Slate 900 | 图表大标题 |
-| **数值标签** | `#0F172A` | Slate 900 | 柱顶数值、关键指标 |
-| **副标题** | `#64748B` | Slate 500 | 日期、单位说明 |
-| **坐标轴标签** | `#64748B` | Slate 500 | X/Y 轴刻度值 |
-| **轴标题 / 图例** | `#475569` | Slate 600 | "年薪（万元）"、图例文字 |
-| **数据来源** | `#94A3B8` | Slate 400 | 页面底部来源说明 |
-| **脚注 / 淡化提示** | `#CBD5E1` | Slate 300 | "各阶段可灵活调整" |
+| **Main Title** | `#0F172A` | Slate 900 | Chart Main Title |
+| **Value Label** | `#0F172A` | Slate 900 | Bar Top Value, Key Metrics |
+| **Subtitle** | `#64748B` | Slate 500 | Date, Unit Description |
+| **Axis Label** | `#64748B` | Slate 500 | X/Y Axis Tick Values |
+| **Axis Title / Legend** | `#475569` | Slate 600 | "Annual Salary (10k RMB)", Legend Text |
+| **Data Source** | `#94A3B8` | Slate 400 | Source Description at Page Bottom |
+| **Footnote / Faded Hint** | `#CBD5E1` | Slate 300 | "Adjustable at each stage" |
 
-### 1.2 主题色（数据系列）
+### 1.2 Theme Colors (Data Series)
 
-| 色名 | 主色 | 深色（渐变终点） | 用途 |
+| Color Name | Main Color | Dark Color (Gradient End) | Purpose |
 |------|------|------------------|------|
-| **Blue** | `#3B82F6` | `#2563EB` | 第 1 系列（默认首选） |
-| **Emerald** | `#10B981` | `#059669` | 第 2 系列 |
-| **Amber** | `#F59E0B` | `#D97706` | 第 3 系列 |
-| **Violet** | `#8B5CF6` | `#7C3AED` | 第 4 系列 |
-| **Rose** | `#FB7185` | `#E11D48` | 第 5 系列 / 警告 |
-| **Pink** | `#EC4899` | `#BE185D` | 对比组（如蝴蝶图女性） |
+| **Blue** | `#3B82F6` | `#2563EB` | 1st Series (Default Preferred) |
+| **Emerald** | `#10B981` | `#059669` | 2nd Series |
+| **Amber** | `#F59E0B` | `#D97706` | 3rd Series |
+| **Violet** | `#8B5CF6` | `#7C3AED` | 4th Series |
+| **Rose** | `#FB7185` | `#E11D48` | 5th Series / Warning |
+| **Pink** | `#EC4899` | `#BE185D` | Comparison Group (e.g., Butterfly Chart Female) |
 
-> 径向渐变（如气泡图）使用亮色变体：`#60A5FA`、`#34D399`、`#FBBF24`、`#A78BFA`、`#FB7185`
+> Radial gradients (e.g., bubble charts) use lighter variants: `#60A5FA`, `#34D399`, `#FBBF24`, `#A78BFA`, `#FB7185`
 
-### 1.3 语义色
+### 1.3 Semantic Colors
 
-| 用途 | 色值 | 说明 |
+| Purpose | Color Value | Description |
 |------|------|------|
-| 达标 / 正面 | `#10B981` | Emerald 500 |
-| 警告 / 中性 | `#F59E0B` | Amber 500 |
-| 未达标 / 负面 | `#EF4444` | Red 500 |
-| 异常值标注 | `#F43F5E` | Rose 500 |
+| Achieved / Positive | `#10B981` | Emerald 500 |
+| Warning / Neutral | `#F59E0B` | Amber 500 |
+| Not Achieved / Negative | `#EF4444` | Red 500 |
+| Outlier Annotation | `#F43F5E` | Rose 500 |
 
-### 1.4 UI 辅助色
+### 1.4 UI Auxiliary Colors
 
-| 用途 | 色值 | 说明 |
+| Purpose | Color Value | Description |
 |------|------|------|
-| **坐标轴线** | `#94A3B8` | Slate 400, stroke-width="2" |
-| **网格线** | `#E2E8F0` 或 `#E0E0E0` | stroke-dasharray="4,4" |
-| **中心分隔线** | `#CBD5E1` | 如象限十字线 |
-| **卡片背景** | `#F8FAFC` / `#F8F9FA` | Slate 50 |
-| **卡片描边** | `#E2E8F0` | Slate 200 |
-| **行分隔线** | `#F1F5F9` | Slate 100（极淡） |
-| **Tint 背景**（蓝） | `#EFF6FF` | Blue 50 |
-| **Tint 背景**（绿） | `#ECFDF5` | Emerald 50 |
-| **Tint 背景**（红） | `#FFF1F2` | Rose 50 |
-| **Tint 背景**（黄） | `#FFFBEB` | Amber 50 |
+| **Axis Line** | `#94A3B8` | Slate 400, stroke-width="2" |
+| **Grid Line** | `#E2E8F0` or `#E0E0E0` | stroke-dasharray="4,4" |
+| **Center Divider Line** | `#CBD5E1` | e.g., Quadrant Crosshairs |
+| **Card Background** | `#F8FAFC` / `#F8F9FA` | Slate 50 |
+| **Card Stroke** | `#E2E8F0` | Slate 200 |
+| **Row Divider Line** | `#F1F5F9` | Slate 100 (Very Light) |
+| **Tint Background** (Blue) | `#EFF6FF` | Blue 50 |
+| **Tint Background** (Green) | `#ECFDF5` | Emerald 50 |
+| **Tint Background** (Red) | `#FFF1F2` | Rose 50 |
+| **Tint Background** (Yellow) | `#FFFBEB` | Amber 50 |
 
 ---
 
-## 2. 排版规范
+## 2. Typography Guidelines
 
-### 2.1 字体栈
+### 2.1 Font Stack
 
 ```
 font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
 ```
 
-- 纯英文场景可省略 `'PingFang SC', 'Microsoft YaHei'`
-- **禁止** 使用 `@font-face`、外部字体、`<style>` 标签
+- For purely English scenarios, `'PingFang SC', 'Microsoft YaHei'` can be omitted.
+- **Forbidden** to use `@font-face`, external fonts, or `<style>` tags.
 
-### 2.2 字号层级
+### 2.2 Font Size Hierarchy
 
-| 层级 | 字号 | font-weight | 用途 |
+| Level | Font Size | font-weight | Purpose |
 |------|------|-------------|------|
-| H1 | `34px` | `bold` (700) | 图表主标题 |
-| H2 | `22px` | `600` | 区域标题（如"详细数据"） |
-| Body L | `18-20px` | `600` | 关键数值、百分比 |
-| Body M | `15-16px` | `600` | 数据标签、分类名 |
-| Body S | `14px` | 正常 | 副标题、图例、来源 |
-| Caption | `12-13px` | 正常 | 坐标轴刻度、注释 |
+| H1 | `34px` | `bold` (700) | Chart Main Title |
+| H2 | `22px` | `600` | Section Title (e.g., "Detailed Data") |
+| Body L | `18-20px` | `600` | Key Values, Percentages |
+| Body M | `15-16px` | `600` | Data Labels, Category Names |
+| Body S | `14px` | Normal | Subtitle, Legend, Source |
+| Caption | `12-13px` | Normal | Axis Ticks, Annotations |
 
-> **最小字号下限：12px**。所有文本不得小于 12px。
+> **Minimum Font Size: 12px**. All text must not be smaller than 12px.
 
-### 2.3 tspan 规范
+### 2.3 tspan Specification
 
-所有 `<text>` 元素的文本内容 **必须** 包裹在 `<tspan>` 中：
+The text content of all `<text>` elements **must** be wrapped in `<tspan>`:
 
 ```xml
-<!-- 正确 -->
+<!-- Correct -->
 <text x="60" y="80" font-size="34" fill="#0F172A">
-    <tspan>图表标题</tspan>
+    <tspan>Chart Title</tspan>
 </text>
 
-<!-- 错误 -->
-<text x="60" y="80" font-size="34" fill="#0F172A">图表标题</text>
+<!-- Incorrect -->
+<text x="60" y="80" font-size="34" fill="#0F172A">Chart Title</text>
 ```
 
-### 2.4 内联格式化规则（shared-standards SS4）
+### 2.4 Inline Formatting Rules (shared-standards SS4)
 
-**单逻辑行 = 单 `<text>`**。同一行内需要多色/多粗细时，用内联 `<tspan>` 实现，**不要**用多个并排 `<text>`：
+**Single logical line = single `<text>`**. When multiple colors/weights are needed within the same line, use inline `<tspan>`, **do not** use multiple side-by-side `<text>`:
 
 ```xml
-<!-- 正确：一个 text frame，三个 run -->
+<!-- Correct: One text frame, three runs -->
 <text x="100" y="200" font-size="24" fill="#333333">
-  实现<tspan fill="#3B82F6" font-weight="bold">10倍</tspan>效率提升
+  Achieve<tspan fill="#3B82F6" font-weight="bold">10x</tspan>efficiency improvement
 </text>
 
-<!-- 错误：三个独立 text frame，PPT 中无法作为一行编辑 -->
-<text x="100" y="200">实现</text>
-<text x="160" y="200" fill="#3B82F6">10倍</text>
-<text x="240" y="200">效率提升</text>
+<!-- Incorrect: Three independent text frames, cannot be edited as one line in PPT -->
+<text x="100" y="200">Achieve</text>
+<text x="160" y="200" fill="#3B82F6">10x</text>
+<text x="240" y="200">efficiency improvement</text>
 ```
 
-> 内联 tspan **不得** 携带 `x` / `y` / `dy`，否则后处理会将其拆分为独立 text frame。`dx` 可用于微调字距。
+> Inline tspan **must not** carry `x` / `y` / `dy`, otherwise post-processing will split it into independent text frames. `dx` can be used for fine-tuning letter spacing.
 
-### 2.5 数据高亮默认行为
+### 2.5 Data Highlight Default Behavior
 
-图表中的关键数据文本应默认高亮：
-- **数值结果** — 百分比、倍数、金额 → `<tspan fill="主题色" font-weight="bold">`
-- **对比项** — 增/减、达标/未达标 → 语义色（绿/红）
-- **不高亮** — 连接词、普通动词、结构性文字（轴标签、图例、页码）
+Key data text in charts should be highlighted by default:
+- **Numerical Results** — Percentages, multiples, amounts → `<tspan fill="theme color" font-weight="bold">`
+- **Comparison Items** — Increase/decrease, achieved/not achieved → Semantic color (green/red)
+- **Not Highlighted** — Conjunctions, common verbs, structural text (axis labels, legends, page numbers)
 
 ---
 
-## 3. 阴影滤镜
+## 3. Shadow Filter
 
-`<filter>` 本身是允许的、且是 PPT 阴影/发光的官方推荐路径（详见本节末尾的"禁用列表"说明）。本节统一阴影 primitive 写法——使用 `feFlood` 方案，**禁止** `<filter>` 内部使用 `<feComponentTransfer>`：
+`<filter>` itself is allowed and is the officially recommended path for PPT shadows/glows (see "Forbidden List" at the end of this section for details). This section unifies the shadow primitive syntax—use the `feFlood` scheme, **forbid** the use of `<feComponentTransfer>` inside `<filter>`:
 
 ```xml
 <filter id="chartShadow" x="-15%" y="-15%" width="130%" height="130%">
@@ -148,53 +148,53 @@ font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Micr
 </filter>
 ```
 
-### 参数参考
+### Parameter Reference
 
-| 场景 | stdDeviation | dy | flood-opacity |
+| Scenario | stdDeviation | dy | flood-opacity |
 |------|-------------|-----|---------------|
-| 重型元素（箭头、卡片） | 4-6 | 2-4 | 0.12-0.15 |
-| 中型元素（柱子、箱体） | 2-3 | 1-2 | 0.10-0.15 |
-| 轻型元素（底部卡片） | 4-6 | 2-4 | 0.06-0.08 |
+| Heavy Elements (arrows, cards) | 4-6 | 2-4 | 0.12-0.15 |
+| Medium Elements (bars, boxes) | 2-3 | 1-2 | 0.10-0.15 |
+| Light Elements (bottom cards) | 4-6 | 2-4 | 0.06-0.08 |
 
-### 禁用列表
+### Forbidden List
 
-- `flood-color="#000000"` → 必须用 `#0F172A`
-- `<feComponentTransfer>` + `<feFuncA slope=...>` → 用 `<feFlood flood-color flood-opacity>` 替代
-- `flood-opacity > 0.20` → 阴影过重，最大 0.15-0.20
+- `flood-color="#000000"` → Must use `#0F172A`
+- `<feComponentTransfer>` + `<feFuncA slope=...>` → Use `<feFlood flood-color flood-opacity>` instead
+- `flood-opacity > 0.20` → Shadow too heavy, max 0.15-0.20
 
-> **被禁的是 sub-element，不是 `<filter>` 本身。** `<filter>` 是 PPT Master 允许的、官方推荐的阴影/发光路径（见 [`shared-standards.md`](../../references/shared-standards.md) §1 黑名单不含 filter、§6 把 filter shadow 列为 drop-shadow 的官方实现），转换器 [`svg_to_pptx/drawingml_styles.py`](../../scripts/svg_to_pptx/drawingml_styles.py) 也主动把 `feGaussianBlur` + `feOffset` + `feFlood` + `feComposite` + `feMerge`（以及 `feDropShadow` 简写）映射成 DrawingML `<a:outerShdw>`。
+> **What is forbidden is the sub-element, not `<filter>` itself.** `<filter>` is allowed by PPT Master and is the officially recommended path for shadows/glows (see [`shared-standards.md`](../../references/shared-standards.md) §1 blacklist does not include filter, §6 lists filter shadow as the official implementation of drop-shadow). The converter [`svg_to_pptx/drawingml_styles.py`](../../scripts/svg_to_pptx/drawingml_styles.py) also actively maps `feGaussianBlur` + `feOffset` + `feFlood` + `feComposite` + `feMerge` (and `feDropShadow` shorthand) to DrawingML `<a:outerShdw>`.
 >
-> 单独禁 `feComponentTransfer/feFuncA(slope)` 的原因：**它物理上只能调透明度、无法携带颜色**。转换器读到 `feFuncA slope` 时只把它当作 alpha，颜色字段保持默认 `'000000'`——SVG 端看起来阴影颜色正常（因为 SourceAlpha 本身是黑），但导出到 PPTX 后阴影颜色会被定死成纯黑 `#000000`，与同页其他用 `feFlood flood-color="#0F172A"` 的卡片产生肉眼可见的冷暖色差。
+> The reason for specifically forbidding `feComponentTransfer/feFuncA(slope)`: **it can physically only adjust transparency, not carry color**. When the converter reads `feFuncA slope`, it treats it only as alpha, and the color field remains the default `'000000'`—the shadow color appears normal on the SVG side (because SourceAlpha itself is black), but after exporting to PPTX, the shadow color will be fixed to pure black `#000000`, creating a visually noticeable warm/cool color difference compared to other cards on the same page using `feFlood flood-color="#0F172A"`.
 >
-> 简言之：**用 filter 没问题，但 primitive 必须能把"颜色"显式表达出来；只能表达"透明度"的 primitive 是被禁的。**
+> In short: **Using filters is fine, but the primitive must be able to explicitly express "color"; primitives that can only express "transparency" are forbidden.**
 
-### 阴影使用原则（shared-standards SS6）
+### Shadow Usage Principles (shared-standards SS6)
 
-> **阴影是美学成分，不是默认处理。** 克制而非丰富才能产生"经过设计"的感觉。 "阴影被感知而非被看见" 是高端美学标准。
+> **Shadows are an aesthetic component, not a default treatment.** Restraint rather than abundance creates a "designed" feel. "Shadows are perceived, not seen" is a high-end aesthetic standard.
 
-**应加阴影**：浮在照片/彩色面板上方的卡片、唯一的主 CTA、叠加层（tooltip、callout）
+**Should add shadows**: Cards floating above photos/colored panels, the sole main CTA, overlays (tooltip, callout)
 
-**不应加阴影**：背景面板/分隔条、网格中平等的同级卡片、已有描边/渐变的容器、正文段落容器、装饰线/图标、深色背景上（黑色阴影不可见）
+**Should not add shadows**: Background panels/dividers, peer cards in a grid, containers with existing strokes/gradients, body text paragraph containers, decorative lines/icons, on dark backgrounds (black shadows are invisible)
 
-**每页预算**：最多 2-3 个带阴影元素。第 4 个需要阴影时，先移除现有某个的阴影。
+**Per-page budget**: A maximum of 2-3 elements with shadows. If a 4th shadow is needed, first remove an existing one.
 
-**统一光源**：同页所有 `feOffset` 的 `dx`/`dy` 方向必须一致（默认 `dx=0, dy=正值`，光从上方来）。
+**Unified light source**: The `dx`/`dy` direction of all `feOffset` on the same page must be consistent (default `dx=0, dy=positive value`, light comes from above).
 
-**两级高度上限**：
+**Two-level height limit**:
 
-| 层级 | 场景 | dy | stdDeviation | flood-opacity |
+| Level | Scenario | dy | stdDeviation | flood-opacity |
 |------|------|----|--------------|---------------|
-| 地面（无阴影） | 背景、同级网格卡片、分隔线、正文容器 | — | — | — |
-| 静止 | 照片/面板上的卡片、次级 callout | 2-4 | 4-8 | 0.06-0.10 |
-| 抬升 | 主 CTA、焦点/推荐卡片、覆盖层 | 6-10 | 10-16 | 0.12-0.20 |
+| Ground (no shadow) | Background, peer grid cards, dividers, body text containers | — | — | — |
+| Static | Cards on photos/panels, secondary callouts | 2-4 | 4-8 | 0.06-0.10 |
+| Elevated | Main CTA, focus/recommended cards, overlays | 6-10 | 10-16 | 0.12-0.20 |
 
-**不要堆叠**：阴影 + 描边 + 圆角 + 渐变填充同时出现 = 模板感。容器的"看我"预算很小，选其一即可。
+**Do not stack**: Shadow + stroke + rounded corners + gradient fill all at once = template feel. A container's "look at me" budget is small, choose one.
 
 ---
 
-## 4. 渐变规范
+## 4. Gradient Specification
 
-### 4.1 线性渐变（柱状/条形图）
+### 4.1 Linear Gradient (Bar/Column Charts)
 
 ```xml
 <linearGradient id="barGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -203,10 +203,10 @@ font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Micr
 </linearGradient>
 ```
 
-- 方向：从亮到深（顶到底 或 左到右）
-- 每个渐变 ID 应语义化：`barGrad1`、`leftGrad`、`actualBarBlue`
+- Direction: From light to dark (top to bottom or left to right)
+- Each gradient ID should be semantic: `barGrad1`, `leftGrad`, `actualBarBlue`
 
-### 4.2 径向渐变（气泡图）
+### 4.2 Radial Gradient (Bubble Charts)
 
 ```xml
 <radialGradient id="bubbleGrad1" cx="30%" cy="30%">
@@ -215,235 +215,239 @@ font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Micr
 </radialGradient>
 ```
 
-- 高光偏左上方 (`cx="30%" cy="30%"`)
-- 边缘 opacity 降低至 0.7，制造通透感
+- Highlight biased towards top-left (`cx="30%" cy="30%"`)
+- Edge opacity reduced to 0.7 to create a sense of transparency
 
 ---
 
-## 5. 结构规范
+## 5. Structure Specification
 
-### 5.1 层级分组（shared-standards SS4 Grouping）
+### 5.1 Hierarchical Grouping (shared-standards SS4 Grouping)
 
-使用 `<g id="...">` 进行语义分组，便于 PPT 中逐个操作/动画：
+Use `<g id="...">` for semantic grouping, facilitating individual operations/animations in PPT:
 
 ```xml
-<g id="chartArea">        <!-- 图表主体 -->
-    <g id="bar-1">...</g>  <!-- 每个数据元素独立分组 -->
+<g id="chartArea">        <!-- Chart Body -->
+    <g id="bar-1">...</g>  <!-- Each data element grouped independently -->
     <g id="bar-2">...</g>
 </g>
-<g id="legend">            <!-- 图例区域 -->
+<g id="legend">            <!-- Legend Area -->
     <g id="legend-high">...</g>
 </g>
-<g id="detailList">        <!-- 详情面板 -->
+<g id="detailList">        <!-- Detail Panel -->
     <g id="list-items">
         <g id="item-1">...</g>
     </g>
 </g>
 ```
 
-**分组单元参考**（来自 shared-standards）：
+**Grouping Unit Reference** (from shared-standards):
 
-| 分组单元 | 包含内容 |
+| Grouping Unit | Contents |
 |---------|---------|
-| 卡片/面板 | 背景 rect + 阴影（如适用）+ 图标 + 标题 + 正文 |
-| 流程步骤 | 编号圆 + 图标 + 标签 + 描述 |
-| 列表项 | 圆点/编号 + 图标 + 标题 + 描述 |
-| 图标-文字组合 | 图标元素 + 相邻标签 |
-| 页头 | 标题 + 副标题 + 装饰 |
-| 装饰集群 | 相关装饰形状（环、球、点） |
+| Card/Panel | Background rect + shadow (if applicable) + icon + title + body text |
+| Process Step | Numbered circle + icon + label + description |
+| List Item | Bullet/Number + icon + title + description |
+| Icon-Text Combination | Icon element + adjacent label |
+| Page Header | Title + subtitle + decoration |
+| Decorative Cluster | Related decorative shapes (rings, spheres, dots) |
 
-**命名约定**：使用描述性 `id`（如 `card-1`、`step-discover`、`header`、`footer`）。
+**Naming Convention**: Use descriptive `id`s (e.g., `card-1`, `step-discover`, `header`, `footer`).
 
-> 只有 `<g opacity="...">` 被禁止（见 SS2）。纯结构 `<g>` 是必需的。
+> Only `<g opacity="...">` is forbidden (see SS2). Pure structural `<g>` is required.
 
 ### 5.2 viewBox
 
-固定为 `0 0 1280 720`（PPT 16:9），不可修改。
+Fixed at `0 0 1280 720` (PPT 16:9), cannot be modified.
 
-### 5.3 背景
+### 5.3 Background
 
-首行始终为白色全屏背景：
+The first line is always a white full-screen background:
 ```xml
 <rect width="1280" height="720" fill="#FFFFFF"/>
 ```
 
-### 5.4 数据来源
+### 5.4 Data Source
 
-位于页面底部，固定格式：
+Located at the bottom of the page, fixed format:
 ```xml
 <text x="60" y="695" font-family="..." font-size="14" fill="#94A3B8">
-    <tspan>数据来源: XXX</tspan>
+    <tspan>Data Source: XXX</tspan>
 </text>
 ```
 
 ---
 
-## 6. SVG 禁用特性与兼容性（shared-standards SS1-2）
+## 6. SVG Forbidden Features and Compatibility (shared-standards SS1-2)
 
-### 6.1 绝对禁止
+### 6.1 Absolutely Forbidden
 
-| 禁用特性 | 替代方案 |
-|---------|---------| 
-| HTML 命名实体（`&nbsp;` `&mdash;` `&copy;` `&ndash;` `&reg;` `&hellip;` `&bull;` …） | 直接写原生 Unicode 字符（`—` `–` `©` `®` `→` NBSP …） |
-| 文本/属性值中裸写 `& < > " '` | 必须写成 XML 实体 `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` |
-| `<style>` / `class` | 内联属性（`id` 在 `<defs>` 内合法） |
+| Forbidden Feature | Alternative |
+|---------|---------|
+| HTML Named Entities (`&nbsp;` `&mdash;` `&copy;` `&ndash;` `&reg;` `&hellip;` `&bull;` …) | Directly write native Unicode characters (`—` `–` `©` `®` `→` NBSP …) |
+| Bare `& < > " '` in text/attribute values | Must be written as XML entities `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` |
+| `<style>` / `class` | Inline attributes (`id` is valid within `<defs>`) |
 | `<foreignObject>` | `<text>` + `<tspan>` |
-| `mask` | 叠加遮罩矩形 / gradient overlay |
-| `<symbol>` + `<use>` | 直接写出完整元素 |
-| `textPath` | 手动排列 `<text>` |
-| `@font-face` | 系统字体栈 |
-| `<animate*>` / `<set>` | 无（PPT 侧处理动画） |
-| `<script>` / event 属性 | 无 |
-| `<iframe>` | 无 |
+| `mask` | Overlay mask rectangle / gradient overlay |
+| `<symbol>` + `<use>` | Write out the full element directly |
+| `textPath` | Manually arrange `<text>` |
+| `@font-face` | System font stack |
+| `<animate*>` / `<set>` | None (PPT handles animation) |
+| `<script>` / event attributes | None |
+| `<iframe>` | None |
 
-### 6.2 PPT 兼容性替代
+### 6.2 PPT Compatibility Alternatives
 
-| 禁止语法 | 正确替代 |
+| Forbidden Syntax | Correct Alternative |
 |---------|----------|
 | `fill="rgba(255,255,255,0.1)"` | `fill="#FFFFFF" fill-opacity="0.1"` |
-| `<g opacity="0.2">...</g>` | 在每个子元素上单独设置 `fill-opacity` / `stroke-opacity` |
-| `<image opacity="0.3"/>` | 在 image 后叠加 `<rect fill="背景色" opacity="0.7"/>` |
+| `<g opacity="0.2">...</g>` | Set `fill-opacity` / `stroke-opacity` individually on each child element |
+| `<image opacity="0.3"/>` | Overlay `<rect fill="background color" opacity="0.7"/>` after the image |
 
-### 6.3 条件允许
+### 6.3 Conditionally Allowed
 
-| 特性 | 条件 | 转换结果 |
+| Feature | Condition | Conversion Result |
 |------|------|----------|
-| `marker-start` / `marker-end` | `<marker>` 在 `<defs>` 中，`orient="auto"`，形状为三角/菱形/圆 | DrawingML `<a:headEnd>` / `<a:tailEnd>` |
-| `clipPath` on `<image>` | `<clipPath>` 在 `<defs>` 中，单子元素，**仅用于 image** | DrawingML `<a:prstGeom>` / `<a:custGeom>` |
-| `stroke-dasharray` | 使用预设值 `4,4` / `2,2` / `8,4` / `8,4,2,4` | PPTX `<a:prstDash>` |
-| `text-decoration` | `underline` / `line-through` | PPTX 原生文本格式 |
-| `transform="rotate(...)"` | 所有元素类型均支持 | PPTX `<a:xfrm rot="...">` |
+| `marker-start` / `marker-end` | `<marker>` in `<defs>`, `orient="auto"`, shape is triangle/diamond/circle | DrawingML `<a:headEnd>` / `<a:tailEnd>` |
+| `clipPath` on `<image>` | `<clipPath>` in `<defs>`, single child element, **only for images** | DrawingML `<a:prstGeom>` / `<a:custGeom>` |
+| `stroke-dasharray` | Use preset values `4,4` / `2,2` / `8,4` / `8,4,2,4` | PPTX `<a:prstDash>` |
+| `text-decoration` | `underline` / `line-through` | PPTX native text formatting |
+| `transform="rotate(...)"` | Supported by all element types | PPTX `<a:xfrm rot="...">` |
 
-> 完整条件约束见 [`shared-standards.md`](../../references/shared-standards.md) SS1.1（marker 约束）和 SS1.2（clipPath 约束）。
+> For complete conditional constraints, see [`shared-standards.md`](../../references/shared-standards.md) SS1.1 (marker constraints) and SS1.2 (clipPath constraints).
 
-### 6.4 虚线预设对照
+### 6.4 Dashed Line Preset Comparison
 
-| SVG 值 | PPTX 预设 | 适用场景 |
+| SVG Value | PPTX Preset | Applicable Scenario |
 |--------|-----------|---------|
-| `4,4` | Dash | 通用虚线、分隔线 |
-| `2,2` | Dot (sysDot) | 占位轮廓、细边框 |
-| `8,4` | Long dash | 时间线连接、流程箭头 |
-| `8,4,2,4` | Long dash-dot | 技术图纸、尺寸线 |
+| `4,4` | Dash | General dashed line, divider line |
+| `2,2` | Dot (sysDot) | Placeholder outline, thin border |
+| `8,4` | Long dash | Timeline connection, process arrow |
+| `8,4,2,4` | Long dash-dot | Technical drawings, dimension lines |
 
 ---
 
-## 7. 旧色映射速查表
+## 7. Old Color Mapping Quick Reference
 
-在维护旧模板时，使用以下映射快速替换：
+When maintaining old templates, use the following mapping for quick replacement:
 
-| 旧色 (Material/Flat) | → | 新色 (Tailwind) | 角色 |
+| Old Color (Material/Flat) | → | New Color (Tailwind) | Role |
 |----------------------|---|-----------------|------|
-| `#2C3E50` | → | `#0F172A` | 主文本 |
-| `#7F8C8D` | → | `#64748B` | 副文本 |
-| `#5D6D7E` | → | `#475569` | 图例文本 |
-| `#95A5A6` | → | `#94A3B8` | 数据来源 |
-| `#BDC3C7` | → | `#CBD5E1` | 淡化元素 |
-| `#2196F3` / `#1976D2` | → | `#3B82F6` / `#2563EB` | 蓝色系列 |
-| `#4CAF50` / `#388E3C` | → | `#10B981` / `#059669` | 绿色系列 |
-| `#FF9800` / `#F57C00` | → | `#F59E0B` / `#D97706` | 橙色系列 |
-| `#E91E63` | → | `#F43F5E` | 异常值 |
-| `#000000` (shadow) | → | `#0F172A` | 阴影底色 |
+| `#2C3E50` | → | `#0F172A` | Main Text |
+| `#7F8C8D` | → | `#64748B` | Secondary Text |
+| `#5D6D7E` | → | `#475569` | Legend Text |
+| `#95A5A6` | → | `#94A3B8` | Data Source |
+| `#BDC3C7` | → | `#CBD5E1` | Faded Elements |
+| `#2196F3` / `#1976D2` | → | `#3B82F6` / `#2563EB` | Blue Series |
+| `#4CAF50` / `#388E3C` | → | `#10B981` / `#059669` | Green Series |
+| `#FF9800` / `#F57C00` | → | `#F59E0B` / `#D97706` | Orange Series |
+| `#E91E63` | → | `#F43F5E` | Outlier |
+| `#000000` (shadow) | → | `#0F172A` | Shadow Base Color |
 
 ---
 
-## 8. 占位内容规范 (Placeholder Content Strategy)
+## 8. Placeholder Content Strategy
 
-既然这些 SVG 文件是供 AI 后续调用的“模板”，它们的核心价值在于展示 **图形结构、排版约束与视觉空间**，而不是传递真实的业务数据。因此，写入模板的文本内容应遵循以下“占位原则”：
+Since these SVG files are "templates" for subsequent AI calls, their core value lies in demonstrating **graphic structure, layout constraints, and visual space**, rather than conveying real business data. Therefore, the text content written into the templates should follow the following "placeholder principles":
 
-### 8.0 全英文原则 (English-Only Rule)
-**强制要求**：所有图表模板中的占位文本（包括标题、副标题、坐标轴、图例、数据节点、详情描述及底部来源说明）**必须全部使用英文编写**。
-- **目的**：确保后续自动化管线中的 LLM 能够更精准地进行语义理解和结构化内容映射，同时英文单词的天然长度特征更易于在模板中展示排版时的换行逻辑与空间边界。
+### 8.0 English-Only Rule
 
-### 8.1 结构边界演示
-- **展示最大宽度/换行逻辑**：刻意使用典型长度的字符串（如两到三个词的短语、多行 `tspan`）来明确展示文本框的边界。这样能确保 AI 填入真实文本时有直观的参考，防止溢出。
-- **展示数据格式**：使用能体现完整格式特征的占位数值（如 `$1,234.5M`、`98.5%`）而不仅是简单的 `10`，以验证符号和字符宽度是否适配。
+**Mandatory Requirement**: All placeholder text in chart templates (including titles, subtitles, axes, legends, data nodes, detailed descriptions, and bottom source descriptions) **must be written entirely in English**.
+- **Purpose**: To ensure that the LLM in the subsequent automated pipeline can perform semantic understanding and structured content mapping more accurately, and at the same time, the natural length characteristics of English words make it easier to demonstrate line-breaking logic and spatial boundaries in the template during layout.
 
-### 8.2 通用性与中立性
-- 使用通用、专业的商业占位符，避免过于垂直或具象的特定业务数据（除非该模板本身具有强烈的行业属性）。
-- **推荐做法**：使用 `Category A`、`Q1 Revenue`、`Strategic Objective`、`Phase 01`。
-- **避免做法**：使用具体的长篇现实数据（如“某某品牌2023年特种设备销量分析”）。
+### 8.1 Structural Boundary Demonstration
 
-### 8.3 视觉平衡
-- 占位文本应当在视觉上保持图表的平衡性（例如蝴蝶图左右文本长度应大致相等，列表文本应长短错落有致），以便让人一眼看清图表的布局设计意图。
+- **Show maximum width/line-breaking logic**: Deliberately use strings of typical length (e.g., two or three-word phrases, multi-line `tspan`) to clearly demonstrate the boundaries of text boxes. This ensures that AI has an intuitive reference when filling in real text, preventing overflow.
+- **Show data format**: Use placeholder numerical values that reflect complete format characteristics (e.g., `$1,234.5M`, `98.5%`) rather than just simple `10`, to verify whether symbols and character widths are adapted.
+
+### 8.2 Generality and Neutrality
+
+- Use generic, professional business placeholders, avoiding overly vertical or concrete specific business data (unless the template itself has strong industry attributes).
+- **Recommended practice**: Use `Category A`, `Q1 Revenue`, `Strategic Objective`, `Phase 01`.
+- **Avoid practice**: Using specific, lengthy real-world data (e.g., "Analysis of a certain brand's special equipment sales in 2023").
+
+### 8.3 Visual Balance
+
+- Placeholder text should visually maintain the balance of the chart (e.g., the left and right text lengths of a butterfly chart should be roughly equal, and list text should vary in length), so that the layout design intent of the chart can be seen at a glance.
 
 ---
 
-## 9. 注册到 charts_index.json
+## 9. Register to charts_index.json
 
-新增 SVG 模板后，**必须** 在 [`charts_index.json`](./charts_index.json) 中登记，否则 Strategist 选型时不会发现它。
+After adding a new SVG template, it **must** be registered in [`charts_index.json`](./charts_index.json), otherwise Strategist will not discover it during selection.
 
-### 9.1 字段规范
+### 9.1 Field Specification
 
 ```json
 "<key>": {
-  "summary": "Pick for <内容形态 + 规模>. Skip if <反例 → 替代模板>."
+  "summary": "Pick for <content form + scale>. Skip if <counter-example → alternative template>."
 }
 ```
 
-- **`key`** = SVG 文件名去掉 `.svg`，下划线小写（如 `bullet_chart`）
-- **`summary`** 是**选型句**，不是描述句。语法见 `meta.summaryGrammar`：先说什么时候选它，再用 `Skip if ... (use <other_key>)` 指向最容易混淆的兄弟模板
-- **`meta.total`** 同步 +1
+- **`key`** = SVG filename without `.svg`, lowercase with underscores (e.g., `bullet_chart`)
+- **`summary`** is a **selection sentence**, not a descriptive sentence. See `meta.summaryGrammar` for syntax: first state when to pick it, then use `Skip if ... (use <other_key>)` to point to the most easily confused sibling template.
+- **`meta.total`** increments by +1 synchronously.
 
-> **不需要** `label` / `categories` / `quickLookup` / `keywords` —— 这些都已经移除。Strategist 全量读取 summary 列表后语义匹配，不依赖任何预计算索引。**注意**：summary 是英文，但 source 文档常含中文/行业术语（"中台"、"架构图"、"管道"），Strategist 自己负责语义翻译再匹配。如果一个模板的命中强依赖某个中文短语，把它的英文等价物写进 summary 的 Pick 子句里。
+> **No need for** `label` / `categories` / `quickLookup` / `keywords` — these have been removed. Strategist reads the entire summary list and performs semantic matching, without relying on any pre-calculated index. **Note**: The summary is in English, but source documents often contain Chinese/industry terms ("Middle Platform", "Architecture Diagram", "Pipeline"). Strategist is responsible for semantic translation and matching. If a template's hit strongly depends on a certain Chinese phrase, write its English equivalent into the summary's Pick clause.
 
-### 9.2 反例
+### 9.2 Counter-examples
 
-❌ 只写"是什么"：`"summary": "Bidirectional comparison chart for two datasets"`
-✅ 写"何时选"：`"summary": "Pick for two mirrored datasets sharing a common axis (age pyramid, A/B). Skip for >2 sides (use grouped_bar_chart)."`
+❌ Only write "what it is": `"summary": "Bidirectional comparison chart for two datasets"`
+✅ Write "when to pick": `"summary": "Pick for two mirrored datasets sharing a common axis (age pyramid, A/B). Skip for >2 sides (use grouped_bar_chart)."`
 
-❌ summary 过长（>400 字符）—— 选型时反而难抓重点，目标在 150-300 字符。
+❌ Summary too long (>400 characters) — makes it harder to grasp the main point during selection, target is 150-300 characters.
 
-> **Why not stricter**：单一结构模板常需覆盖多个商业框架/场景（如 `quadrant_text_bullets` 覆盖 SWOT + Ansoff，`top_down_tree` 覆盖 org + OKR），summary 需要列出关键词锚点（"principles, key takeaways, action items" 这种）才能让 Strategist 语义命中"非数字结构页"，所以 100-180 字符的旧基线在结构-派命名后已经太紧。
+> **Why not stricter**: A single structural template often needs to cover multiple business frameworks/scenarios (e.g., `quadrant_text_bullets` covers SWOT + Ansoff, `top_down_tree` covers org + OKR). The summary needs to list keyword anchors (like "principles, key takeaways, action items") to allow Strategist to semantically hit "non-numeric structural pages", so the old baseline of 100-180 characters is already too tight after structural-based naming.
 
 ---
 
-## 10. 检查清单
+## 10. Checklist
 
-新增或修改图表后，逐项检查：
+After adding or modifying a chart, check each item:
 
-### 基础校验
-- [ ] `xmllint --noout` 通过
-- [ ] viewBox 为 `0 0 1280 720`
-- [ ] 首行为白色背景 `<rect width="1280" height="720" fill="#FFFFFF"/>`
+### Basic Validation
+- [ ] `xmllint --noout` passes
+- [ ] viewBox is `0 0 1280 720`
+- [ ] First line is white background `<rect width="1280" height="720" fill="#FFFFFF"/>`
 
-### 色彩
-- [ ] 无旧色残留（`grep` 验证，见下方命令）
-- [ ] 阴影 `flood-color` 为 `#0F172A`，opacity 小于等于 0.20
-- [ ] 数据来源用 `#94A3B8`
+### Colors
+- [ ] No old color residue (`grep` verification, see command below)
+- [ ] Shadow `flood-color` is `#0F172A`, opacity less than or equal to 0.20
+- [ ] Data source uses `#94A3B8`
 
-### 排版
-- [ ] 无 `font-size < 12` 的文本
-- [ ] 所有 `<text>` 内容包裹 `<tspan>`
-- [ ] 同一行多格式用内联 `<tspan>`，**非**多个并排 `<text>`
-- [ ] 内联 `<tspan>` 不携带 `x` / `y` / `dy`
-- [ ] 标题 34px、副标题 18px、来源 14px
+### Typography
+- [ ] No text with `font-size < 12`
+- [ ] All `<text>` content wrapped in `<tspan>`
+- [ ] Multiple formats on the same line use inline `<tspan>`, **not** multiple side-by-side `<text>`
+- [ ] Inline `<tspan>` does not carry `x` / `y` / `dy`
+- [ ] Title 34px, subtitle 18px, source 14px
 
-### 结构
-- [ ] 主要元素有语义化 `<g id="...">`
-- [ ] 无 `<style>`、`class`、`<foreignObject>`、`mask`、`rgba()`
-- [ ] `<g>` 标签无 `opacity` 属性
-- [ ] 文本字符为原生 Unicode（`—` `©` `→` NBSP 等），无 HTML 命名实体（`&nbsp;` `&mdash;` `&copy;` 等）；裸 `& < >` 已转义为 `&amp; &lt; &gt;`
+### Structure
+- [ ] Main elements have semantic `<g id="...">`
+- [ ] No `<style>`, `class`, `<foreignObject>`, `mask`, `rgba()`
+- [ ] `<g>` tags have no `opacity` attribute
+- [ ] Text characters are native Unicode (`—` `©` `→` NBSP, etc.), no HTML named entities (`&nbsp;` `&mdash;` `&copy;`, etc.); bare `& < >` are escaped as `&amp; &lt; &gt;`
 
-### 阴影
-- [ ] 使用 `feFlood` 方案（非 `feComponentTransfer`）
-- [ ] 同页阴影 `dx`/`dy` 方向一致
-- [ ] 每页带阴影元素不超过 3 个
+### Shadows
+- [ ] Uses `feFlood` scheme (not `feComponentTransfer`)
+- [ ] `dx`/`dy` direction of shadows on the same page is consistent
+- [ ] No more than 3 shadowed elements per page
 
-### 注册（仅新增模板时）
-- [ ] `charts_index.json` 的 `charts.<key>` 已登记 `summary` 字段
-- [ ] `summary` 写成选型句（`Pick for ... Skip if ... (use <other>)`），不是描述句
-- [ ] `summary` 长度控制在 150-300 字符（>400 字符要重写）；如果模板覆盖多个商业框架/场景，可放宽到 350 字符以塞下关键词锚点
-- [ ] `meta.total` 同步 +1
+### Registration (for new templates only)
+- [ ] `charts.<key>` in `charts_index.json` has `summary` field registered
+- [ ] `summary` is written as a selection sentence (`Pick for ... Skip if ... (use <other>)`), not a descriptive sentence
+- [ ] `summary` length controlled to 150-300 characters (rewrite if >400 characters); if the template covers multiple business frameworks/scenarios, it can be relaxed to 350 characters to fit keyword anchors
+- [ ] `meta.total` increments by +1 synchronously
 
-### 坐标校准标记（calculator-supported 图表必填）
-- [ ] 矩形坐标系图表（bar / horizontal_bar / grouped_bar / stacked_bar / line / area / stacked_area / scatter / waterfall / pareto / butterfly）包含 `<!-- chart-plot-area: x_min,y_min,x_max,y_max -->` 标记
-- [ ] Pie / donut / radar 图表包含 `<!-- chart-plot-area: <type> | center: cx,cy | radius: r -->` 标记
-- [ ] 标记位于 `<g id="chartArea">` 内、坐标轴之后、数据元素之前
-- [ ] 坐标值与轴线的实际 SVG 坐标一致
+### Coordinate Calibration Markers (mandatory for calculator-supported charts)
+- [ ] Rectangular coordinate charts (bar / horizontal_bar / grouped_bar / stacked_bar / line / area / stacked_area / scatter / waterfall / pareto / butterfly) include `<!-- chart-plot-area: x_min,y_min,x_max,y_max -->` marker
+- [ ] Pie / donut / radar charts include `<!-- chart-plot-area: <type> | center: cx,cy | radius: r -->` marker
+- [ ] Marker is located within `<g id="chartArea">`, after the axes, before data elements
+- [ ] Coordinate values are consistent with the actual SVG coordinates of the axes
 
-### 验证命令
+### Verification Commands
 ```bash
-# 一键校验
+# One-click verification
 f="your_chart.svg"
 xmllint --noout "skills/ppt-master/templates/charts/$f" && echo "XML OK" || echo "XML FAIL"
 echo "Old colors:" && grep -c '#2C3E50\|#7F8C8D\|#95A5A6\|#5D6D7E\|#000000' "skills/ppt-master/templates/charts/$f"
@@ -452,92 +456,92 @@ echo "Small fonts:" && grep -c 'font-size="[0-9]"' "skills/ppt-master/templates/
 
 ---
 
-## 11. 卡片容器图式 (Card Container Patterns)
+## 11. Card Container Patterns
 
-容器卡是 PPT Master 中复用率最高的视觉单元（KPI 卡、分区卡、信息卡）。下面三种图式是经过验证、与 PPTX 往返兼容的"参考实现"，新增模板优先沿用，不要发明等价但实现脏的替代。
+Container cards are the most frequently reused visual units in PPT Master (KPI cards, section cards, info cards). The following three patterns are verified "reference implementations" compatible with PPTX round-tripping. New templates should prioritize adopting them, rather than inventing equivalent but poorly implemented alternatives.
 
-### 11.1 半圆角分区头 (Half-Rounded Section Tab)
+### 11.1 Half-Rounded Section Tab
 
-**用途**：给卡片或区块加一个有色"标签头"，标识分类（S/W/O/T、Political/Economic、自我介绍/获奖等）。比纯文字大标题更易识别，比独立标签条更紧凑。
+**Purpose**: To add a colored "tab header" to a card or block, identifying its category (S/W/O/T, Political/Economic, self-introduction/awards, etc.). It's easier to recognize than a plain text title and more compact than a separate label bar.
 
-**两种形态**——根据 tab 的"视觉锚点"在上还是在下选择：
+**Two Forms** — choose based on whether the tab's "visual anchor" is at the top or bottom:
 
-| 形态 | 形状 | 视觉语义 | 典型场景 |
+| Form | Shape | Visual Semantics | Typical Scenarios |
 |------|------|---------|---------|
-| **上圆下方** (圆顶角) | 顶部两角圆，底部两角直 | 从卡片"长出来"的标签 | 分区卡头部、quadrant 标题、信息卡分类 |
-| **上方下圆** (圆底角) | 顶部两角直，底部两角圆 | 从页头/章节条"悬挂下来"的吊牌 | 章节锚点、页头分隔条延伸、目录跳转标记 |
+| **Rounded Top, Straight Bottom** (Rounded Top Corners) | Top two corners rounded, bottom two corners straight | Label "growing out" of the card | Section card header, quadrant title, info card category |
+| **Straight Top, Rounded Bottom** (Rounded Bottom Corners) | Top two corners straight, bottom two corners rounded | Hanging tag "suspended" from page header/section bar | Section anchor, page header divider extension, table of contents jump marker |
 
-> 两种形态的共同要求：**只圆一对角**，整条 path 直接画出来。不要用"全圆角矩形 + 同色矩形盖底/盖顶"的 hack（往返到 PPTX 时会变成两个独立对象，编辑时颜色容易脱钩）。
+> Common requirement for both forms: **Only round one pair of corners**, draw the entire path directly. Do not use the hack of "fully rounded rectangle + same-color rectangle covering the bottom/top" (this will become two independent objects when round-tripped to PPTX, and colors can easily decouple during editing).
 
-**实现一：上圆下方（默认）**
+**Implementation One: Rounded Top, Straight Bottom (Default)**
 
 ```xml
-<!-- 模板：宽 W、高 H、圆角 R，左上原点 (x, y) -->
+<!-- Template: Width W, Height H, Corner Radius R, Top-left origin (x, y) -->
 <path d="M {x+R} {y} h {W-2R} a {R} {R} 0 0 1 {R} {R} v {H-R} h -{W} v -{H-R} a {R} {R} 0 0 1 {R} -{R} Z"
       fill="#2563EB"/>
 
-<!-- 实例：240×50, r=25, 起点 (245, 140) -->
+<!-- Example: 240×50, r=25, Origin (245, 140) -->
 <path d="M 245 140 h 190 a 25 25 0 0 1 25 25 v 25 h -240 v -25 a 25 25 0 0 1 25 -25 Z" fill="#2563EB"/>
 ```
 
-**实现二：上方下圆（悬挂吊牌）**
+**Implementation Two: Straight Top, Rounded Bottom (Hanging Tag)**
 
 ```xml
-<!-- 模板：宽 W、高 H、圆角 R，左上原点 (x, y) -->
+<!-- Template: Width W, Height H, Corner Radius R, Top-left origin (x, y) -->
 <path d="M {x} {y} h {W} v {H-R} a {R} {R} 0 0 1 -{R} {R} h -{W-2R} a {R} {R} 0 0 1 -{R} -{R} Z"
       fill="#2563EB"/>
 
-<!-- 实例：240×50, r=25, 起点 (245, 140) -->
+<!-- Example: 240×50, r=25, Origin (245, 140) -->
 <path d="M 245 140 h 240 v 25 a 25 25 0 0 1 -25 25 h -190 a 25 25 0 0 1 -25 -25 Z" fill="#2563EB"/>
 ```
 
-**禁用反例**（PEST/SWOT/comparison_columns 旧实现中常见）：
+**Forbidden Counter-example** (common in old PEST/SWOT/comparison_columns implementations):
 
 ```xml
-<!-- ❌ 不要这样写：用全圆角矩形 + 白色矩形覆盖一边圆角 -->
+<!-- ❌ Do not write like this: Use a fully rounded rectangle + a white rectangle to cover one rounded corner -->
 <rect width="260" height="120" rx="12" fill="#EFF6FF"/>
 <rect y="100" width="260" height="20" fill="#EFF6FF"/>
 ```
 
-底部覆盖矩形在 SVG→PPTX 往返时会变成一个独立的、跟头部颜色绑定的矩形对象，PPT 里编辑头部颜色时容易漏改、视觉会"穿帮"。
+The bottom covering rectangle will become an independent rectangle object tied to the header color during SVG→PPTX round-tripping. When editing the header color in PPT, it's easy to miss changing it, leading to a visual "giveaway".
 
-### 11.2 嵌套卡片描边 (Nested Card Border)
+### 11.2 Nested Card Border
 
-**用途**：让卡片有"被描边"的层次感，但避免 stroke。stroke 在 PPTX 中常被渲染为细线分层，且与阴影叠加易产生模板感。
+**Purpose**: To give cards a layered "bordered" feel, but avoid `stroke`. `stroke` is often rendered as thin layered lines in PPTX and can create a templated look when combined with shadows.
 
-**做法**：外层浅灰圆角 rect + 内层白色稍小圆角 rect，两层之间留出 8–20px 缝即可形成"边框"效果。
+**Method**: An outer light gray rounded rect + an inner white slightly smaller rounded rect. Leaving an 8–20px gap between the two layers creates a "border" effect.
 
 ```xml
-<!-- 外层"边框"层 -->
+<!-- Outer "border" layer -->
 <rect x="60" y="140" width="560" height="255" rx="20" fill="#F1F5F9"/>
-<!-- 内层白色内容卡（内缩 20px，半径变小） -->
+<!-- Inner white content card (inset 20px, smaller radius) -->
 <rect x="80" y="210" width="520" height="165" rx="12" fill="#FFFFFF"/>
 ```
 
-**适用条件**：
-- 当卡片上方还有 §11.1 的分区头时，外层框充当头部的"背板"
-- 同页只用 **一种** 描边表达：外层框 OR stroke OR 阴影，不要同时用（参见 §3 阴影使用原则）
+**Applicable Conditions**:
+- When the card also has a section header from §11.1 above it, the outer frame acts as the "backplate" for the header.
+- Only **one type** of border expression should be used on the same page: outer frame OR stroke OR shadow, do not use them simultaneously (see §3 Shadow Usage Principles).
 
-### 11.3 卡片网格作为内容页骨架 (Card Grid as Page Skeleton)
+### 11.3 Card Grid as Page Skeleton
 
-**用途**：当一页要并列展示 4 个平等的方面（pillar / aspect / quadrant），优先用 2×2 网格而非垂直叠加。
+**Purpose**: When a page needs to display 4 equal aspects (pillar / aspect / quadrant) side-by-side, prioritize a 2×2 grid over vertical stacking.
 
-**网格尺寸建议**（1280×720 画布）：
+**Recommended Grid Sizes** (1280×720 canvas):
 
-| 网格 | 单卡宽 × 高 | 间距 | 起始 (x, y) |
+| Grid | Single Card W × H | Spacing | Origin (x, y) |
 |------|-------------|------|-------------|
 | 2×2 | 560 × 255 | 40 | (60, 140) (660, 140) (60, 420) (660, 420) |
-| 2×3 (横) | 370 × 260 | 25 | (50, 130) 行距 290 |
-| 1×3 (横长) | 400 × 540 | 30 | (60, 130) 列距 430 |
-| 1×4 (顶) | 280 × 250 | 20 | (60, 150) 列距 300 |
+| 2×3 (Horizontal) | 370 × 260 | 25 | (50, 130) Row spacing 290 |
+| 1×3 (Long Horizontal) | 400 × 540 | 30 | (60, 130) Column spacing 430 |
+| 1×4 (Top) | 280 × 250 | 20 | (60, 150) Column spacing 300 |
 
-**判定**："4 个并列方面" → 2×2；"3 个并列方面" → 1×3；"6 个能力点" → 2×3；"4 个关键指标" → 1×4。`page_rhythm` 标 `breathing` 的页面 **不要** 用卡片网格（见 executor-base.md §2.1）。
+**Determination**: "4 parallel aspects" → 2×2; "3 parallel aspects" → 1×3; "6 capability points" → 2×3; "4 key metrics" → 1×4. Pages marked `page_rhythm` as `breathing` **should not** use card grids (see executor-base.md §2.1).
 
-### 11.5 倾斜虚线连接箭头 (Diagonal Dashed Connector)
+### 11.5 Diagonal Dashed Connector
 
-**用途**：表达"跨象限/跨层级"的关系——优先级迁移、影响传导、虚线汇报、对角趋势。水平/垂直箭头表达的是"流程进度"，倾斜虚线箭头表达的是"关系或方向引导"，两者语义不一样。
+**Purpose**: To express "cross-quadrant/cross-level" relationships — priority migration, influence transmission, dotted line reporting, diagonal trends. Horizontal/vertical arrows express "process progress", while diagonal dashed arrows express "relationship or directional guidance"; their semantics are different.
 
-**做法**：单条 `<line>` + `stroke-dasharray="6 5"` + `marker-end`。需要为这条线单独定义一个 marker（不复用主流程图的箭头颜色，建议用 Slate 600 `#475569` 表达"建议性、非强制"的色调）。
+**Method**: A single `<line>` + `stroke-dasharray="6 5"` + `marker-end`. A separate marker needs to be defined for this line (do not reuse the arrow color of the main flowchart, Slate 600 `#475569` is recommended to express a "suggestive, non-mandatory" tone).
 
 ```xml
 <defs>
@@ -547,56 +551,56 @@ echo "Small fonts:" && grep -c 'font-size="[0-9]"' "skills/ppt-master/templates/
   </marker>
 </defs>
 
-<!-- 从 Q4 (右下) 指向 Q2 (左上) 的优先级迁移箭头 -->
+<!-- Priority migration arrow from Q4 (bottom right) to Q2 (top left) -->
 <line x1="850" y1="605" x2="385" y2="200"
       stroke="#475569" stroke-width="2"
       stroke-dasharray="6 5" stroke-linecap="round"
       marker-end="url(#migrationArrow)"/>
 
-<!-- 中段标签：白底胶囊压在箭头上，避免视觉打架 -->
+<!-- Mid-segment label: White capsule over the arrow to avoid visual clutter -->
 <rect x="525" y="385" width="190" height="28" rx="14"
       fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
 <text x="620" y="403" text-anchor="middle" font-size="12"
       font-weight="700" fill="#475569" letter-spacing="1">PRIORITY MIGRATION</text>
 ```
 
-> **配对要求**：每条倾斜虚线箭头必须配一个中段标签（小胶囊或一行文字），否则读者会困惑"这条线在说什么"。无标签的箭头只允许出现在水平/垂直流程中（如 `process_flow`）。
+> **Pairing Requirement**: Each diagonal dashed arrow must be accompanied by a mid-segment label (small capsule or a line of text), otherwise readers will be confused about "what this line is saying". Unlabeled arrows are only allowed in horizontal/vertical flows (e.g., `process_flow`).
 
-### 11.6 接地椭圆 (Ground Anchor Ellipse) — 非 filter 的深度表达
+### 11.6 Ground Anchor Ellipse — Non-Filter Depth Expression
 
-**用途**：让"漂浮在卡片上的圆形/icon/人物头像/奖杯/角色徽章"获得"接触地面"的视觉锚定，**但不使用 `<filter>` 阴影**。
+**Purpose**: To give "circles/icons/avatars/trophies/role badges floating on cards" a visual anchor that "touches the ground", **without using `<filter>` shadows**.
 
-**为什么有用**：
-1. PPTX 原生圆/椭圆对象，跨渲染器一致，不会被解析为 `<a:outerShdw>`（避免阴影颜色丢失或重排问题）
-2. 跟 §3 「克制阴影」呼应——一页阴影预算上限 2-3 个，剩下需要"深度"的元素可以走这条路
-3. 比 filter 阴影**更容易在 PPT 中二次编辑**（用户可以直接拖、改色、删除）
+**Why it's useful**:
+1. Native PPTX circle/ellipse objects, consistent across renderers, will not be parsed as `<a:outerShdw>` (avoiding shadow color loss or rearrangement issues).
+2. Echoes §3 "Restrained Shadows" — a page's shadow budget is capped at 2-3, other elements needing "depth" can use this method.
+3. **Easier to re-edit in PPT** than filter shadows (users can directly drag, change color, delete).
 
-**做法**：在浮动元素**正下方**画一个**横扁椭圆**（`ry << rx`），低透明度，颜色用主体色或 Slate 900：
+**Method**: Draw a **horizontally flattened ellipse** (`ry << rx`) directly **below** the floating element, with low opacity, and a color using the main theme color or Slate 900:
 
 ```xml
-<!-- 头像/徽章下方的接地阴影板，cy 比头像底边低 10-15px -->
+<!-- Ground anchor shadow plate below avatar/badge, cy 10-15px lower than avatar bottom edge -->
 <ellipse cx="80" cy="172" rx="70" ry="5" fill="#0F172A" opacity="0.10"/>
-<!-- 然后再画头像本体（顺序很重要，椭圆必须先画） -->
+<!-- Then draw the avatar body (order is important, ellipse must be drawn first) -->
 <circle cx="80" cy="80" r="80" fill="#E2E8F0"/>
 ```
 
-**参数参考**：
+**Parameter Reference**:
 
-| 浮动元素半径 | 椭圆 rx | 椭圆 ry | opacity |
+| Floating Element Radius | Ellipse rx | Ellipse ry | opacity |
 |-------------|---------|---------|---------|
 | 30-50 px | r × 0.85 | 3-4 | 0.10-0.15 |
 | 50-100 px | r × 0.85 | 5-6 | 0.10-0.12 |
 | 100+ px | r × 0.85 | 7-9 | 0.08-0.10 |
 
-颜色：默认 `#0F172A`（中性深灰），可改为主体色的深色变体（如人物头像下用 `#1E3A8A`）表达"品牌色阴影"。
+Color: Default `#0F172A` (neutral dark gray), can be changed to a darker variant of the main theme color (e.g., `#1E3A8A` under an avatar) to express a "brand color shadow".
 
-**禁用**：不要把椭圆画成正圆或近正圆（`ry/rx > 0.25` 就显得失真）。也不要叠在`<filter>` 阴影上——挑一种就够。
+**Forbidden**: Do not draw the ellipse as a perfect circle or near-perfect circle (`ry/rx > 0.25` will appear distorted). Also, do not stack it on top of `<filter>` shadows — choose one is enough.
 
-### 11.7 双向交互箭头 (Bidirectional Interaction Arrows)
+### 11.7 Bidirectional Interaction Arrows
 
-**用途**：表达"请求/响应"、"推/拉"、"上行/下行"、"供给/需求"等成对关系。区别于单向流程箭头。
+**Purpose**: To express paired relationships such as "request/response", "push/pull", "upstream/downstream", "supply/demand". This differs from unidirectional process arrows.
 
-**做法**：两条平行的 `<line>` + 不同颜色的 `marker-end`，方向相反，**每条线都必须带动作标签**：
+**Method**: Two parallel `<line>`s + `marker-end`s of different colors, in opposite directions. **Each line must have an action label**:
 
 ```xml
 <defs>
@@ -610,7 +614,7 @@ echo "Small fonts:" && grep -c 'font-size="[0-9]"' "skills/ppt-master/templates/
   </marker>
 </defs>
 
-<!-- 请求：左到右，蓝色 -->
+<!-- Request: Left to right, blue -->
 <line x1="380" y1="250" x2="926" y2="250" stroke="#3B82F6" stroke-width="2.5"
       marker-end="url(#reqArrow)"/>
 <rect x="500" y="216" width="280" height="26" rx="11" fill="#FFFFFF"
@@ -618,26 +622,25 @@ echo "Small fonts:" && grep -c 'font-size="[0-9]"' "skills/ppt-master/templates/
 <text x="640" y="234" text-anchor="middle" font-size="14" font-weight="700"
       fill="#3B82F6">① Login Request · POST /auth/login</text>
 
-<!-- 响应：右到左，绿色 -->
+<!-- Response: Right to left, green -->
 <line x1="926" y1="290" x2="384" y2="290" stroke="#10B981" stroke-width="2.5"
       marker-end="url(#reqArrow)"/>
-<!-- ...同样配标签... -->
+<!-- ...same label pairing... -->
 ```
 
-**配色约定**：请求侧（initiator）用蓝色 `#3B82F6`、响应侧（responder）用绿色 `#10B981`。如果是对等关系（如 A↔B 协同），统一用 Slate 600 `#475569` 不区分颜色。
+**Color Convention**: Request side (initiator) uses blue `#3B82F6`, response side (responder) uses green `#10B981`. For peer-to-peer relationships (e.g., A↔B collaboration), use Slate 600 `#475569` uniformly without distinguishing colors.
 
-**禁用**：不允许画"裸线"——双向箭头**每条都必须带标签**说明动作；否则读者无法分辨方向语义。
+**Forbidden**: "Bare lines" are not allowed — **each** bidirectional arrow must have a label explaining the action; otherwise, readers cannot discern the directional semantics.
 
-### 11.8 参考实现
+### 11.8 Reference Implementations
 
-| 图式 | 参考模板 |
+| Pattern | Reference Template |
 |------|---------|
-| §11.1 半圆角分区头（上圆下方） | `quadrant_text_bullets.svg`, `labeled_card.svg`, `vertical_pillars.svg`, `comparison_columns.svg` |
-| §11.2 嵌套卡片描边 | `labeled_card.svg` |
-| §11.3 2×2 卡片网格 | `kpi_cards.svg`, `quadrant_text_bullets.svg`, `labeled_card.svg` |
-| §11.3 2×3 卡片网格 | `icon_grid.svg` |
-| §11.3 1×3/1×4 卡片网格 | `comparison_columns.svg`, `vertical_pillars.svg` |
-| §11.5 倾斜虚线连接箭头 | `matrix_2x2.svg` |
-| §11.6 接地椭圆 | `team_roster.svg` |
-| §11.7 双向交互箭头 | `client_server_flow.svg` |
-
+| §11.1 Half-Rounded Section Tab (Rounded Top, Straight Bottom) | `quadrant_text_bullets.svg`, `labeled_card.svg`, `vertical_pillars.svg`, `comparison_columns.svg` |
+| §11.2 Nested Card Border | `labeled_card.svg` |
+| §11.3 2×2 Card Grid | `kpi_cards.svg`, `quadrant_text_bullets.svg`, `labeled_card.svg` |
+| §11.3 2×3 Card Grid | `icon_grid.svg` |
+| §11.3 1×3/1×4 Card Grid | `comparison_columns.svg`, `vertical_pillars.svg` |
+| §11.5 Diagonal Dashed Connector | `matrix_2x2.svg` |
+| §11.6 Ground Anchor Ellipse | `team_roster.svg` |
+| §11.7 Bidirectional Interaction Arrows | `client_server_flow.svg` |

@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1280 720">
-    <!-- 模板: 目录页 - 重庆两江新区发改委风格 -->
+    <!-- Template: Table of Contents Page - Chongqing Liangjiang New Area Development and Reform Commission Style -->
 
     <defs>
-        <!-- 顶部装饰渐变 -->
+        <!-- Top Decorative Gradient -->
         <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style="stop-color:#8B0000;stop-opacity:1" />
             <stop offset="100%" style="stop-color:#003366;stop-opacity:1" />
         </linearGradient>
     </defs>
 
-    <!-- 白色背景 -->
+    <!-- White Background -->
     <rect x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
 
-    <!-- 顶部渐变装饰线 -->
+    <!-- Top Gradient Decorative Line -->
     <rect x="0" y="0" width="1280" height="6" fill="url(#topGrad)"/>
 
-    <!-- 导航栏区域 -->
+    <!-- Navigation Bar Area -->
     <rect x="60" y="30" width="50" height="50" fill="#8B0000"/>
-    <text x="85" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">目</text>
-    <text x="130" y="65" font-family="Microsoft YaHei, SimHei, sans-serif" font-size="28" font-weight="bold" fill="#1A1A1A">目 录</text>
+    <text x="85" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">T</text>
+    <text x="130" y="65" font-family="Microsoft YaHei, SimHei, sans-serif" font-size="28" font-weight="bold" fill="#1A1A1A">Table of Contents</text>
     <text x="130" y="85" font-family="Arial, sans-serif" font-size="14" fill="#718096">CONTENTS</text>
 
-    <!-- 左侧装饰竖线 -->
+    <!-- Left Decorative Vertical Line -->
     <rect x="280" y="140" width="4" height="480" fill="#8B0000"/>
     <rect x="288" y="140" width="2" height="480" fill="#DAA520" fill-opacity="0.5"/>
 
-    <!-- 目录项 - 第1章 -->
+    <!-- TOC Item - Chapter 1 -->
     <g>
         <rect x="310" y="160" width="40" height="40" fill="#8B0000"/>
         <text x="330" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">01</text>
@@ -34,7 +34,7 @@
         <text x="370" y="210" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#718096">{{TOC_ITEM_1_DESC}}</text>
     </g>
 
-    <!-- 目录项 - 第2章 -->
+    <!-- TOC Item - Chapter 2 -->
     <g>
         <rect x="310" y="250" width="40" height="40" fill="#8B0000"/>
         <text x="330" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">02</text>
@@ -42,7 +42,7 @@
         <text x="370" y="300" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#718096">{{TOC_ITEM_2_DESC}}</text>
     </g>
 
-    <!-- 目录项 - 第3章 -->
+    <!-- TOC Item - Chapter 3 -->
     <g>
         <rect x="310" y="340" width="40" height="40" fill="#8B0000"/>
         <text x="330" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">03</text>
@@ -50,7 +50,7 @@
         <text x="370" y="390" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#718096">{{TOC_ITEM_3_DESC}}</text>
     </g>
 
-    <!-- 目录项 - 第4章 -->
+    <!-- TOC Item - Chapter 4 -->
     <g>
         <rect x="310" y="430" width="40" height="40" fill="#8B0000"/>
         <text x="330" y="460" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">04</text>
@@ -58,7 +58,7 @@
         <text x="370" y="480" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#718096">{{TOC_ITEM_4_DESC}}</text>
     </g>
 
-    <!-- 目录项 - 第5章 -->
+    <!-- TOC Item - Chapter 5 -->
     <g>
         <rect x="310" y="520" width="40" height="40" fill="#8B0000"/>
         <text x="330" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">05</text>
@@ -66,11 +66,11 @@
         <text x="370" y="570" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#718096">{{TOC_ITEM_5_DESC}}</text>
     </g>
 
-    <!-- 右侧装饰区域 -->
+    <!-- Right Decorative Area -->
     <rect x="880" y="160" width="320" height="440" fill="#F5F7FA" rx="8"/>
     <rect x="880" y="160" width="6" height="440" fill="#003366"/>
     
-    <!-- 右侧统计数据展示 -->
+    <!-- Right Side Statistics Display -->
     <text x="1040" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#003366" fill-opacity="0.15">{{STAT_NUMBER_1}}</text>
     <text x="1040" y="320" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#4A5568">{{STAT_LABEL_1}}</text>
     
@@ -79,10 +79,10 @@
     <text x="1040" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#8B0000" fill-opacity="0.2">{{STAT_NUMBER_2}}</text>
     <text x="1040" y="480" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#4A5568">{{STAT_LABEL_2}}</text>
 
-    <!-- 底部装饰线 -->
+    <!-- Bottom Decorative Line -->
     <rect x="0" y="716" width="1280" height="4" fill="#8B0000"/>
 
-    <!-- 页码 -->
+    <!-- Page Number -->
     <text x="640" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#718096">{{PAGE_NUM}}</text>
 
 </svg>

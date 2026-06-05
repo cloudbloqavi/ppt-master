@@ -37,7 +37,7 @@ def normalize_title(title: str) -> str:
     if not title:
         return ''
     text = title.strip()
-    # Replace any non-alnum / non-CJK run with underscore
+    # Replace any non-alphanumeric / non-CJK run with underscore
     text = re.sub(r'[^0-9A-Za-z\u4e00-\u9fff]+', '_', text)
     text = re.sub(r'_+', '_', text).strip('_')
     return text.lower()
@@ -55,17 +55,12 @@ def extract_leading_number(text: str) -> int | None:
     if m:
         return int(m.group(1))
 
-    # Try 2: Common prefixes (Slide X, Page X, 第X页)
+    # Try 2: Common prefixes (Slide X, Page X)
     # Case insensitive for English
     text_lower = text.lower().strip()
 
     # Slide/Page X
     m = re.match(r'^(?:slide|page|p)\s*[-_:]?\s*(\d{1,3})', text_lower)
-    if m:
-        return int(m.group(1))
-
-    # 第X页/张
-    m = re.match(r'^第\s*(\d{1,3})\s*[页张]', text_lower)
     if m:
         return int(m.group(1))
 

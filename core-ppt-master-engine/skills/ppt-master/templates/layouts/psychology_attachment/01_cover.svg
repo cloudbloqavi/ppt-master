@@ -7,46 +7,46 @@
         </linearGradient>
     </defs>
 
-    <!-- 背景渐变 -->
+    <!-- Background Gradient -->
     <rect width="1280" height="720" fill="url(#coverGradient)" />
 
-    <!-- 可选：背景图片（使用时替换 {{COVER_BG_IMAGE}}） -->
-    <!-- 如需弱化图片，请改用叠加蒙层，不要直接设置 <image opacity> -->
+    <!-- Optional: Background Image (replace {{COVER_BG_IMAGE}} when used) -->
+    <!-- If you want to soften the image, use an overlay mask instead of directly setting <image opacity> -->
 
-    <!-- 装饰圆形 -->
+    <!-- Decorative Circles -->
     <circle cx="1100" cy="150" r="200" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.1" />
     <circle cx="1100" cy="150" r="150" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.1" />
     <circle cx="1100" cy="150" r="100" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.1" />
     <circle cx="180" cy="600" r="120" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.1" />
     <circle cx="180" cy="600" r="80" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.1" />
 
-    <!-- 装饰斜线 -->
+    <!-- Decorative Lines -->
     <line x1="0" y1="200" x2="300" y2="350" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.15" />
     <line x1="0" y1="250" x2="250" y2="400" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.15" />
     <line x1="980" y1="720" x2="1280" y2="520" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.15" />
     <line x1="1030" y1="720" x2="1280" y2="570" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.15" />
 
-    <!-- 主标题 -->
+    <!-- Main Title -->
     <text x="640" y="280" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="52" font-weight="bold"
         fill="#FFFFFF" text-anchor="middle">
         {{TITLE}}
     </text>
 
-    <!-- 副标题 -->
+    <!-- Subtitle -->
     <text x="640" y="340" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#E5E7EB"
         text-anchor="middle">
         {{SUBTITLE}}
     </text>
 
-    <!-- 英文标题 -->
+    <!-- English Title -->
     <text x="640" y="385" font-family="system-ui, sans-serif" font-size="20" fill="#94A3B8" text-anchor="middle">
         {{TITLE_EN}}
     </text>
 
-    <!-- 装饰线 -->
+    <!-- Decorative Line -->
     <rect x="540" y="410" width="200" height="3" rx="1.5" fill="#E07843" />
 
-    <!-- 引言卡片 -->
+    <!-- Quote Card -->
     <rect x="240" y="460" width="800" height="100" rx="12" fill="#FFFFFF" fill-opacity="0.1" />
     <rect x="240" y="460" width="4" height="100" rx="2" fill="#3D8B7A" />
 
@@ -58,7 +58,7 @@
         —— {{QUOTE_AUTHOR}}
     </text>
 
-    <!-- 关键词标签 -->
+    <!-- Keyword Tags -->
     <g font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#CBD5E1">
         <rect x="420" y="590" width="80" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.1" />
         <text x="460" y="609" text-anchor="middle">{{TAG_1}}</text>
@@ -73,6 +73,6 @@
         <text x="770" y="609" text-anchor="middle">{{TAG_4}}</text>
     </g>
 
-    <!-- 页码 -->
+    <!-- Page Number -->
     <text x="1220" y="685" font-family="system-ui, sans-serif" font-size="14" fill="#64748B" text-anchor="end">01</text>
 </svg>

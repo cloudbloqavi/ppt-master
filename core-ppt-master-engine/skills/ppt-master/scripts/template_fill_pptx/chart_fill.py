@@ -184,7 +184,7 @@ def _apply_chart_edit_to_chart_xml(chart_root: ET.Element, chart_edit: dict[str,
         order = _ensure_child(series, "c:order")
         _set_val_attr(idx, index)
         _set_val_attr(order, index)
-        _set_series_name(series, str(payload.get("name", f"系列{index + 1}")), index + 2)
+        _set_series_name(series, str(payload.get("name", f"Series{index + 1}")), index + 2)
         _set_category_cache(series, categories)
         _set_value_cache(series, values, index + 2)
 
@@ -256,7 +256,7 @@ def _rewrite_chart_workbook(xlsx_bytes: bytes, chart_edit: dict[str, Any]) -> by
     for child in list(sheet_data):
         sheet_data.remove(child)
 
-    rows = [["Category"] + [str(item.get("name", f"系列{idx + 1}")) for idx, item in enumerate(series_payload)]]
+    rows = [["Category"] + [str(item.get("name", f"Series{idx + 1}")) for idx, item in enumerate(series_payload)]]
     for row_index, category in enumerate(categories):
         rows.append([category] + [item.get("values", [])[row_index] for item in series_payload])
     for row_index, values in enumerate(rows, start=1):

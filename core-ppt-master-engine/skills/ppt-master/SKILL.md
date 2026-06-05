@@ -1,10 +1,9 @@
----
 name: ppt-master
 description: >
   AI-driven multi-format SVG content generation system. Converts source documents
   (PDF/DOCX/URL/Markdown) into high-quality SVG pages and exports to PPTX through
   multi-role collaboration. Use when user asks to "create PPT", "make presentation",
-  "生成PPT", "做PPT", "制作演示文稿", or mentions "ppt-master".
+  "create PPT", "make PPT", "prepare presentation", or mentions "ppt-master".
 ---
 
 # PPT Master Skill
@@ -24,14 +23,14 @@ description: >
 > 4. **GATE BEFORE ENTRY** — Each Step has prerequisites (🚧 GATE) listed at the top; these MUST be verified before starting that Step
 > 5. **NO SPECULATIVE EXECUTION** — "Pre-preparing" content for subsequent Steps is FORBIDDEN (e.g., writing SVG code during the Strategist phase)
 > 6. **NO SUB-AGENT SVG GENERATION** — Executor Step 6 SVG generation is context-dependent and MUST be completed by the current main agent end-to-end. Delegating page SVG generation to sub-agents is FORBIDDEN
-> 7. **SEQUENTIAL PAGE GENERATION ONLY** — In Executor Step 6, after the global design context is confirmed, SVG pages MUST be generated sequentially page by page in one continuous pass. Grouped page batches (for example, 5 pages at a time) are FORBIDDEN
+> 7. **SEQUENTIAL PAGE GENERATION ONLY** — In Executor Step 6, after the global design context is confirmed, SVG pages MUST be generated sequentially page by page in one continuous pass. Grouped page batches (for example, 5 pages at a time) is FORBIDDEN
 > 8. **SPEC_LOCK RE-READ PER PAGE** — Before generating each SVG page, Executor MUST `read_file <project_path>/spec_lock.md`. All colors / fonts / icons / images MUST come from this file — no values from memory or invented on the fly. Executor MUST also look up the current page's `page_rhythm` (`anchor` / `dense` / `breathing`), `page_layouts` (which template SVG to inherit, if any), and `page_charts` (which chart template to adapt, if any). Empty / absent entries are intentional Strategist signals — see executor-base.md §2.1. This rule exists to resist context-compression drift on long decks and to break the uniform "every page is a card grid" default
 > 9. **SVG MUST BE HAND-WRITTEN, NOT SCRIPT-GENERATED** — Every SVG page is written by the main agent directly, one page at a time (see rules 6 and 7). Writing or running a Python / Node / shell script that produces the SVG files in batch — looping over pages, templating from data, or emitting them via a generator — is FORBIDDEN, including under "save tokens", "quick draft", or "user is in a hurry" pretexts. The script-generation path was tried on a feature branch and abandoned: cross-page visual consistency depends on per-page authoring with full upstream context, which a generator script cannot reproduce
 
 > [!IMPORTANT]
 > ## 🌐 Language & Communication Rule
 >
-> - **Response language**: match the user's input and source materials. Explicit user override (e.g., "请用英文回答") takes precedence.
+> - **Response language**: match the user's input and source materials. Explicit user override (e.g., "Please answer in English") takes precedence.
 > - **Template format**: `design_spec.md` MUST follow its original English template structure (section headings, field names) regardless of conversation language. Content values may be in the user's language.
 
 > [!IMPORTANT]
@@ -82,7 +81,7 @@ For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 | `resume-execute` | `workflows/resume-execute.md` | Phase B entry — resume execution in a fresh chat after Phase A (Step 1–5) completed in another session (split mode) |
 | `verify-charts` | `workflows/verify-charts.md` | Chart coordinate calibration — run after SVG generation if the deck contains data charts |
 | `customize-animations` | `workflows/customize-animations.md` | Object-level PPTX animation customization — run only when the user explicitly asks to tune animation order/effects/timing |
-| `live-preview` | `workflows/live-preview.md` | Browser-based live preview — disabled by default, can be explicitly enabled during generation, and re-enterable any time the user mentions "live preview", "preview", "看效果", or wants to click/select a slide element |
+| `live-preview` | `workflows/live-preview.md` | Browser-based live preview — disabled by default, can be explicitly enabled during generation, and re-enterable any time the user mentions "live preview", "preview", "preview", or wants to click/select a slide element |
 | `visual-review` | `workflows/visual-review.md` | Per-page rubric-based visual self-check — run only when the user explicitly asks for a visual re-pass on the generated SVGs (between Executor and post-processing). Opt-in only; never invoked by the main pipeline. |
 
 ---
@@ -161,13 +160,13 @@ Import source content (choose based on the situation):
 | User input contains | Step 3 action |
 |---|---|
 | One or more explicit template directory paths (each resolves to a directory containing `design_spec.md` with `kind: brand` / `kind: layout` / `kind: deck` in its YAML frontmatter) | Read each spec's `kind`, dispatch per the kind matrix below, fuse if multiple |
-| Anything else — bare template names ("用 academic_defense"), style descriptions ("麦肯锡风格"), brand mentions ("招商银行风格"), vague intent ("想用个模板"), or silence | Skip Step 3, free design |
+| Anything else — bare template names ("use academic_defense"), style descriptions ("McKinsey style"), brand mentions ("China Merchants Bank style"), vague intent ("I want to use a template"), or silence | Skip Step 3, free design |
 
 There is no slug matching, no name lookup, no fuzzy resolution. A name without a path does not trigger — the user must give a path the AI can `cd` into.
 
-> Style descriptions ("麦肯锡风格" / "Keynote 风" / "极简风" / etc.) never trigger Step 3. They flow into Strategist's Eight Confirmations as a style brief (color / typography / tone in confirmations e–g).
+> Style descriptions ("McKinsey style" / "Keynote style" / "minimalist style" / etc.) never trigger Step 3. They flow into Strategist's Eight Confirmations as a style brief (color / typography / tone in confirmations e–g).
 
-> Bare names ("academic_defense", "招商银行", "anthropic") do NOT trigger Step 3 even if a matching directory exists in the library. The user must give a path. AI must not "helpfully" resolve a name to a path.
+> Bare names ("academic_defense", "China Merchants Bank", "anthropic") do NOT trigger Step 3 even if a matching directory exists in the library. The user must give a path. AI must not "helpfully" resolve a name to a path.
 
 > "What templates exist?" is out-of-band Q&A — answer by listing entries from `brands_index.json` / `layouts_index.json` / `decks_index.json` together with their paths. Listing alone does not advance the pipeline; the user must send a path back to trigger Step 3.
 
@@ -175,7 +174,7 @@ There is no slug matching, no name lookup, no fuzzy resolution. A name without a
 
 #### Three template kinds
 
-The architecture has three independent reference bundles. Full schema in [`docs/zh/templates-architecture.md`](../../docs/zh/templates-architecture.md). Summary:
+The architecture has three independent reference bundles. Full schema in [`docs/templates-architecture.md`](../../docs/templates-architecture.md). Summary:
 
 | Kind | Physical dir | Contains | Frontmatter |
 |---|---|---|---|
@@ -229,14 +228,14 @@ Field-level micro-adjustment (e.g. "use anthropic brand but primary changed to #
 When the user gives two paths of the **same kind** (e.g. `brands/anthropic` + `brands/google`), Step 3 surfaces a conflict prompt before fusing — like resolving a git merge conflict:
 
 ```
-AI: 你给了两个 brand，检测到段级冲突：
-    - Color Scheme（Anthropic 橙红 vs Google 多色）
-    - Typography（Styrene/AnthropicSans vs GoogleSans/Roboto）
-    - Logo（Anthropic 标 vs Google 标）
-    - Voice & Tone（restrained vs friendly）
-    - Icon Style（stroke vs filled）
+AI: You provided two brands; segment-level conflicts detected:
+    - Color Scheme (Anthropic Orange-Red vs Google Multi-color)
+    - Typography (Styrene/AnthropicSans vs GoogleSans/Roboto)
+    - Logo (Anthropic logo vs Google logo)
+    - Voice & Tone (restrained vs friendly)
+    - Icon Style (stroke vs filled)
 
-    要 (a) 全部按 Anthropic / (b) 全部按 Google / (c) 逐段挑？
+    Do you want to (a) use all Anthropic / (b) use all Google / (c) pick segment by segment?
 ```
 
 Rules:
@@ -251,10 +250,10 @@ When fusion happens (any multi-path case), the resulting `<project>/templates/de
 
 ```markdown
 > **Fused from:**
-> - deck: `templates/decks/招商银行/` （base）
-> - brand: `templates/brands/anthropic/` （identity override）
-> - layout: `templates/layouts/academic_defense/` （structure override）
-> - conflicts resolved: Color Scheme from anthropic（user picked a）
+> - deck: `templates/decks/China Merchants Bank/` (base)
+> - brand: `templates/brands/anthropic/` (identity override)
+> - layout: `templates/layouts/academic_defense/` (structure override)
+> - conflicts resolved: Color Scheme from anthropic (user picked a)
 ```
 
 Single-path Step 3 does **not** add provenance (the source is self-evident from the copied files).
@@ -291,8 +290,8 @@ Read references/strategist.md
 
 | Signal read | Line content |
 |---|---|
-| Heavy (long page count / bulky sources / heavy web-fetch accumulation) | State estimated page count and large source size; recommend switching to [split mode](workflows/resume-execute.md) after Step 5 — stop this chat, open a fresh window and input `继续生成 projects/<project_name>` to enter Phase B (SVG generation + export); no response or "continue" = default continuous mode. |
-| Normal (default) | State scale is moderate, default continuous mode generates in one go; if mid-way window switch is desired, input `继续生成 projects/<project_name>` after Step 5 to switch to [split mode](workflows/resume-execute.md). |
+| Heavy (long page count / bulky sources / heavy web-fetch accumulation) | State estimated page count and large source size; recommend switching to [split mode](workflows/resume-execute.md) after Step 5 — stop this chat, open a fresh window and input `resume generation projects/<project_name>` to enter Phase B (SVG generation + export); no response or "continue" = default continuous mode. |
+| Normal (default) | State scale is moderate, default continuous mode generates in one go; if mid-way window switch is desired, input `resume generation projects/<project_name>` after Step 5 to switch to [split mode](workflows/resume-execute.md). |
 
 This line is required output every run — the user must always see the mode choice exists. Whether to act on it is the user's call.
 
@@ -384,7 +383,7 @@ Workflow:
   ## ✅ Phase A Complete
   - [x] Spec: `design_spec.md`, `spec_lock.md`
   - [x] Resources: `sources/`, `images/`, `templates/`
-  - [ ] **Next**: open a fresh chat window and input `继续生成 projects/<project_name>` to enter Phase B via the [`resume-execute`](workflows/resume-execute.md) workflow.
+  - [ ] **Next**: open a fresh chat window and input `resume generation projects/<project_name>` to enter Phase B via the [`resume-execute`](workflows/resume-execute.md) workflow.
   ```
 
 > On acquisition failure, do NOT halt — follow the Failure Handling rule in [image-base.md](references/image-base.md) §5: retry once, then mark the row `Needs-Manual`, report to user, and continue to the checkpoint above.
@@ -448,7 +447,7 @@ python3 ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 
 > **Chart pages?** If this deck contains data charts (bar / line / pie / radar / etc.), run the standalone [`verify-charts`](workflows/verify-charts.md) workflow before Step 7 to calibrate coordinates. AI models routinely introduce 10–50 px errors when mapping data to pixel positions; verify-charts eliminates that class of error. Skip if no chart pages.
 
-> **Visual self-check (opt-in)?** If the user explicitly asked for a per-page visual re-pass on the SVGs ("跑一下视觉自检 / 视觉回看", "visual review", "check pages visually", etc.), run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. Do NOT run it by default and do NOT recommend it based on inferred model capability or deck size — trigger is user request only.
+> **Visual self-check (opt-in)?** If the user explicitly asked for a per-page visual re-pass on the SVGs ("run a visual self-check / visual review", "visual review", "check pages visually", etc.), run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. Do NOT run it by default and do NOT recommend it based on inferred model capability or deck size — trigger is user request only.
 
 ---
 
@@ -526,9 +525,9 @@ Full effect list, anchor logic, and limits: [`references/animations.md`](referen
 > ❌ **NEVER** force `-s output` for the legacy/preview pptx (PowerPoint's internal SVG parser drops icons and rounded corners). The default auto-split already gives native the high-fidelity source it needs without touching legacy.
 > ❌ **NEVER** use `--only` (it suppresses one of the two output files)
 
-> **Post-export annotation window**: the preview service from Step 6 typically remains running after export. If the user submitted annotations in the browser (during Executor or after export) and now asks to apply them — they may quote the browser prompt (`Annotations saved. ... apply my annotations`), say "apply my annotations" / "应用注解" / equivalent — run [`live-preview`](workflows/live-preview.md) Step 2 to apply and re-export. Annotations submitted during generation are also handled here, not earlier.
+> **Post-export annotation window**: the preview service from Step 6 typically remains running after export. If the user submitted annotations in the browser (during Executor or after export) and now asks to apply them — they may quote the browser prompt (`Annotations saved. ... apply my annotations`), say "apply my annotations" / "apply annotations" / equivalent — run [`live-preview`](workflows/live-preview.md) Step 2 to apply and re-export. Annotations submitted during generation are also handled here, not earlier.
 
-> **Preview not running?** Any time the user mentions "live preview", "preview", "看效果", or wants to select/click a slide element and the service is not running, run [`live-preview`](workflows/live-preview.md) Step 1 to start it. If the service is already running, just point them at the URL — do not restart.
+> **Preview not running?** Any time the user mentions "live preview", "preview", "preview", or wants to select/click a slide element and the service is not running, run [`live-preview`](workflows/live-preview.md) Step 1 to start it. If the service is already running, just point them at the URL — do not restart.
 
 ---
 

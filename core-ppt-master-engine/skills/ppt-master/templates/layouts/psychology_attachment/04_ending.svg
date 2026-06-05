@@ -7,13 +7,13 @@
         </linearGradient>
     </defs>
 
-    <!-- 背景渐变 -->
+    <!-- Background Gradient -->
     <rect width="1280" height="720" fill="url(#endGradient)" />
 
-    <!-- 装饰网络图 - 中心点 -->
+    <!-- Decorative Network - Center Point -->
     <circle cx="640" cy="360" r="8" fill="#FFFFFF" fill-opacity="0.2" />
 
-    <!-- 外围节点 -->
+    <!-- Peripheral Nodes -->
     <circle cx="350" cy="200" r="5" fill="#FFFFFF" fill-opacity="0.2" />
     <circle cx="450" cy="150" r="4" fill="#FFFFFF" fill-opacity="0.2" />
     <circle cx="550" cy="180" r="5" fill="#FFFFFF" fill-opacity="0.2" />
@@ -30,7 +30,7 @@
     <circle cx="950" cy="450" r="4" fill="#FFFFFF" fill-opacity="0.2" />
     <circle cx="1000" cy="350" r="5" fill="#FFFFFF" fill-opacity="0.2" />
 
-    <!-- 连接线 - 从中心辐射 -->
+    <!-- Connecting Lines - Radiating from Center -->
     <line x1="640" y1="360" x2="350" y2="200" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.2" />
     <line x1="640" y1="360" x2="450" y2="150" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.2" />
     <line x1="640" y1="360" x2="550" y2="180" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.2" />
@@ -47,7 +47,7 @@
     <line x1="640" y1="360" x2="950" y2="450" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.2" />
     <line x1="640" y1="360" x2="1000" y2="350" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.2" />
 
-    <!-- 连接线 - 外围连接 -->
+    <!-- Connecting Lines - Peripheral Connections -->
     <line x1="350" y1="200" x2="450" y2="150" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.15" />
     <line x1="450" y1="150" x2="550" y2="180" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.15" />
     <line x1="730" y1="160" x2="830" y2="200" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.15" />
@@ -55,33 +55,33 @@
     <line x1="580" y1="580" x2="700" y2="560" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.15" />
     <line x1="830" y1="520" x2="950" y2="450" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.15" />
 
-    <!-- 主标题 -->
+    <!-- Main Title -->
     <text x="640" y="260" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="56" font-weight="bold"
         fill="#FFFFFF" text-anchor="middle">
         {{THANK_YOU}}
     </text>
 
-    <!-- 副标题 -->
+    <!-- Subtitle -->
     <text x="640" y="320" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#E5E7EB"
         text-anchor="middle">
         {{ENDING_SUBTITLE}}
     </text>
 
-    <!-- 英文标题 -->
+    <!-- English Title -->
     <text x="640" y="360" font-family="system-ui, sans-serif" font-size="18" fill="#94A3B8" text-anchor="middle">
         {{THANK_YOU_EN}}
     </text>
 
-    <!-- 装饰线 -->
+    <!-- Decorative Line -->
     <rect x="490" y="400" width="300" height="4" rx="2" fill="#E07843" />
 
-    <!-- 感谢语 -->
+    <!-- Thank You Message -->
     <text x="640" y="470" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="32" fill="#FFFFFF"
         text-anchor="middle">
         {{CLOSING_MESSAGE}}
     </text>
 
-    <!-- 信息卡片 -->
+    <!-- Info Card -->
     <rect x="440" y="520" width="400" height="100" rx="12" fill="#FFFFFF" fill-opacity="0.1" />
 
     <text x="640" y="560" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E5E7EB"
@@ -93,7 +93,7 @@
         {{CONTACT_LINE_2}}
     </text>
 
-    <!-- 底部版权 -->
+    <!-- Footer Copyright -->
     <text x="640" y="680" font-family="system-ui, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">
         {{COPYRIGHT}}
     </text>

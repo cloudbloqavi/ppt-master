@@ -114,10 +114,10 @@ def get_heading_level(size: float, size_map: dict, text: str = "",
         return 0
 
     # Exclusion: complete sentences ending with punctuation
-    sentence_endings = '.。!！?？'
+    sentence_endings = '.!?'
     if text and text[-1] in sentence_endings:
         # But keep numbered headings like "1. Overview" or "Chapter 1."
-        if not re.match(r'^[\d第]+[.、章节]', text):
+        if not re.match(r'^[\d]+[.](?:\s|$)', text):
             return 0
 
     # Bonus: bold text is more likely to be a heading
@@ -179,7 +179,7 @@ def detect_list_item(text: str) -> tuple:
         if match:
             return (True, 'ul', marker + ' ' + text[match.end():])
 
-    ol_pattern = r'^(\d+)[.、)]\s*'
+    ol_pattern = r'^(\d+)[.)]\s*'
     match = re.match(ol_pattern, text)
     if match:
         num = match.group(1)
@@ -190,16 +190,16 @@ def detect_list_item(text: str) -> tuple:
 
 def remove_page_footer(text: str) -> str:
     """
-    Remove page number patterns from footers, e.g. 'November 2025 8' or '2025年11月 8'.
+    Remove page number patterns from footers, e.g. 'November 2025 8' or '2025-11 8'.
     """
     # English month + year + page number
     months_en = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)'
     pattern_en = rf'\s*{months_en}\s+\d{{4}}\s+\d{{1,3}}\s*$'
     text = re.sub(pattern_en, '', text, flags=re.IGNORECASE)
 
-    # Chinese format: 2025年11月 8
-    pattern_cn = r'\s*\d{4}年\d{1,2}月\s+\d{1,3}\s*$'
-    text = re.sub(pattern_cn, '', text)
+    # Generic date format (YYYY-MM or YYYY.MM) + page number
+    pattern_date_page = r'\s*\d{4}[-/.]\d{1,2}\s+\d{1,3}\s*$'
+    text = re.sub(pattern_date_page, '', text)
 
     return text.rstrip()
 
@@ -636,7 +636,7 @@ def is_sentence_end(text: str) -> bool:
     text = text.rstrip()
     if not text:
         return True
-    end_puncts = '.。!！?？:：;；'
+    end_puncts = '.!?:;'
     return text[-1] in end_puncts
 
 

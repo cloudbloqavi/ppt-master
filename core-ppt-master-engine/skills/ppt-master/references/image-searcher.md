@@ -1,4 +1,4 @@
-> See [`image-base.md`](./image-base.md) for the common framework. Technical SVG/PPT constraints are in [`shared-standards.md`](./shared-standards.md).
+See [`image-base.md`](./image-base.md) for the common framework. Technical SVG/PPT constraints are in [`shared-standards.md`](./shared-standards.md).
 
 # Image_Searcher Reference Manual
 
@@ -82,7 +82,7 @@ Then `build_query_progression` tries: original → simplified (4 words) → simp
 |---|---|
 | Subject | Use 1-2 concrete nouns only: `offshore wind farm`, `Xiamen skyline`, `boardroom meeting` |
 | Quality cues | **DO NOT ADD QUALITY CUES** like `professional editorial photography` or `clean composition`. These APIs use exact keyword matching; adding long adjectives will result in 0 matches. |
-| Language | For Chinese landmarks: use precise Chinese names (e.g., `磁器口古镇`) if specifically targeting `--provider wikimedia`. For general stock providers (Pexels/Pixabay), use simple English nouns (e.g., `Chongqing Jiefangbei`); do NOT use complex Chinese sentences or overly long English descriptive strings which fail on these platforms. |
+| Language | For Chinese landmarks: use precise Chinese names (e.g., `Ciqikou Ancient Town`) if specifically targeting `--provider wikimedia`. For general stock providers (Pexels/Pixabay), use simple English nouns (e.g., `Chongqing Jiefangbei`); do NOT use complex Chinese sentences or overly long English descriptive strings which fail on these platforms. |
 
 **Forbidden — web negative prompts**: `not tourist snapshot`, `no amateur photo`, `avoid low quality`.
 

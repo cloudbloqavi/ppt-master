@@ -1,4 +1,3 @@
----
 description: Gather source materials via web search when the user supplies only a topic or requirements without source files. Produces a Markdown document and an image folder that feed SKILL.md Step 2's import-sources.
 ---
 
@@ -12,8 +11,8 @@ This workflow is **independent**: it owns the source-acquisition step when no fi
 
 | User-supplied input | Action |
 |---|---|
-| Topic name only (e.g. "做一个关于宫崎骏的 PPT") | Run this workflow |
-| Requirement description without facts (e.g. "介绍我们公司新产品") | Run this workflow |
+| Topic name only (e.g. "Create a PPT about Hayao Miyazaki") | Run this workflow |
+| Requirement description without facts (e.g. "Introduce our company's new product") | Run this workflow |
 | ≥1 page of substantive content already in chat | Skip — feed chat content into SKILL.md Step 1 directly |
 | Source file attached (PDF / DOCX / URL / Markdown) | Skip — go to SKILL.md Step 1 source converter |
 

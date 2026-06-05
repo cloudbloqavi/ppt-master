@@ -9,7 +9,7 @@ This guide is the **primary technical reference** for the `ppt-master` autonomou
 ## 📁 Repository Architecture
 
 ```
-ppt-master/                      # Root: SDK infrastructure & deployment config
+ai-builder-engine/               # Root: SDK infrastructure & deployment config
 ├── run_agent.py                 # ← Entry point. Run this to start the agent.
 ├── requirements.txt             # All Python deps (SDK + skill tools) — single source of truth
 ├── Dockerfile                   # Production container (Cloud Run Job)
@@ -70,25 +70,25 @@ Follow these steps exactly. Each step builds on the previous one.
 
 ```bash
 # Create the destination directory
-mkdir -p ~/development/ppt-master
+mkdir -p ~/development/ai-builder-engine
 
 # Sync the repository to your WSL home directory
-rsync -ah --info=progress2 /mnt/c/Users/<your-windows-username>/repo/ppt-master/ ~/development/ppt-master/
-cd ~/development/ppt-master
+rsync -ah --info=progress2 /mnt/c/Users/<your-windows-username>/repo/ai-builder-engine/ ~/development/ai-builder-engine/
+cd ~/development/ai-builder-engine
 ```
 
 **If you are on a native Linux machine** (fresh clone):
 
 ```bash
 # Clone the repository
-git clone https://github.com/<org>/ppt-master.git ~/development/ppt-master
-cd ~/development/ppt-master
+git clone https://github.com/<org>/ai-builder-engine.git ~/development/ai-builder-engine
+cd ~/development/ai-builder-engine
 ```
 
 Confirm you are on the right path:
 ```bash
 pwd
-# Expected: /home/<your-username>/development/ppt-master  (NOT /mnt/c/...)
+# Expected: /home/<your-username>/development/ai-builder-engine  (NOT /mnt/c/...)
 ```
 
 ---
@@ -248,7 +248,7 @@ What you will see during a run:
 ...
 [INFO] ════════════════════════════════════════════════════════════
 [INFO] ARTIFACT COPY STAGE
-[INFO]   Source dir:      /home/user/development/ppt-master/core-ppt-master-engine/projects
+[INFO]   Source dir:      /home/user/development/ai-builder-engine/core-ppt-master-engine/projects
 [INFO]   Destination dir: /home/user/ppt-outputs
 [INFO]   Run status:      success
 [INFO] ════════════════════════════════════════════════════════════
@@ -288,12 +288,12 @@ The `.pptx` file is in: `$OUTPUT_ARTIFACTS_DIR/<project-name>/`
 Once set up, your daily workflow is just:
 
 ```bash
-cd ~/development/ppt-master
+cd ~/development/ai-builder-engine
 source .venv/bin/activate
 
 # Sync latest code changes from Windows (WSL only)
 rsync -av --exclude='.venv' --exclude='__pycache__' --exclude='core-ppt-master-engine/projects' \
-  /mnt/c/Users/<your-windows-username>/repo/ppt-master/ ~/development/ppt-master/
+  /mnt/c/Users/<your-windows-username>/repo/ai-builder-engine/ ~/development/ai-builder-engine/
 
 # Run the agent
 python3 run_agent.py --prompt "Your prompt here"
@@ -329,21 +329,21 @@ Cloud Run containers use ephemeral storage — everything is lost when the conta
 | Resource | What to create | Notes |
 |:---|:---|:---|
 | GCP Project | With billing enabled | |
-| Artifact Registry repo | `ppt-master` in your region | `gcloud artifacts repositories create ppt-master --repository-format=docker --location=us-central1` |
+| Artifact Registry repo | `ai-builder-engine` in your region | `gcloud artifacts repositories create ai-builder-engine --repository-format=docker --location=us-central1` |
 | Secret Manager secret | `gemini-api-key` | `echo -n "AIzaSy..." \| gcloud secrets create gemini-api-key --data-file=-` |
-| GCS bucket | `your-ppt-master-outputs` | For output persistence |
+| GCS bucket | `your-ai-builder-outputs` | For output persistence |
 | Service Account | For Cloud Run Job runtime | Optional — defaults to Compute SA |
 
 ### Step 2 — Create the GCS output bucket
 
 ```bash
 # Create the bucket (outputs land here after every job run)
-gcloud storage buckets create gs://your-ppt-master-outputs \
+gcloud storage buckets create gs://your-ai-builder-outputs \
   --project=YOUR_PROJECT_ID \
   --location=us-central1
 
 # Grant the Cloud Run runtime service account write access to the bucket
-gcloud storage buckets add-iam-policy-binding gs://your-ppt-master-outputs \
+gcloud storage buckets add-iam-policy-binding gs://your-ai-builder-outputs \
   --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 ```
@@ -354,10 +354,10 @@ gcloud storage buckets add-iam-policy-binding gs://your-ppt-master-outputs \
 
 ```bash
 # Build the image locally (from the repo root)
-docker build -t ppt-master-agent:local .
+docker build -t ai-builder-agent:local .
 
 # Quick sanity check — run the self-test inside the container (no API key needed)
-docker run --rm ppt-master-agent:local python run_agent.py --self-test
+docker run --rm ai-builder-agent:local python run_agent.py --self-test
 ```
 
 Expected output from the container self-test:
@@ -382,7 +382,7 @@ docker run --rm \
   -e GEMINI_API_KEY="AIzaSy...your-key..." \
   -e OUTPUT_ARTIFACTS_DIR=/outputs \
   -v /tmp/ppt-local-outputs:/outputs \
-  ppt-master-agent:local \
+  ai-builder-agent:local \
   python run_agent.py --prompt "Create a 3-slide test deck."
 
 # Check what was produced
@@ -395,8 +395,8 @@ cat /tmp/ppt-local-outputs/run_manifest.json
 ### Step 3 — Deploy the Cloud Run Job
 
 ```bash
-gcloud run jobs create ppt-master-agent \
-  --image=us-central1-docker.pkg.dev/YOUR_PROJECT/ppt-master/ppt-master-agent:latest \
+gcloud run jobs create ai-builder-agent \
+  --image=us-central1-docker.pkg.dev/YOUR_PROJECT/ai-builder-engine/ai-builder-agent:latest \
   --region=us-central1 \
   --task-timeout=3600 \
   --max-retries=1 \
@@ -404,7 +404,7 @@ gcloud run jobs create ppt-master-agent \
   --cpu=2 \
   --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
   --set-env-vars="OUTPUT_ARTIFACTS_DIR=/workspace/outputs" \
-  --add-volume=name=gcs-output,type=cloud-storage,bucket=your-ppt-master-outputs \
+  --add-volume=name=gcs-output,type=cloud-storage,bucket=your-ai-builder-outputs \
   --add-volume-mount=volume=gcs-output,mount-path=/workspace/outputs
 ```
 
@@ -412,10 +412,10 @@ gcloud run jobs create ppt-master-agent \
 
 ```bash
 # Run with the AGENT_PROMPT env variable (set at job level during create/update)
-gcloud run jobs execute ppt-master-agent --region=us-central1 --wait
+gcloud run jobs execute ai-builder-agent --region=us-central1 --wait
 
 # Run with a one-off prompt override (overrides AGENT_PROMPT for this execution only)
-gcloud run jobs execute ppt-master-agent \
+gcloud run jobs execute ai-builder-agent \
   --region=us-central1 \
   --args="--prompt,Create a 15-slide investor pitch deck for a fintech startup." \
   --wait
@@ -426,7 +426,7 @@ gcloud run jobs execute ppt-master-agent \
 ```bash
 # List recent executions and their status
 gcloud run jobs executions list \
-  --job=ppt-master-agent \
+  --job=ai-builder-agent \
   --region=us-central1 \
   --limit=5
 ```
@@ -434,21 +434,21 @@ gcloud run jobs executions list \
 Expected output:
 ```
 NAME                           COMPLETIONTIME         SUCCEEDED  FAILED
-ppt-master-agent-execution-abc  2026-06-04T10:30:00Z  1          0
+ai-builder-agent-execution-abc  2026-06-04T10:30:00Z  1          0
 ```
 
 **Check outputs in GCS:**
 
 ```bash
 # List all output files from the last run
-gcloud storage ls -r gs://your-ppt-master-outputs/
+gcloud storage ls -r gs://your-ai-builder-outputs/
 
 # Download the run manifest to check status and file count
-gcloud storage cp gs://your-ppt-master-outputs/run_manifest.json /tmp/run_manifest.json
+gcloud storage cp gs://your-ai-builder-outputs/run_manifest.json /tmp/run_manifest.json
 cat /tmp/run_manifest.json
 
 # Download the PPTX output
-gcloud storage cp -r gs://your-ppt-master-outputs/<project-name>/ /tmp/ppt-output/
+gcloud storage cp -r gs://your-ai-builder-outputs/<project-name>/ /tmp/ppt-output/
 ```
 
 The `run_manifest.json` in GCS will show:
@@ -483,14 +483,14 @@ gcloud builds submit . \
   --project=YOUR_PROJECT_ID \
   --substitutions="\
     _REGION=us-central1,\
-    _GAR_REPOSITORY=ppt-master,\
-    _CLOUD_RUN_JOB_NAME=ppt-master-agent,\
+    _GAR_REPOSITORY=ai-builder-engine,\
+    _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
     _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
     _GEMINI_SECRET_NAME=gemini-api-key"
 
 # Option C — update the Cloud Run Job to a specific image tag (no rebuild)
-gcloud run jobs update ppt-master-agent \
-  --image=us-central1-docker.pkg.dev/YOUR_PROJECT/ppt-master/ppt-master-agent:COMMIT_SHA \
+gcloud run jobs update ai-builder-agent \
+  --image=us-central1-docker.pkg.dev/YOUR_PROJECT/ai-builder-engine/ai-builder-agent:COMMIT_SHA \
   --region=us-central1
 ```
 
@@ -499,14 +499,14 @@ gcloud run jobs update ppt-master-agent \
 ```bash
 gcloud builds triggers create github \
   --project=YOUR_PROJECT_ID \
-  --repo-name=ppt-master \
+  --repo-name=ai-builder-engine \
   --repo-owner=YOUR_GITHUB_ORG_OR_USER \
   --branch-pattern="^main$" \
   --build-config=cloudbuild.yaml \
   --substitutions="\
     _REGION=us-central1,\
-    _GAR_REPOSITORY=ppt-master,\
-    _CLOUD_RUN_JOB_NAME=ppt-master-agent,\
+    _GAR_REPOSITORY=ai-builder-engine,\
+    _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
     _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
     _GEMINI_SECRET_NAME=gemini-api-key"
 ```
@@ -521,8 +521,8 @@ gcloud builds submit . \
   --project=YOUR_PROJECT_ID \
   --substitutions="\
     _REGION=us-central1,\
-    _GAR_REPOSITORY=ppt-master,\
-    _CLOUD_RUN_JOB_NAME=ppt-master-agent,\
+    _GAR_REPOSITORY=ai-builder-engine,\
+    _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
     _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
     _GEMINI_SECRET_NAME=gemini-api-key"
 ```
@@ -560,7 +560,7 @@ All agent and harness logs write to stderr and are captured by Cloud Logging aut
 ```
 # All Cloud Run Job logs
 resource.type="cloud_run_job"
-resource.labels.job_name="ppt-master-agent"
+resource.labels.job_name="ai-builder-agent"
 
 # Harness (Go binary) logs only
 resource.type="cloud_run_job"
@@ -611,6 +611,24 @@ python3 auto_resume.py
 python3 auto_resume.py --depth 5
 ```
 
+### 🇨🇳 CJK Translation & Verification
+
+The project is strictly 100% English. To enforce the **Zero Chinese Characters Rule** and to prevent CJK (Chinese, Japanese, Korean) characters from being introduced during remote upstream merges, the repository includes an automated scanner and translator.
+
+#### Scanner Utility
+A validation script `check_cjk.py` is located in the scripts directory. You can run it locally to audit the repository or automatically translate content:
+```bash
+# Scan the repository for any Chinese characters (exits with 1 if found)
+python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --scan
+
+# Automatically translate all CJK characters in place using Gemini API
+python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --translate
+
+# Scan or translate specific files (e.g. conflicted files)
+python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --scan --files path/to/file1.py
+```
+For remote updates, always follow the merge guidelines in [AGENTS.md](AGENTS.md) to ensure all incoming CJK characters are translated and template folders are mapped to lowercase English IDs.
+
 ---
 
 ## ⚠️ Troubleshooting
@@ -618,7 +636,7 @@ python3 auto_resume.py --depth 5
 ### WS 1006 timeout / connection drops
 
 **Cause**: Running from a `/mnt/c/...` path in WSL.
-**Fix**: Copy the repo to `~/development/ppt-master` and run from there. See [Step 1](#step-1--get-the-repository-onto-a-native-linux-filesystem).
+**Fix**: Copy the repo to `~/development/ai-builder-engine` and run from there. See [Step 1](#step-1--get-the-repository-onto-a-native-linux-filesystem).
 
 ### `GEMINI_API_KEY` or `OUTPUT_ARTIFACTS_DIR` missing
 
@@ -630,7 +648,7 @@ cat .env
 
 # Check venv is active (prompt should show (.venv))
 which python3
-# Expected: /home/.../ppt-master/.venv/bin/python3
+# Expected: /home/.../ai-builder-engine/.venv/bin/python3
 
 # Re-activate if needed
 source .venv/bin/activate

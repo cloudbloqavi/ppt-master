@@ -1,4 +1,3 @@
----
 brand_id: anthropic
 kind: brand
 summary: Anthropic brand identity — AI/LLM tech talks, developer conferences, technical training, product launches
@@ -60,7 +59,7 @@ Anthropic uses a six-petal star **mark** that is most commonly seen locked up wi
 ## V. Voice & Tone
 
 - Formality: professional-neutral
-- Person: we / you (English), 我们 / 你 (Chinese)
+- Person: we / you
 - Emoji: avoid
 - Abbreviations: spell-out-first-use
 

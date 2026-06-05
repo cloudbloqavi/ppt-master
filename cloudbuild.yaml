@@ -10,14 +10,14 @@
 # Trigger setup (run once per environment):
 #   gcloud builds triggers create github \
 #     --project=$PROJECT_ID \
-#     --repo-name=ppt-master \
+#     --repo-name=ai-builder-engine \
 #     --repo-owner=<github-org-or-user> \
 #     --branch-pattern="^main$" \
 #     --build-config=cloudbuild.yaml \
 #     --substitutions="\
 #       _REGION=us-central1,\
-#       _GAR_REPOSITORY=ppt-master,\
-#       _CLOUD_RUN_JOB_NAME=ppt-master-agent,\
+#       _GAR_REPOSITORY=ai-builder-engine,\
+#       _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
 #       _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
 #       _GEMINI_SECRET_NAME=gemini-api-key"
 #
@@ -27,8 +27,8 @@
 #     --project=$PROJECT_ID \
 #     --substitutions="\
 #       _REGION=us-central1,\
-#       _GAR_REPOSITORY=ppt-master,\
-#       _CLOUD_RUN_JOB_NAME=ppt-master-agent,\
+#       _GAR_REPOSITORY=ai-builder-engine,\
+#       _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
 #       _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
 #       _GEMINI_SECRET_NAME=gemini-api-key"
 #
@@ -44,8 +44,8 @@
 # These are NOT secrets — they are plain configuration values.
 substitutions:
   _REGION: us-central1
-  _GAR_REPOSITORY: ppt-master
-  _CLOUD_RUN_JOB_NAME: ppt-master-agent
+  _GAR_REPOSITORY: ai-builder-engine
+  _CLOUD_RUN_JOB_NAME: ai-builder-agent
   _OUTPUT_ARTIFACTS_DIR: /workspace/outputs
   _GEMINI_SECRET_NAME: gemini-api-key   # Secret Manager secret name (not the value)
 
@@ -67,15 +67,15 @@ steps:
     args:
       - build
       - --tag
-      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:$COMMIT_SHA
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:$COMMIT_SHA
       - --tag
-      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:latest
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:latest
       - --label
       - git-commit=$COMMIT_SHA
       - --label
       - built-by=cloud-build
       - --cache-from
-      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:latest
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:latest
       - .
 
   # ── Step 2: Push both image tags to Artifact Registry ───────
@@ -83,14 +83,14 @@ steps:
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:$COMMIT_SHA
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:$COMMIT_SHA
     waitFor: [build]
 
   - id: push-latest
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:latest
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:latest
     waitFor: [build]
 
   # ── Step 3: Create or update the Cloud Run Job ──────────────
@@ -104,7 +104,7 @@ steps:
       - |
         set -euo pipefail
 
-        IMAGE="$_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:$COMMIT_SHA"
+        IMAGE="$_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:$COMMIT_SHA"
         JOB_NAME="$_CLOUD_RUN_JOB_NAME"
         REGION="$_REGION"
 
@@ -150,5 +150,5 @@ steps:
 
 # Final image published to Artifact Registry
 images:
-  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:$COMMIT_SHA
-  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ppt-master-agent:latest
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:$COMMIT_SHA
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_GAR_REPOSITORY/ai-builder-agent:latest

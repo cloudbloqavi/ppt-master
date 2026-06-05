@@ -87,22 +87,22 @@ Match `design_spec.md d. Style` (mode + descriptor) against this table. First ma
 |---|---|---|
 | Top Consulting / strategic / MBB | `editorial` or `vector-illustration` | `blueprint`, `minimalist-swiss` |
 | General Consulting / corporate report | `vector-illustration` | `flat`, `digital-dashboard` |
-| High-end consulting / luxury / 高端 / design-firm | `minimalist-swiss` | `editorial`, `vector-illustration` |
+| High-end consulting / luxury / high-end / design-firm | `minimalist-swiss` | `editorial`, `vector-illustration` |
 | Tech / SaaS / AI / system / architecture | `3d-isometric`, `blueprint`, or `digital-dashboard` | `flat`, `vector-illustration` |
 | Modern SaaS / fintech / health-tech / premium app | `glassmorphism` | `digital-dashboard`, `flat` |
 | Product launch / brand / marketing | `flat`, `3d-isometric`, or `corporate-photo` | `vector-illustration` |
-| Education / training / onboarding / 教学 | `sketch-notes` | `vector-illustration` (if school is corporate), `paper-cut` |
-| Children / story / storybook / 儿童 | `fantasy-animation` | `paper-cut`, `watercolor`, `sketch-notes` |
-| Cultural / folk / festival / 文化 / 节日 | `paper-cut` | `vintage-poster`, `screen-print` |
-| Methodology / Before-After / manifesto / 方法论 | `ink-notes` | `editorial` |
+| Education / training / onboarding / education | `sketch-notes` | `vector-illustration` (if school is corporate), `paper-cut` |
+| Children / story / storybook / children | `fantasy-animation` | `paper-cut`, `watercolor`, `sketch-notes` |
+| Cultural / folk / festival / cultural / festival | `paper-cut` | `vintage-poster`, `screen-print` |
+| Methodology / Before-After / manifesto / methodology | `ink-notes` | `editorial` |
 | Government / formal / official report | `editorial` or `corporate-photo` | `vector-illustration` |
-| Finance / data journalism / 财经 | `editorial` or `digital-dashboard` | `vector-illustration` |
-| Personal story / 个人成长 / lifestyle | `watercolor`, `warm-scene` | `corporate-photo`, `paper-cut` |
+| Finance / data journalism / finance | `editorial` or `digital-dashboard` | `vector-illustration` |
+| Personal story / personal growth / lifestyle | `watercolor`, `warm-scene` | `corporate-photo`, `paper-cut` |
 | Cultural / media / opinion / cinematic | `screen-print`, `vintage-poster` | `editorial`, `warm-scene` |
-| Brand heritage / hospitality / 老字号 / 周年 | `vintage-poster` | `screen-print`, `editorial` |
-| Gaming / retro / 8-bit / 复古 | `pixel-art` | `vintage-poster` |
-| Environment / wellness / 环保 / 户外 | `nature` | `watercolor`, `paper-cut` |
-| Classroom / blackboard / 课堂 | `chalkboard` | `sketch-notes` |
+| Brand heritage / hospitality / heritage brand / anniversary | `vintage-poster` | `screen-print`, `editorial` |
+| Gaming / retro / 8-bit / retro | `pixel-art` | `vintage-poster` |
+| Environment / wellness / environment / outdoor | `nature` | `watercolor`, `paper-cut` |
+| Classroom / blackboard / classroom | `chalkboard` | `sketch-notes` |
 | Team / company / product photo | `corporate-photo` | — |
 
 ---

@@ -1,10 +1,8 @@
----
 description: Generate per-slide narration audio with AI-recommended voice selection, then optionally re-export PPTX with embedded audio
----
 
 # Generate Audio Workflow
 
-> Standalone post-export step. Run when the user asks for "生成音频" / "录制旁白" / "narrated PPT" / "video export with voice", or proactively offer it after a deck is exported. Produces one audio file per slide via `edge-tts` by default, or a cloud TTS provider (`elevenlabs` / `minimax` / `qwen` / `cosyvoice`) when the user chooses high-quality narration or a cloned voice, then optionally re-exports a video-ready PPTX with audio embedded and per-slide auto-advance timings.
+> Standalone post-export step. Run when the user asks for "Generate Audio" / "Record Narration" / "narrated PPT" / "video export with voice", or proactively offer it after a deck is exported. Produces one audio file per slide via `edge-tts` by default, or a cloud TTS provider (`elevenlabs` / `minimax` / `qwen` / `cosyvoice`) when the user chooses high-quality narration or a cloned voice, then optionally re-exports a video-ready PPTX with audio embedded and per-slide auto-advance timings.
 
 This workflow is **independent**: it reads `notes/*.md` and queries the selected TTS voice catalog — no upstream conversation context required. Safe to invoke in a fresh session.
 
@@ -68,13 +66,13 @@ The output is a flat list of all available voices for the selected provider. Fro
 - **For ElevenLabs**: prefer voices already present in the user's account; if the user provides a specific `voice_id`, do not override it.
 - **For MiniMax / Qwen / CosyVoice**: if the user provides a cloned `voice_id`, use it directly. Do not attempt voice cloning inside the narration workflow.
 - **Match the deck's tone** — pick the strongest recommendation based on style:
-  - Consultant / data-driven / 财报 → 稳重男声（如 `zh-CN-YunjianNeural`）or 清晰女声（如 `zh-CN-XiaoxiaoNeural`）
-  - General / 教学 / 产品介绍 → 明亮女声 / 年轻男声（如 `zh-CN-XiaoyiNeural` / `zh-CN-YunxiNeural`）
-  - 发布会 / 播报 → 播报感男声（如 `zh-CN-YunyangNeural`）
+  - Consultant / data-driven / financial report → steady male voice (e.g. `zh-CN-YunjianNeural`) or clear female voice (e.g. `zh-CN-XiaoxiaoNeural`)
+  - General / teaching / product introduction → bright female voice / young male voice (e.g. `zh-CN-XiaoyiNeural` / `zh-CN-YunxiNeural`)
+  - Press conference / broadcast → broadcast-style male voice (e.g. `zh-CN-YunyangNeural`)
   - English consultant deck → `en-US-GuyNeural` (steady) or `en-US-JennyNeural` (clear)
   - Japanese / Korean → pick from `ja-JP-*` / `ko-KR-*` neural voices, mark gender + tone
 
-For each candidate, write a **one-line Chinese description** covering: 性别 · 调性 · 适用场景。For cloud providers, include the voice name/ID exactly as it must be passed to `--voice-id`.
+For each candidate, write a **one-line description** covering: Gender · Tone · Applicable Scenario. For cloud providers, include the voice name/ID exactly as it must be passed to `--voice-id`.
 
 ---
 
@@ -82,33 +80,33 @@ For each candidate, write a **one-line Chinese description** covering: 性别 ·
 
 Send a single message to the user that asks all three questions at once and provides a recommended value for each. Do NOT split into multiple rounds.
 
-**Cloned-voice fast path**: if the user mentioned a cloned voice / 克隆音色 / 复刻音色 / "my own voice" along with a `voice_id`, skip the voice-recommendation list — set the provider to whichever the user named (`elevenlabs` / `minimax` / `qwen` / `cosyvoice`), pin the `voice_id` they gave you, and only confirm rate + embed-or-not.
+**Cloned-voice fast path**: if the user mentioned a cloned voice / cloned voice / replicated voice / "my own voice" along with a `voice_id`, skip the voice-recommendation list — set the provider to whichever the user named (`elevenlabs` / `minimax` / `qwen` / `cosyvoice`), pin the `voice_id` they gave you, and only confirm rate + embed-or-not.
 
-**Message template** (Chinese; translate to user's chat language if different):
+**Message template** (translate to user's chat language if different):
 
-> 检测到 notes 主语言为 **<语言>**（locale: `<locale>`）。基于 deck 调性（<风格>），我推荐以下配置：
+> The primary language of the notes is detected as **<Language>** (locale: `<locale>`). Based on the deck's tone (<Style>), I recommend the following configuration:
 >
-> **生成模式**：⭐ 推荐 `<edge|elevenlabs|minimax|qwen|cosyvoice>`（理由：<一句话，如"无需配置，稳定生成"或"用户要求高质量云端音色">）。
+> **Generation Mode**: ⭐ Recommended `<edge|elevenlabs|minimax|qwen|cosyvoice>` (Reason: <One sentence, such as "no configuration needed, stable generation" or "user requested high-quality cloud voice">).
 >
-> **音色**：
-> - **[1] <ShortName>** — <性别·调性·适用场景> ⭐ **推荐**
-> - [2] <ShortName> — <性别·调性·适用场景>
-> - [3] <ShortName> — <性别·调性·适用场景>
-> - [4] <ShortName> — <性别·调性·适用场景>
-> - [5] <ShortName> — <性别·调性·适用场景>
-> - 也可直接输入清单中的其他 ShortName。
+> **Voice**:
+> - **[1] <ShortName>** — <Gender · Tone · Applicable Scenario> ⭐ **Recommended**
+> - [2] <ShortName> — <Gender · Tone · Applicable Scenario>
+> - [3] <ShortName> — <Gender · Tone · Applicable Scenario>
+> - [4] <ShortName> — <Gender · Tone · Applicable Scenario>
+> - [5] <ShortName> — <Gender · Tone · Applicable Scenario>
+> - You can also directly enter other ShortNames from the list.
 >
-> **语速/风格参数**：⭐ 推荐 `<rate or provider defaults>`（理由：<一句话，如"页均 2–3 句，正常语速听感最稳"或"ElevenLabs 默认 voice settings 保留音色原始表现最稳">）。
+> **Speech Rate/Style Parameters**: ⭐ Recommended `<rate or provider defaults>` (Reason: <One sentence, such as "2–3 sentences per page, normal speech rate sounds most stable" or "ElevenLabs default voice settings best preserve the original voice performance">).
 >
-> **生成完是否重新导出嵌入音频的 PPTX**：⭐ 推荐 **是**（一次到位，自动按音频时长设页面停留）。
+> **Re-export PPTX with embedded audio after generation**: ⭐ Recommended **Yes** (one-shot, automatically sets page duration based on audio length).
 >
-> 直接回"好"用全部推荐值，或告诉我想改的部分（如"音色 2，语速 -5%"或"用 MiniMax 的 voice_id xxx"）。
+> Reply "OK" to use all recommended values, or tell me what you want to change (e.g., "Voice 2, rate -5%" or "use MiniMax's voice_id xxx").
 
 **Recommended-value rules**:
-- 生成模式：默认 `edge`；当用户明确追求高质量云端音色或提供 cloud voice ID 时，按用户指定选 `elevenlabs` / `minimax` / `qwen` / `cosyvoice`。
-- 音色：从 Step 2 候选里挑最贴合 deck 调性的那一个。
-- 语速：edge 默认 `+0%`；notes 字数密集（页均 >4 句长句）建议 `-5%`；notes 简短紧凑建议 `+5%`；超出此范围需说明理由。Cloud providers 默认用 provider defaults，除非用户明确要调速或改风格。
-- 嵌入：默认推荐"是"；除非用户已有定制 PPTX 不希望覆盖。
+- Generation Mode: `edge` by default; when the user explicitly seeks high-quality cloud voice or provides a cloud voice ID, select `elevenlabs` / `minimax` / `qwen` / `cosyvoice` as specified by the user.
+- Voice: Pick the one from Step 2 candidates that best matches the deck's tone.
+- Speech Rate: edge defaults to `+0%`; if notes are dense (average >4 long sentences per page), `-5%` is suggested; if notes are brief and concise, `+5%` is suggested; reasons must be given if outside this range. Cloud providers default to provider defaults, unless the user explicitly requests to adjust speed or style.
+- Embedding: "Yes" is recommended by default; unless the user has a customized PPTX they do not wish to overwrite.
 
 ---
 

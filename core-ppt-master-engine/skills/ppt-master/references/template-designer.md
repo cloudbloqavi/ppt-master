@@ -1,4 +1,4 @@
-> See shared-standards.md for common technical constraints.
+See shared-standards.md for common technical constraints.
 
 # Template Designer — Template Design Role
 
@@ -173,11 +173,11 @@ Sections to **omit** from template `design_spec.md` (sourced elsewhere — listi
 |---|---|
 | SVG technical constraints / Mandatory rules / Prohibited elements | `shared-standards.md` §1 |
 | PPT compatibility rules (`<g opacity>`, inline-styles-only, etc.) | `shared-standards.md` |
-| Generic layout pattern library (centered card / 三栏 / timeline / …) | `design_spec_reference.md` §V |
+| Generic layout pattern library (centered card / three-column / timeline / …) | `design_spec_reference.md` §V |
 | Generic spacing bands (margin 40-60px, card gap 20-32px, etc.) | `design_spec_reference.md` §V |
 | Generic font-size hierarchy (cover 2.5-5x body, page title 1.5-2x, …) | `design_spec_reference.md` §IV |
 | Canonical placeholder table (`{{TITLE}}`, `{{PAGE_NUM}}`, …) | §4 below |
-| Content methodology (pyramid / SCQA / MECE / 金字塔) | `strategist.md` |
+| Content methodology (pyramid / SCQA / MECE / pyramid) | `strategist.md` |
 | "Usage Instructions" boilerplate (copy template / select page / …) | `create-template.md` |
 | Created Date / Page Count rows | not a library-level field |
 
@@ -371,8 +371,8 @@ templates/
 │   ├── academic_defense/  # Academic-defense structure (no identity)
 │   └── pixel_retro/       # Pixel retro / cyberpunk structure (no identity)
 └── decks/
-    ├── 招商银行/          # China Merchants Bank full PPT replica
-    └── 中国电建_常规/      # PowerChina full PPT replica
+    ├── china_merchants_bank/          # China Merchants Bank full PPT replica
+    └── powerchina_standard/      # PowerChina full PPT replica
 ```
 
 ---

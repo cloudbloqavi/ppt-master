@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
-  <!-- 模板: 目录页 - 像素复古风格 -->
+  <!-- Template: Table of Contents Page - Pixel Retro Style -->
   
   <defs>
     <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
@@ -12,14 +12,14 @@
     </filter>
   </defs>
   
-  <!-- 深空黑背景 -->
+  <!-- Deep Space Black Background -->
   <rect width="1280" height="720" fill="#0D1117" />
   
-  <!-- 顶部装饰线 -->
+  <!-- Top Decorative Line -->
   <rect x="0" y="0" width="1280" height="4" fill="#39FF14" fill-opacity="0.8" />
   <rect x="0" y="4" width="1280" height="2" fill="#39FF14" fill-opacity="0.4" />
   
-  <!-- 页面标题 -->
+  <!-- Page Title -->
   <text x="60" y="70" font-family="Consolas, Monaco, monospace" font-size="36" font-weight="bold" fill="#39FF14" filter="url(#glowGreen)">
     📍 {{PAGE_TITLE}}
   </text>
@@ -27,50 +27,50 @@
     {{PAGE_TITLE_EN}}
   </text>
   
-  <!-- 分隔线 -->
+  <!-- Separator Line -->
   <rect x="60" y="120" width="200" height="2" fill="#30363D" />
   
-  <!-- 目录区域 -->
+  <!-- Table of Contents Area -->
   <g transform="translate(60, 160)">
     
-    <!-- 第一章节 - 关键必学 -->
+    <!-- Chapter One - Essential Learning -->
     <g transform="translate(0, 0)">
       <rect x="0" y="0" width="560" height="80" fill="#161B22" stroke="#39FF14" stroke-width="2" />
-      <!-- 重要度标签 -->
+      <!-- Importance Tag -->
       <rect x="0" y="0" width="100" height="24" fill="#FF2E97" />
-      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🔴 关键必学</text>
-      <!-- 章节序号 -->
+      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🔴 Essential Learning</text>
+      <!-- Chapter Number -->
       <rect x="20" y="35" width="40" height="40" fill="#39FF14" />
       <text x="40" y="62" text-anchor="middle" font-family="Consolas, monospace" font-size="24" font-weight="bold" fill="#0D1117">01</text>
-      <!-- 章节标题 -->
+      <!-- Chapter Title -->
       <text x="80" y="60" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="20" fill="#E6EDF3">{{TOC_ITEM_1_TITLE}}</text>
     </g>
     
-    <!-- 第二章节 -->
+    <!-- Chapter Two -->
     <g transform="translate(0, 100)">
       <rect x="0" y="0" width="560" height="80" fill="#161B22" stroke="#00D4FF" stroke-width="2" />
       <rect x="0" y="0" width="100" height="24" fill="#FF2E97" />
-      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🔴 关键必学</text>
+      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🔴 Essential Learning</text>
       <rect x="20" y="35" width="40" height="40" fill="#00D4FF" />
       <text x="40" y="62" text-anchor="middle" font-family="Consolas, monospace" font-size="24" font-weight="bold" fill="#0D1117">02</text>
       <text x="80" y="60" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="20" fill="#E6EDF3">{{TOC_ITEM_2_TITLE}}</text>
     </g>
     
-    <!-- 第三章节 - 建议了解 -->
+    <!-- Chapter Three - Recommended Knowledge -->
     <g transform="translate(0, 200)">
       <rect x="0" y="0" width="560" height="80" fill="#161B22" stroke="#FFD700" stroke-width="2" />
       <rect x="0" y="0" width="100" height="24" fill="#FFD700" />
-      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#0D1117" font-weight="bold">🟡 建议了解</text>
+      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#0D1117" font-weight="bold">🟡 Recommended Knowledge</text>
       <rect x="20" y="35" width="40" height="40" fill="#FFD700" />
       <text x="40" y="62" text-anchor="middle" font-family="Consolas, monospace" font-size="24" font-weight="bold" fill="#0D1117">03</text>
       <text x="80" y="60" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="20" fill="#E6EDF3">{{TOC_ITEM_3_TITLE}}</text>
     </g>
     
-    <!-- 第四章节 - 可选内容 -->
+    <!-- Chapter Four - Optional Content -->
     <g transform="translate(0, 300)">
       <rect x="0" y="0" width="560" height="80" fill="#161B22" stroke="#8B949E" stroke-width="2" />
       <rect x="0" y="0" width="100" height="24" fill="#238636" />
-      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🟢 可选内容</text>
+      <text x="50" y="17" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#FFFFFF" font-weight="bold">🟢 Optional Content</text>
       <rect x="20" y="35" width="40" height="40" fill="#238636" />
       <text x="40" y="62" text-anchor="middle" font-family="Consolas, monospace" font-size="24" font-weight="bold" fill="#FFFFFF">04</text>
       <text x="80" y="60" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="20" fill="#8B949E">{{TOC_ITEM_4_TITLE}}</text>
@@ -78,52 +78,52 @@
     
   </g>
   
-  <!-- 右侧装饰区域 -->
+  <!-- Right Decorative Area -->
   <g transform="translate(680, 160)">
     <rect x="0" y="0" width="540" height="380" fill="#161B22" stroke="#30363D" stroke-width="2" stroke-dasharray="8 4" />
     
-    <!-- 进度指示 -->
-    <text x="270" y="50" text-anchor="middle" font-family="Consolas, monospace" font-size="20" fill="#00D4FF">📊 学习进度</text>
+    <!-- Progress Indicator -->
+    <text x="270" y="50" text-anchor="middle" font-family="Consolas, monospace" font-size="20" fill="#00D4FF">📊 Learning Progress</text>
     
-    <!-- 进度条 -->
+    <!-- Progress Bar -->
     <rect x="40" y="80" width="460" height="30" fill="#0D1117" stroke="#30363D" stroke-width="1" />
     <rect x="42" y="82" width="0" height="26" fill="#39FF14" fill-opacity="0.8" />
-    <text x="270" y="102" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#8B949E">0% 完成</text>
+    <text x="270" y="102" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#8B949E">0% Complete</text>
     
-    <!-- 统计信息 -->
+    <!-- Statistics -->
     <g transform="translate(40, 140)">
       <rect x="0" y="0" width="140" height="80" fill="#0D1117" stroke="#39FF14" stroke-width="2" />
       <text x="70" y="35" text-anchor="middle" font-family="Consolas, monospace" font-size="32" font-weight="bold" fill="#39FF14">{{STAT_1}}</text>
-      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">关键内容</text>
+      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">Essential Content</text>
     </g>
     <g transform="translate(160, 140)">
       <rect x="0" y="0" width="140" height="80" fill="#0D1117" stroke="#FFD700" stroke-width="2" />
       <text x="70" y="35" text-anchor="middle" font-family="Consolas, monospace" font-size="32" font-weight="bold" fill="#FFD700">{{STAT_2}}</text>
-      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">建议了解</text>
+      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">Recommended Knowledge</text>
     </g>
     <g transform="translate(320, 140)">
       <rect x="0" y="0" width="140" height="80" fill="#0D1117" stroke="#238636" stroke-width="2" />
       <text x="70" y="35" text-anchor="middle" font-family="Consolas, monospace" font-size="32" font-weight="bold" fill="#238636">{{STAT_3}}</text>
-      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">可选内容</text>
+      <text x="70" y="60" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="14" fill="#8B949E">Optional Content</text>
     </g>
     
-    <!-- 提示信息 -->
+    <!-- Hint Message -->
     <text x="270" y="280" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#8B949E">
-      █ 点击章节开始学习
+      █ Click a chapter to start learning
     </text>
     
-    <!-- 开始按钮 -->
+    <!-- Start Button -->
     <g transform="translate(170, 300)">
       <rect x="0" y="0" width="200" height="50" fill="#39FF14" />
       <text x="100" y="33" text-anchor="middle" font-family="Consolas, monospace" font-size="18" font-weight="bold" fill="#0D1117">▶ START</text>
     </g>
   </g>
   
-  <!-- 底部装饰线 -->
+  <!-- Bottom Decorative Line -->
   <rect x="0" y="712" width="1280" height="4" fill="#39FF14" fill-opacity="0.4" />
   <rect x="0" y="716" width="1280" height="4" fill="#39FF14" fill-opacity="0.8" />
   
-  <!-- 页码 -->
+  <!-- Page Number -->
   <text x="60" y="690" font-family="Consolas, monospace" font-size="14" fill="#8B949E">02/{{TOTAL_PAGES}}</text>
   <text x="1220" y="690" text-anchor="end" font-family="Consolas, monospace" font-size="14" fill="#8B949E">Table of Contents</text>
 

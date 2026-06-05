@@ -85,7 +85,7 @@ def read_chart_data(chart_root: ET.Element) -> dict[str, Any]:
     for index, series in enumerate(series_nodes, start=1):
         series_payload.append(
             {
-                "name": _series_name(series, f"系列{index}"),
+                "name": _series_name(series, f"Series {index}"),
                 "values": _cache_values(series.find("c:val", NS), numeric=True),
             }
         )

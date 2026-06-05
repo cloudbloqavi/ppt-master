@@ -21,11 +21,11 @@ If the static checker has not been run or has failed, the subagent must abort wi
 
 Each review subagent processes a **batch** of pages (see §6.1 for batch sizing). The inputs are:
 
-1. **Page batch** — a list of `(svg_path, png_path, page_role)` tuples, one per assigned page. `svg_path` resolves under `<project>/svg_output/<page>.svg`, `png_path` under `<project>/.preview/<page>.png`. `page_role` is one of `cover` / `chapter` / `tldr` / `content` / `data` / `closing` / `breathing`, parsed from `design_spec.md §IX` by the orchestrator — subagents do **not** guess.
-2. **Path to this rubric file**
-3. **`<project>/design_spec.md`** (read-only) — §IX outline is the source of truth for "what should this page deliver"
-4. **`<project>/spec_lock.md`** (read-only) — brand-locked values
-5. **`<project>/.review/`** (writable) — where backups and findings JSON go
+1.  **Page batch** — a list of `(svg_path, png_path, page_role)` tuples, one per assigned page. `svg_path` resolves under `<project>/svg_output/<page>.svg`, `png_path` under `<project>/.preview/<page>.png`. `page_role` is one of `cover` / `chapter` / `tldr` / `content` / `data` / `closing` / `breathing`, parsed from `design_spec.md §IX` by the orchestrator — subagents do **not** guess.
+2.  **Path to this rubric file**
+3.  **`<project>/design_spec.md`** (read-only) — §IX outline is the source of truth for "what should this page deliver"
+4.  **`<project>/spec_lock.md`** (read-only) — brand-locked values
+5.  **`<project>/.review/`** (writable) — where backups and findings JSON go
 
 The subagent reads inputs 2–4 **once** at the start of its turn, then iterates over the page batch sequentially (one page at a time): apply the rubric → write `<project>/.review/<page>.json` → move on. This is the core token-saving move — three fixed documents are read N/K times instead of N times.
 
@@ -56,15 +56,15 @@ H8 → H9      (content)
 
 If H4 fires and the foreground or background color is a **brand token** (defined in `spec_lock.md`) — i.e., the violation will repeat on every page using that token — do **not** touch the SVG. Brand decisions are §3 Don't-Touch; even position-only escapes (scrim insertion, font-size escalation) shift the page's visual weight in ways that should be a brand-level decision, not a per-page subagent decision. Instead:
 
-1. Record the finding in the page JSON under `needs_human_items` with `rule: "H4"`, the offending element selector, and `suggested_fix_summary` describing the brand-level options (e.g., "raise body-text token from `#6E7681` to `#8B949E` deck-wide" or "introduce a scrim style in the brand").
-2. Append the finding to `<project>/.review/brand_review.json` (append-only log; one entry per distinct token+context pair). The orchestrator aggregates and surfaces this to the main agent at the end of the run so the user can make one cross-deck decision instead of N per-page ones.
-3. The page's `status` is `needs_human` if H4 is the only Hard hit on the page; if other (non-brand) Hard hits were fixed, the page still finishes as `fixed` and the brand-token H4 entry sits in `needs_human_items` alongside.
+1.  Record the finding in the page JSON under `needs_human_items` with `rule: "H4"`, the offending element selector, and `suggested_fix_summary` describing the brand-level options (e.g., "raise body-text token from `#6E7681` to `#8B949E` deck-wide" or "introduce a scrim style in the brand").
+2.  Append the finding to `<project>/.review/brand_review.json` (append-only log; one entry per distinct token+context pair). The orchestrator aggregates and surfaces this to the main agent at the end of the run so the user can make one cross-deck decision instead of N per-page ones.
+3.  The page's `status` is `needs_human` if H4 is the only Hard hit on the page; if other (non-brand) Hard hits were fixed, the page still finishes as `fixed` and the brand-token H4 entry sits in `needs_human_items` alongside.
 
 The aggregated brand review is the responsibility of the orchestrator at the end of the run, not the per-page subagent.
 
 ## §2 Soft rules (act only when clearly bad)
 
-Subagents must apply the **明显** ("clearly bad") threshold — when in doubt, leave it. Better to under-fix than to oscillate.
+Subagents must apply the **clearly bad** threshold — when in doubt, leave it. Better to under-fix than to oscillate.
 
 | # | Category | Trigger | Fix direction |
 |---|----------|---------|---------------|
@@ -83,11 +83,11 @@ Subagents must apply the **明显** ("clearly bad") threshold — when in doubt,
 
 Hard boundary, equal weight to §1.
 
-- **Brand decisions** — color tokens, font families, geometry style (decided by `spec_lock.md` / brand directory)
-- **Layout restructure** — do not change column counts, replace chart types, add/remove sections
-- **Content** — do not add or remove copy; only adjust position, font-size (within ramp), spacing, letter-spacing, alignment, scrim
-- **Other files** — never edit `design_spec.md` / `spec_lock.md` / `animations.json` / `image_prompts.json` / `images/` / other pages' SVGs
-- **Atomicity** — one edit per fix, no bulk multi-element replacements
+-   **Brand decisions** — color tokens, font families, geometry style (decided by `spec_lock.md` / brand directory)
+-   **Layout restructure** — do not change column counts, replace chart types, add/remove sections
+-   **Content** — do not add or remove copy; only adjust position, font-size (within ramp), spacing, letter-spacing, alignment, scrim
+-   **Other files** — never edit `design_spec.md` / `spec_lock.md` / `animations.json` / `image_prompts.json` / `images/` / other pages' SVGs
+-   **Atomicity** — one edit per fix, no bulk multi-element replacements
 
 If a "violation" requires reinterpreting `design_spec.md` to fix → mark `needs_human` with a one-line `suggested_fix_summary`.
 
@@ -97,9 +97,9 @@ If a "violation" requires reinterpreting `design_spec.md` to fix → mark `needs
 
 Run before applying any rule:
 
-- PNG file exists and is non-zero bytes
-- PNG dimensions = 1280 × 720
-- PNG is **not** all-background (a histogram check: count of background-color pixels < 99% of total) — guards against blank/white-out renders only, **does not** filter sparse dark layouts
+-   PNG file exists and is non-zero bytes
+-   PNG dimensions = 1280 × 720
+-   PNG is **not** all-background (a histogram check: count of background-color pixels < 99% of total) — guards against blank/white-out renders only, **does not** filter sparse dark layouts
 
 Any check fails → status = `render_failed`, abort without scanning rules.
 
@@ -115,14 +115,14 @@ iteration 3 (opt-in): report only, no further fix
 
 Per-iteration fix caps:
 
-- **Hard rules**: no per-round cap — every Hard hit must be addressed in the iteration it was found in
-- **Soft rules**: ≤ 2 fixes per iteration; remaining Soft hits go to `untouched_concerns`
+-   **Hard rules**: no per-round cap — every Hard hit must be addressed in the iteration it was found in
+-   **Soft rules**: ≤ 2 fixes per iteration; remaining Soft hits go to `untouched_concerns`
 
 ### §4.2 Termination conditions
 
-- **Rollback trigger**: any iteration's fix introduces a **new Hard hit** that did not exist before → immediately `cp` the backup back over the SVG, status = `needs_human`, finding records "rolled back fix X — created Hard Y"
-- **Soft thrash trigger** (iteration budget ≥ 2 only): iteration 2's fix introduces a **new Soft hit** that did not exist before → stop, status = `needs_human` with note "fixes are competing"
-- **Clean exit**: iteration ends with zero Hard hits and ≤ 1 Soft hit remaining → status = `ok` if no fixes were applied, `fixed` if any were applied
+-   **Rollback trigger**: any iteration's fix introduces a **new Hard hit** that did not exist before → immediately `cp` the backup back over the SVG, status = `needs_human`, finding records "rolled back fix X — created Hard Y"
+-   **Soft thrash trigger** (iteration budget ≥ 2 only): iteration 2's fix introduces a **new Soft hit** that did not exist before → stop, status = `needs_human` with note "fixes are competing"
+-   **Clean exit**: iteration ends with zero Hard hits and ≤ 1 Soft hit remaining → status = `ok` if no fixes were applied, `fixed` if any were applied
 
 ### §4.3 Backup discipline
 
@@ -177,7 +177,7 @@ Each subagent writes exactly one file to `<project>/.review/<page>.json`:
     }
   ],
   "design_intent_check": {
-    "spec_says": "TL;DR — emphasize 意图 as the core abstraction",
+    "spec_says": "TL;DR — emphasize intent as the core abstraction",
     "render_delivers": true,
     "note": "..."
   }
@@ -194,47 +194,47 @@ This rubric is consumed by subagents spawned via the `visual-review` workflow. M
 
 The orchestrator partitions the N pages into `ceil(N/K)` batches of ≤ K pages each (default **K = 5**; configurable per run via the orchestrator prompt) and spawns one subagent per batch.
 
-- Spawn all batch subagents in **one assistant message** (parallel `Agent` calls). Sequential dispatch breaks pipelining.
-- Each subagent prompt is **self-contained** — no prior conversation context. Inline the absolute paths for §0.1 inputs 1–5 explicitly, plus the full `(svg_path, png_path, page_role)` list for that batch. Do not assume the subagent knows the project root.
-- `subagent_type: general-purpose`. Tool restrictions: Read, Edit, Bash (for `cp` backups), Write (for JSON output). MCP playwright is **not** required by subagents — orchestrator pre-renders PNGs.
-- `name` / `team_name` parameters may be unavailable from nested teammate context. Dispatch must remain functional with anonymous subagents — do not require named addressing.
+-   Spawn all batch subagents in **one assistant message** (parallel `Agent` calls). Sequential dispatch breaks pipelining.
+-   Each subagent prompt is **self-contained** — no prior conversation context. Inline the absolute paths for §0.1 inputs 1–5 explicitly, plus the full `(svg_path, png_path, page_role)` list for that batch. Do not assume the subagent knows the project root.
+-   `subagent_type: general-purpose`. Tool restrictions: Read, Edit, Bash (for `cp` backups), Write (for JSON output). MCP playwright is **not** required by subagents — orchestrator pre-renders PNGs.
+-   `name` / `team_name` parameters may be unavailable from nested teammate context. Dispatch must remain functional with anonymous subagents — do not require named addressing.
 
 **Why batched, not per-page**: the rubric (~2.5K tokens), `design_spec.md` (~4–5K), and `spec_lock.md` (~1K) are identical inputs across all pages and do **not** share a prompt cache between sibling subagents. A 20-page deck with per-page dispatch re-reads ~150K tokens of fixed documents; batched dispatch with K=5 cuts that by ~75% while staying inside default parallel-subagent limits (~10). Batches also bound failure blast radius — one crashed subagent loses K pages, not the entire run.
 
 **Batch size guidance**:
-- `K = 5` (default) — balanced; safe for decks up to ~50 pages
-- `K = 3` — high-fidelity / small decks (≤ 12 pages); slightly higher parallelism
-- `K = 10` — token-sensitive / large decks (50+ pages); fewer subagents, larger blast radius per failure
+-   `K = 5` (default) — balanced; safe for decks up to ~50 pages
+-   `K = 3` — high-fidelity / small decks (≤ 12 pages); slightly higher parallelism
+-   `K = 10` — token-sensitive / large decks (50+ pages); fewer subagents, larger blast radius per failure
 
 Larger K is **not** always better: subagent context fills with prior pages' SVG / PNG / findings as the batch progresses, and beyond ~10 pages context auto-compression starts dropping early findings. Keep K such that `K × (avg_svg_size + image_token_cost + report_size)` stays well under the subagent context budget.
 
 ### §6.2 Subagent → orchestrator
 
-- Subagent's **final action before going idle** must be `SendMessage(to=<lead>)` listing one JSON path per processed page (e.g., `<project>/.review/<page>.json`) and a ≤150-word text summary covering all pages in the batch. Going idle without messaging — or messaging with a partial batch — is a protocol violation.
-- If the subagent aborts mid-batch (rule §4.2 rollback, tool error, etc.), it must still send the batch report covering both completed and aborted pages, with the aborted pages marked `needs_human` or `render_failed` as appropriate.
+-   Subagent's **final action before going idle** must be `SendMessage(to=<lead>)` listing one JSON path per processed page (e.g., `<project>/.review/<page>.json`) and a ≤150-word text summary covering all pages in the batch. Going idle without messaging — or messaging with a partial batch — is a protocol violation.
+-   If the subagent aborts mid-batch (rule §4.2 rollback, tool error, etc.), it must still send the batch report covering both completed and aborted pages, with the aborted pages marked `needs_human` or `render_failed` as appropriate.
 
 ### §6.3 Orchestrator → main agent
 
-- Orchestrator's **final action before going idle** must be `SendMessage(to=<lead>)` containing:
-  - the aggregate Markdown table (page × status × hard_hits × soft_hits × fixes_applied × needs_human_reason)
-  - one ≤150-word "plumbing verdict" paragraph
-  - path to `brand_review.json` if any §1.1 aggregations occurred
+-   Orchestrator's **final action before going idle** must be `SendMessage(to=<lead>)` containing:
+    -   the aggregate Markdown table (page × status × hard_hits × soft_hits × fixes_applied × needs_human_reason)
+    -   one ≤150-word "plumbing verdict" paragraph
+    -   path to `brand_review.json` if any §1.1 aggregations occurred
 
 ### §6.4 Concurrency
 
-- Pre-rendering is serialized by `visual_review.py`'s file lock at `<project>/.preview/.render.lock`. Subagents must **not** call the renderer concurrently. Re-renders during iteration loop go through the same lock.
+-   Pre-rendering is serialized by `visual_review.py`'s file lock at `<project>/.preview/.render.lock`. Subagents must **not** call the renderer concurrently. Re-renders during iteration loop go through the same lock.
 
 ## §7 Renderer expectations *(script contract)*
 
 `visual_review.py <project> [pages...]` must guarantee:
 
-- Output PNG matches what the user would see in the live-preview browser (inlined `<use data-icon>`, resolved `<image href>`)
-- Output dimensions = 1280 × 720
-- File-lock serialization at `<project>/.preview/.render.lock`
-- Clean exit codes:
-  - `0` — all requested pages rendered
-  - `2` — live-preview server not running for this project (subagent should not retry; surfaces to the orchestrator)
-  - `3` — rendering backend (playwright + chromium) missing or unable to launch (config error, surface to user)
-  - `4` — page-level render failure (specific failures listed in stderr; partial output is acceptable)
+-   Output PNG matches what the user would see in the live-preview browser (inlined `<use data-icon>`, resolved `<image href>`)
+-   Output dimensions = 1280 × 720
+-   File-lock serialization at `<project>/.preview/.render.lock`
+-   Clean exit codes:
+    -   `0` — all requested pages rendered
+    -   `2` — live-preview server not running for this project (subagent should not retry; surfaces to the orchestrator)
+    -   `3` — rendering backend (playwright + chromium) missing or unable to launch (config error, surface to user)
+    -   `4` — page-level render failure (specific failures listed in stderr; partial output is acceptable)
 
 The renderer never edits SVGs and never reads any rule from this rubric — it is a pure render-and-validate tool.

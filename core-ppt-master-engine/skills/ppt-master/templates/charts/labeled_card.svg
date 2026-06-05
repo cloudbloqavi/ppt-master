@@ -4,7 +4,7 @@
     Purpose: Section overview, multi-aspect introduction, capability quadrant
     Use cases: Self-introduction, "About" pages, four-pillar overview, parallel resource/skill blocks
     Design Principles:
-      - Half-rounded section tab as header (半圆角分区头, 上圆下方) — see CHART_STYLE_GUIDE §11.1
+      - Half-rounded section tab as header (half-rounded section header, rounded top, flat bottom) — see CHART_STYLE_GUIDE §11.1
       - Nested card border without stroke (outer tinted frame + inner white card) — §11.2
       - 2x2 grid for 4 parallel aspects of a single subject — §11.3
     -->
@@ -26,7 +26,7 @@
     <g id="card-discovery">
         <!-- Outer tinted frame (the "border" without stroke) -->
         <rect x="60" y="140" width="560" height="255" rx="20" fill="#F1F5F9"/>
-        <!-- Domed top-rounded section tab (圆顶角分区头) -->
+        <!-- Domed top-rounded section tab -->
         <path d="M 245 140 h 190 a 25 25 0 0 1 25 25 v 25 h -240 v -25 a 25 25 0 0 1 25 -25 Z" fill="#2563EB"/>
         <text x="340" y="173" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" fill="#FFFFFF"><tspan>Discovery</tspan></text>
         <!-- Inner white content card -->

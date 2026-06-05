@@ -1,4 +1,4 @@
-"""DrawingML <p:txBody> -> SVG <text> conversion.
+DrawingML <p:txBody> -> SVG <text> conversion.
 
 Reverse of svg_to_pptx/drawingml_elements.convert_text.
 
@@ -817,12 +817,41 @@ def _char_width(ch: str, font_size: float, bold: bool) -> float:
     else:
         w = font_size * 0.55
     # Bold Latin generally expands a little. CJK glyphs keep their em advance
-    # in common PPT fonts; applying the bold multiplier causes short Chinese
-    # titles such as "少年强国说" to wrap even though PowerPoint keeps them on
-    # one line.
+    # in common PPT fonts; applying the bold multiplier causes short titles
+    # such as "Youthful Nation's Strength Discourse" to wrap even though PowerPoint
+    # keeps them on one line.
     if bold and not _is_cjk(ch):
         w *= 1.05
     return w
+
+
+def _find_break_point(
+    text: str, start: int, max_width: float, run: TextRun,
+) -> tuple[int, float]:
+    """Find the longest prefix of text[start:] that fits in max_width.
+
+    Returns (end_index, used_width). Prefers breaking after whitespace, after
+    CJK characters, or after hyphens. If even the first character doesn't fit,
+    returns (start, 0.0) — the caller should flush the current line first.
+    """
+    cur_w = 0.0
+    last_break = start
+    last_break_w = 0.0
+
+    for i in range(start, len(text)):
+        ch = text[i]
+        ch_w = _char_width(ch, run.font_size_px, run.bold)
+        if cur_w + ch_w > max_width:
+            if last_break > start:
+                return last_break, last_break_w
+            return start, 0.0
+        cur_w += ch_w
+        # Update last_break point
+        if ch.isspace() or _is_cjk(ch) or ch in ".,;:-—!?":
+            last_break = i + 1
+            last_break_w = cur_w
+    # Whole rest fits
+    return len(text), cur_w
 
 
 def _estimate_run_width(text: str, run: TextRun) -> float:
@@ -851,7 +880,7 @@ def _find_break_point(
             return start, 0.0
         cur_w += ch_w
         # Update last_break point
-        if ch.isspace() or _is_cjk(ch) or ch in "-—、，。！？：；":
+        if ch.isspace() or _is_cjk(ch) or ch in ".,;:-—!?":
             last_break = i + 1
             last_break_w = cur_w
     # Whole rest fits

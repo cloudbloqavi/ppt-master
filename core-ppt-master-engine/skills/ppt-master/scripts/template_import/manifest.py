@@ -47,9 +47,9 @@ MASTER_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationship
 THEME_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
 IMAGE_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
-THANKS_KEYWORDS = ("thank", "thanks", "q&a", "qa", "contact", "致谢", "谢谢", "感谢", "答疑", "联系方式")
-TOC_KEYWORDS = ("agenda", "contents", "content", "outline", "目录", "议程", "目录页")
-CHAPTER_KEYWORDS = ("chapter", "part", "section", "章节", "部分")
+THANKS_KEYWORDS = ("thank", "thanks", "q&a", "qa", "contact", "acknowledgements", "questions", "contact_info")
+TOC_KEYWORDS = ("agenda", "contents", "content", "outline", "table_of_contents", "agenda_page", "contents_page")
+CHAPTER_KEYWORDS = ("chapter", "part", "section", "chapter_title", "segment")
 
 
 @dataclass

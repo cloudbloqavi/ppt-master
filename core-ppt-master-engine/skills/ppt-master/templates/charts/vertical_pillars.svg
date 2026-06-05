@@ -24,7 +24,7 @@
         <g transform="translate(0, 0)">
             <!-- Background Card -->
             <rect width="260" height="480" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#cardShadow)"/>
-            <!-- Top-rounded Header Block (圆顶角分区头) -->
+            <!-- Top-rounded Header Block (Rounded Corner Section Header) -->
             <path d="M 12 0 h 236 a 12 12 0 0 1 12 12 v 108 h -260 v -108 a 12 12 0 0 1 12 -12 Z" fill="#EFF6FF"/>
             <text x="130" y="55" font-family="Roboto, -apple-system, BlinkMacSystemFont, sans-serif" font-size="48" font-weight="900" fill="#2563EB" text-anchor="middle">P</text>
             <text x="130" y="90" font-family="Roboto, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#1E3A8A" text-anchor="middle">POLITICAL</text>

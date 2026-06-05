@@ -188,7 +188,7 @@ CANVAS_FORMATS = {
         'use_case': 'WeChat article cover images'
     },
     'xiaohongshu': {
-        'name': '小红书',
+        'name': 'Xiaohongshu',
         'dimensions': '1242×1660',
         'viewbox': '0 0 1242 1660',
         'width': 1242,

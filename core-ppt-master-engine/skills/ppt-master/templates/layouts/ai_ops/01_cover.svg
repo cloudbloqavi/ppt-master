@@ -36,19 +36,19 @@
 
   <!-- Blue Scenario Tags -->
   <rect x="250" y="400" width="120" height="40" fill="#2E75B6" />
-  <text x="310" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">智能运维</text>
+  <text x="310" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">Intelligent Operations</text>
 
   <rect x="450" y="400" width="120" height="40" fill="#2E75B6" />
-  <text x="510" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">数字员工</text>
+  <text x="510" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">Digital Employee</text>
 
   <rect x="650" y="400" width="120" height="40" fill="#2E75B6" />
-  <text x="710" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">自动化测试</text>
+  <text x="710" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">Automated Testing</text>
 
   <rect x="850" y="400" width="120" height="40" fill="#2E75B6" />
-  <text x="910" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">故障诊断</text>
+  <text x="910" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">Fault Diagnosis</text>
 
   <rect x="1050" y="400" width="120" height="40" fill="#2E75B6" />
-  <text x="1110" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">开放共享</text>
+  <text x="1110" y="427" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">Open Sharing</text>
 
   <!-- Dashed Separator -->
   <line x1="120" y1="480" x2="1160" y2="480" stroke="#E7E6E6" stroke-width="1" stroke-dasharray="5 5" />

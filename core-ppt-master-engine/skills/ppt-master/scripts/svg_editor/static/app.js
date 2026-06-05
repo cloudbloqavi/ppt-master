@@ -68,70 +68,9 @@
             nav_last: "Last slide (End)",
             nav_counter: "{current} / {total}",
             nav_empty: "— / —"
-        },
-        zh: {
-            page_title: "PPT Master - 实时预览",
-            panel_slides: "幻灯片",
-            panel_annotations: "标注",
-            placeholder_select_slide: "在左侧选择一张幻灯片开始",
-            label_selected_element: "已选元素",
-            empty_selected_element: "点击幻灯片中的元素进行选择",
-            btn_select_group: "选择父级组",
-            label_batch_edit: "批量编辑",
-            label_group_edit: "组编辑",
-            section_geometry: "几何",
-            section_style: "样式",
-            section_text_style: "文本",
-            section_raw_attrs: "原始属性",
-            label_edit_instruction: "修改说明",
-            placeholder_annotation: "描述希望 AI 如何修改该元素……",
-            placeholder_annotation_multi: "描述希望如何修改所选 {count} 个元素……",
-            btn_add_annotation: "添加标注",
-            label_annotations_on_slide: "本页标注",
-            btn_submit_annotations: "应用修改",
-            btn_exit_preview: "退出预览",
-            modal_submit: "提交",
-            modal_cancel: "取消",
-            empty_waiting_slides: "正在等待生成幻灯片……",
-            empty_no_slides: "未找到幻灯片",
-            placeholder_live_ready: "实时预览已就绪,生成的幻灯片会在这里出现。",
-            placeholder_slide_writing: "幻灯片仍在写入,等待下次刷新……",
-            empty_annotations: "暂无标注",
-            tooltip_remove_annotation: "删除标注",
-            multi_selected: "已选 {count} 个元素",
-            multi_mixed: "混合",
-            err_load_slides: "加载幻灯片失败:",
-            err_load_slide: "加载幻灯片失败:",
-            err_add_annotation: "添加标注失败:",
-            err_remove_annotation: "删除标注失败:",
-            err_save: "保存失败:",
-            err_edit: "编辑失败:",
-            label_direct_edit: "对象属性(点击应用修改后写入)",
-            prop_multiline_hint: "多行文本——选中单行(tspan)编辑文字",
-            edit_saved_hint: "修改已暂存。点击“应用修改”后写入 svg_output。",
-            btn_undo: "撤销",
-            undo_done: "已撤销上一条暂存修改",
-            undo_empty: "没有可撤销的暂存修改",
-            overlap_caption: "此处重叠元素——点击选择",
-            err_empty_svg: "幻灯片已加载但画布为空。SVG 可能损坏或缺少根 <svg> 元素。",
-            warn_icon_inline: "{count} 个图标渲染失败:{names}",
-            warn_svg_no_dims: "SVG 缺少 width/height 属性，预览可能异常。请让 AI 严格遵守 shared-standards.md §4 规范，在 SVG 根元素中补全 width 和 height。",
-            slide_error_tooltip: "该幻灯片解析失败:",
-            reload_banner: "当前页已在磁盘上更新,点此重新加载。",
-            modal_confirm_submit: "确认将暂存属性修改和标注写入磁盘?\n\n预览服务会继续运行。需要关闭时请点击退出预览。",
-            modal_success_submit: "修改已保存到 svg_output。\n\n请回到对话窗口重新导出 PPTX，或让 AI 应用需要判断的标注。预览服务仍在运行。",
-            modal_confirm_exit: "退出预览并停止本地服务?\n\n未应用的属性修改和标注将被丢弃。",
-            modal_success_exit: "预览已停止。\n\n可以关闭本标签页并回到对话窗口。",
-            modal_stopping: "正在停止预览服务……",
-            lang_toggle_title: "切换语言",
-            nav_first: "第一页 (Home)",
-            nav_prev: "上一页 (←)",
-            nav_next: "下一页 (→)",
-            nav_last: "末页 (End)",
-            nav_counter: "{current} / {total}",
-            nav_empty: "— / —"
         }
     };
+    MESSAGES.zh = MESSAGES.en;
 
     var LANG = (function () {
         try {
@@ -177,7 +116,7 @@
         applyI18n();
         var toggleBtn = document.getElementById("btn-lang-toggle");
         if (toggleBtn) {
-            toggleBtn.textContent = lang === "zh" ? "EN" : "中";
+            toggleBtn.textContent = "EN";
             toggleBtn.title = t("lang_toggle_title");
         }
         // Re-render dynamic regions so they pick up the new language
@@ -2448,7 +2387,7 @@
     applyI18n();
     var langToggleBtn = document.getElementById("btn-lang-toggle");
     if (langToggleBtn) {
-        langToggleBtn.textContent = LANG === "zh" ? "EN" : "中";
+        langToggleBtn.textContent = "EN";
         langToggleBtn.title = t("lang_toggle_title");
         langToggleBtn.addEventListener("click", function () {
             setLang(LANG === "zh" ? "en" : "zh");

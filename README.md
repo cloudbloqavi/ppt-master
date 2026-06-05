@@ -191,8 +191,8 @@ PPT Master runs in **any tool with agent capability** — read/write files, exec
 **Option B — Git clone** (requires [Git](https://git-scm.com/downloads) installed):
 
 ```bash
-git clone https://github.com/hugohe3/ppt-master.git
-cd ppt-master
+git clone https://github.com/hugohe3/ppt-master.git ai-builder-engine
+cd ai-builder-engine
 ```
 
 Then install dependencies:
@@ -258,7 +258,7 @@ For API-backed features, put credentials in `.env`. Clone installs can use `cp .
 
 ```bash
 mkdir -p ~/.ppt-master
-cp /path/to/installed/ppt-master/.env.example ~/.ppt-master/.env
+cp /path/to/installed/ai-builder-engine/.env.example ~/.ppt-master/.env
 ```
 
 PPT Master reads the current process environment first, then the first `.env` found in this order: current working directory, clone repo root, `~/.ppt-master/.env`.

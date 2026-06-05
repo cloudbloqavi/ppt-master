@@ -46,7 +46,7 @@ EA_FONTS = {
     'Songti SC', 'Songti TC',
     # Windows 10/11 + Office default / common Simplified Chinese
     'DengXian', 'DengXian Light', 'DengXian Bold', 'Microsoft YaHei UI',
-    # Office display Chinese (华文 / 方正) — usually title-only, not on every client
+    # Office display Chinese (HuaWen / Fangzheng) — usually title-only, not on every client
     'STXingkai', 'STLiti', 'STXinwei', 'STHupo', 'STCaiyun',
     'FZShuTi', 'FZYaoti',
     # Common Traditional Chinese (Office)
@@ -54,7 +54,7 @@ EA_FONTS = {
     'Microsoft JhengHei UI',
     # Japanese fonts (Windows-available)
     'Yu Gothic', 'Yu Gothic UI', 'Yu Mincho',
-    'Meiryo', 'Meiryo UI', 'メイリオ',
+    'Meiryo', 'Meiryo UI', '\u30e1\u30a4\u30ea\u30aa',
     'MS Gothic', 'MS Mincho', 'MS PGothic', 'MS PMincho', 'MS UI Gothic',
     # Korean
     'Malgun Gothic', 'Gulim', 'Dotum', 'Batang',
@@ -83,9 +83,9 @@ FONT_FALLBACK_WIN = {
     'Noto Serif SC': 'SimSun',
     'Noto Serif TC': 'SimSun',
     # Japanese: keep as-is if user specified (PowerPoint will fallback if uninstalled)
-    # 'Noto Sans JP': → keep as 'Noto Sans JP' (do not map)
-    # 'メイリオ': → keep as 'メイリオ' (Meiryo alias)
-    'メイリオ': 'Meiryo',
+    # 'Noto Sans JP': -> keep as 'Noto Sans JP' (do not map)
+    # '\u30e1\u30a4\u30ea\u30aa': -> keep as '\u30e1\u30a4\u30ea\u30aa' (Meiryo alias)
+    '\u30e1\u30a4\u30ea\u30aa': 'Meiryo',
     'Source Han Sans SC': 'Microsoft YaHei',
     'Source Han Sans TC': 'Microsoft JhengHei',
     'Source Han Serif SC': 'SimSun',

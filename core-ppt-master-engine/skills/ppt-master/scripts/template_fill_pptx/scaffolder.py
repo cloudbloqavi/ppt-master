@@ -55,7 +55,7 @@ def scaffold_plan(
                 {
                     "chart_id": chart["chart_id"],
                     "categories": chart.get("categories", []),
-                    "series": chart.get("series") or [{"name": "系列1", "values": []}],
+                    "series": chart.get("series") or [{"name": "Series 1", "values": []}],
                 }
             )
         slides.append(

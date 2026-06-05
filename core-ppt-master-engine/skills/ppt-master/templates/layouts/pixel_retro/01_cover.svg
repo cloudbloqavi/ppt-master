@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
-  <!-- 模板: 封面页 - 像素复古风格 -->
+  <!-- Template: Cover Page - Pixel Retro Style -->
   
   <defs>
-    <!-- 霓虹绿发光效果 -->
+    <!-- Neon Green Glow Effect -->
     <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feMerge>
@@ -11,7 +11,7 @@
         <feMergeNode in="SourceGraphic" />
       </feMerge>
     </filter>
-    <!-- 赛博粉发光效果 -->
+    <!-- Cyber Pink Glow Effect -->
     <filter id="glowPink" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="3" result="blur" />
       <feMerge>
@@ -19,7 +19,7 @@
         <feMergeNode in="SourceGraphic" />
       </feMerge>
     </filter>
-    <!-- 电光蓝发光效果 -->
+    <!-- Electric Blue Glow Effect -->
     <filter id="glowBlue" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="3" result="blur" />
       <feMerge>
@@ -29,10 +29,10 @@
     </filter>
   </defs>
   
-  <!-- 深空黑背景 -->
+  <!-- Deep Space Black Background -->
   <rect width="1280" height="720" fill="#0D1117" />
   
-  <!-- 扫描线网格背景（低透明度） -->
+  <!-- Scanline Grid Background (Low Opacity) -->
   <line x1="0" y1="60" x2="1280" y2="60" stroke="#39FF14" stroke-width="1" stroke-opacity="0.1" />
   <line x1="0" y1="120" x2="1280" y2="120" stroke="#39FF14" stroke-width="1" stroke-opacity="0.1" />
   <line x1="0" y1="180" x2="1280" y2="180" stroke="#39FF14" stroke-width="1" stroke-opacity="0.1" />
@@ -42,48 +42,48 @@
   <line x1="60" y1="0" x2="60" y2="720" stroke="#39FF14" stroke-width="1" stroke-opacity="0.1" />
   <line x1="1220" y1="0" x2="1220" y2="720" stroke="#39FF14" stroke-width="1" stroke-opacity="0.1" />
   
-  <!-- 顶部装饰线（霓虹双线） -->
+  <!-- Top Decorative Lines (Neon Double Line) -->
   <rect x="40" y="30" width="1200" height="8" fill="#39FF14" fill-opacity="0.8" />
   <rect x="40" y="42" width="1200" height="4" fill="#39FF14" fill-opacity="0.4" />
   
-  <!-- 左上角像素装饰 -->
+  <!-- Top-Left Pixel Decoration -->
   <rect x="40" y="60" width="16" height="16" fill="#39FF14" />
   <rect x="60" y="60" width="16" height="16" fill="#39FF14" fill-opacity="0.6" />
   <rect x="80" y="60" width="16" height="16" fill="#39FF14" fill-opacity="0.3" />
   
-  <!-- 右上角像素装饰 -->
+  <!-- Top-Right Pixel Decoration -->
   <rect x="1184" y="60" width="16" height="16" fill="#FF2E97" fill-opacity="0.3" />
   <rect x="1204" y="60" width="16" height="16" fill="#FF2E97" fill-opacity="0.6" />
   <rect x="1224" y="60" width="16" height="16" fill="#FF2E97" />
   
-  <!-- 中央像素风控制台图形 -->
+  <!-- Central Pixel-Style Console Graphic -->
   <g transform="translate(540, 140)">
-    <!-- 控制台外壳 -->
+    <!-- Console Casing -->
     <rect x="0" y="0" width="200" height="80" fill="#161B22" stroke="#39FF14" stroke-width="3" rx="8" />
-    <!-- 左侧按钮（绿色发光） -->
+    <!-- Left Button (Green Glow) -->
     <rect x="25" y="20" width="40" height="40" fill="#0D1117" stroke="#8B949E" stroke-width="2" rx="4" />
     <circle cx="45" cy="40" r="12" fill="#39FF14" filter="url(#glowGreen)" />
-    <!-- 右侧按钮（粉色方块） -->
+    <!-- Right Button (Pink Square) -->
     <rect x="135" y="20" width="40" height="40" fill="#0D1117" stroke="#8B949E" stroke-width="2" rx="4" />
     <rect x="147" y="32" width="16" height="16" fill="#FF2E97" />
-    <!-- 中间连接条 -->
+    <!-- Middle Connector Bar -->
     <rect x="85" y="35" width="30" height="10" fill="#00D4FF" rx="2" />
   </g>
   
-  <!-- 主标题（霓虹发光） -->
+  <!-- Main Title (Neon Glow) -->
   <text x="640" y="320" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="52" font-weight="bold" fill="#39FF14" filter="url(#glowGreen)">
     {{TITLE}}
   </text>
   
-  <!-- 副标题 -->
+  <!-- Subtitle -->
   <text x="640" y="380" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Microsoft YaHei, sans-serif" font-size="28" fill="#E6EDF3">
     {{SUBTITLE}}
   </text>
   
-  <!-- 分隔线 -->
+  <!-- Separator Line -->
   <rect x="440" y="410" width="400" height="3" fill="#00D4FF" fill-opacity="0.8" />
   
-  <!-- 功能按钮组 -->
+  <!-- Function Button Group -->
   <g transform="translate(290, 460)">
     <rect x="0" y="0" width="140" height="40" fill="#161B22" stroke="#39FF14" stroke-width="2" />
     <text x="70" y="27" text-anchor="middle" font-family="Consolas, monospace" font-size="16" fill="#39FF14">💾 SAVE</text>
@@ -101,37 +101,37 @@
     <text x="70" y="27" text-anchor="middle" font-family="Consolas, monospace" font-size="16" fill="#FFD700">🤝 COLLAB</text>
   </g>
   
-  <!-- 底部提示语 -->
+  <!-- Bottom Hint Text -->
   <text x="640" y="580" text-anchor="middle" font-family="Consolas, Monaco, monospace" font-size="24" fill="#8B949E">
     ▶ PRESS START TO LEARN ◀
   </text>
   
-  <!-- 作者/单位信息 -->
+  <!-- Author/Organization Info -->
   <text x="640" y="620" text-anchor="middle" font-family="-apple-system, Microsoft YaHei, sans-serif" font-size="18" fill="#8B949E">
     {{AUTHOR}}
   </text>
   
-  <!-- 左下角像素装饰 -->
+  <!-- Bottom-Left Pixel Decoration -->
   <rect x="40" y="640" width="12" height="12" fill="#39FF14" />
   <rect x="56" y="640" width="12" height="12" fill="#39FF14" fill-opacity="0.6" />
   <rect x="72" y="640" width="12" height="12" fill="#39FF14" fill-opacity="0.3" />
   
-  <!-- 右下角像素装饰 -->
+  <!-- Bottom-Right Pixel Decoration -->
   <rect x="1196" y="640" width="12" height="12" fill="#FF2E97" fill-opacity="0.3" />
   <rect x="1212" y="640" width="12" height="12" fill="#FF2E97" fill-opacity="0.6" />
   <rect x="1228" y="640" width="12" height="12" fill="#FF2E97" />
   
-  <!-- 版本号 -->
+  <!-- Version Number -->
   <text x="1200" y="660" text-anchor="end" font-family="Consolas, monospace" font-size="14" fill="#8B949E">
     {{VERSION}}
   </text>
   
-  <!-- 页码 -->
+  <!-- Page Number -->
   <text x="60" y="660" font-family="Consolas, monospace" font-size="14" fill="#8B949E">
     01/{{TOTAL_PAGES}}
   </text>
   
-  <!-- 底部装饰线（霓虹双线） -->
+  <!-- Bottom Decorative Lines (Neon Double Line) -->
   <rect x="40" y="680" width="1200" height="4" fill="#39FF14" fill-opacity="0.4" />
   <rect x="40" y="688" width="1200" height="8" fill="#39FF14" fill-opacity="0.8" />
 

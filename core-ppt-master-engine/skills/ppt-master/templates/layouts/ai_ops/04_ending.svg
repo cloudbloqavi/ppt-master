@@ -46,14 +46,14 @@
 
   <!-- Blue Label Tags (echoing cover) -->
   <rect x="340" y="580" width="100" height="30" fill="#5B9BD5" />
-  <text x="390" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">能力封装</text>
+  <text x="390" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">Capability Encapsulation</text>
 
   <rect x="540" y="580" width="100" height="30" fill="#5B9BD5" />
-  <text x="590" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">跨域拉通</text>
+  <text x="590" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">Cross-Domain Integration</text>
 
   <rect x="740" y="580" width="100" height="30" fill="#5B9BD5" />
-  <text x="790" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">知识沉淀</text>
+  <text x="790" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">Knowledge Accumulation</text>
 
   <rect x="940" y="580" width="100" height="30" fill="#5B9BD5" />
-  <text x="990" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">开放共享</text>
+  <text x="990" y="601" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">Open Sharing</text>
 </svg>

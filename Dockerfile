@@ -4,7 +4,7 @@
 # Designed for Google Cloud Run Jobs.
 #
 # Build:
-#   docker build -t ppt-master-agent .
+#   docker build -t ai-builder-agent .
 #
 # Run locally (mount an output directory):
 #   docker run --rm \
@@ -12,7 +12,7 @@
 #     -e OUTPUT_ARTIFACTS_DIR="/workspace/outputs" \
 #     -e AGENT_PROMPT="Create a 10-slide product launch deck" \
 #     -v $(pwd)/outputs:/workspace/outputs \
-#     ppt-master-agent
+#     ai-builder-agent
 #
 # On GCP Cloud Run Jobs, pass GEMINI_API_KEY via Secret Manager and
 # mount a Cloud Storage bucket (FUSE) at /workspace/outputs.

@@ -26,9 +26,9 @@ from .ooxml import (
     _text_containers,
 )
 
-THANKS_KEYWORDS = ("thank", "thanks", "q&a", "qa", "contact", "致谢", "谢谢", "感谢", "答疑", "联系方式")
-TOC_KEYWORDS = ("agenda", "contents", "content", "outline", "目录", "议程")
-CHAPTER_KEYWORDS = ("chapter", "part", "section", "章节", "部分")
+THANKS_KEYWORDS = ("thank", "thanks", "q&a", "qa", "contact", "acknowledgments", "thanks", "gratitude", "Q&A", "contact info")
+TOC_KEYWORDS = ("agenda", "contents", "content", "outline", "table of contents", "agenda")
+CHAPTER_KEYWORDS = ("chapter", "part", "section", "chapter", "part")
 
 
 def _analyze_tables(slide_root: ET.Element, source_slide: int) -> list[dict[str, Any]]:
@@ -85,7 +85,7 @@ def _slot_role(slot: dict[str, Any], order: int) -> str:
     name = str(slot.get("shape_name") or "").lower()
     geometry = slot.get("geometry") or {}
     y = geometry.get("y")
-    if order == 1 or "title" in name or "标题" in name:
+    if order == 1 or "title" in name or "title" in name:
         return "title_candidate"
     if isinstance(y, int) and y < 160 and len(text) <= 80:
         return "title_candidate"
@@ -202,24 +202,24 @@ def analyze_pptx(pptx_path: Path) -> dict[str, Any]:
             "slides": [
                 {
                     "source_slide": 1,
-                    "purpose": "封面 / 章节 / 内容 / 结尾",
+                    "purpose": "cover / chapter / content / ending",
                     "replacements": [
                         {
                             "slot_id": "s01_sh2",
-                            "text": "替换后的文字",
+                            "text": "replaced text",
                         }
                     ],
                     "table_edits": [
                         {
                             "table_id": "s01_tbl3",
-                            "cells": [{"row": 0, "col": 0, "text": "替换后的单元格"}],
+                            "cells": [{"row": 0, "col": 0, "text": "replaced cell"}],
                         }
                     ],
                     "chart_edits": [
                         {
                             "chart_id": "s01_ch4",
                             "categories": ["A", "B"],
-                            "series": [{"name": "系列1", "values": [1, 2]}],
+                            "series": [{"name": "Series 1", "values": [1, 2]}],
                         }
                     ],
                 }

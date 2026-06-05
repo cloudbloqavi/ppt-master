@@ -45,7 +45,7 @@ python3 scripts/update_repo.py
 | SVG pipeline | `finalize_svg.py`, `svg_to_pptx.py`, `total_md_split.py`, `svg_quality_checker.py`, `animation_config.py`, `notes_to_audio.py` | [docs/svg-pipeline.md](./docs/svg-pipeline.md) |
 | Spec maintenance | `update_spec.py` | [docs/update_spec.md](./docs/update_spec.md) |
 | Image tools | `image_gen.py`, `latex_render.py`, `analyze_images.py`, `gemini_watermark_remover.py` | [docs/image.md](./docs/image.md) |
-| Repo maintenance | `update_repo.py` | README install/update section |
+| Repo maintenance | `update_repo.py`, `check_cjk.py` | README install/update section / CJK scan instructions |
 | Troubleshooting | validation, preview, export, dependency issues | [docs/troubleshooting.md](./docs/troubleshooting.md) |
 
 ## High-Frequency Commands
@@ -106,11 +106,17 @@ python3 scripts/image_gen.py --list-backends
 python3 scripts/analyze_images.py <project_path>/images
 ```
 
-Repository update:
+Repository update and CJK validation:
 
 ```bash
 python3 scripts/update_repo.py
 python3 scripts/update_repo.py --skip-pip
+
+# Scan repository for any Chinese characters
+python3 scripts/check_cjk.py --scan
+
+# Automatically translate Chinese comments, manuals, and text values
+python3 scripts/check_cjk.py --translate
 ```
 
 ## Recommendations
@@ -129,4 +135,4 @@ python3 scripts/update_repo.py --skip-pip
 - [Troubleshooting](./docs/troubleshooting.md)
 - [Skill Entry](../SKILL.md)
 
-_Last updated: 2026-04-09_
+_Last updated: 2026-06-05_

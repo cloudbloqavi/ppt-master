@@ -56,7 +56,7 @@ Backend selection:
 python3 scripts/image_gen.py "A cat" --backend openai
 python3 scripts/image_gen.py "A cinematic portrait" --backend minimax
 python3 scripts/image_gen.py "A product launch hero image" --backend qwen
-python3 scripts/image_gen.py "科技感背景图" --backend zhipu
+python3 scripts/image_gen.py "Tech-inspired background image" --backend zhipu
 python3 scripts/image_gen.py "A product KV in cinematic style" --backend volcengine
 ```
 

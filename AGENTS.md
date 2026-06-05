@@ -20,11 +20,11 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 >
 > Object-level animation tuning: when the user asks to change animation order, effect, timing, or a specific object's reveal behavior, run the standalone [`customize-animations`](core-ppt-master-engine/skills/ppt-master/workflows/customize-animations.md) workflow. Default export already has global animations; do not create `animations.json` unless customization was requested.
 >
-> Live preview: any time the user mentions "live preview", "preview", "see the effect" (or "看效果"), or wants to click/select a slide element, run [`live-preview`](core-ppt-master-engine/skills/ppt-master/workflows/live-preview.md). Step 6 does not start it by default (it is disabled by default unless explicitly enabled); the workflow covers post-export re-entry and applying submitted annotations.
+> Live preview: any time the user mentions "live preview", "preview", "see the effect", or wants to click/select a slide element, run [`live-preview`](core-ppt-master-engine/skills/ppt-master/workflows/live-preview.md). Step 6 does not start it by default (it is disabled by default unless explicitly enabled); the workflow covers post-export re-entry and applying submitted annotations.
 >
-> Brand identity setup: when the user asks to "set up brand" / "establish brand" (or "建立品牌") / "create brand guidelines" (or "做品牌规范"), provides a brand asset (logo / brand site URL / branded PPTX / brand PDF), or wants to extract a brand from existing materials, run the standalone [`create-brand`](core-ppt-master-engine/skills/ppt-master/workflows/create-brand.md) workflow. Output goes to `core-ppt-master-engine/skills/ppt-master/templates/brands/<id>/`. Brands apply at SKILL.md Step 3 via the same explicit-path rule as layout templates — the user supplies the brand directory path to apply it; bare brand names never trigger.
+> Brand identity setup: when the user asks to "set up brand" / "establish brand" / "create brand guidelines", provides a brand asset (logo / brand site URL / branded PPTX / brand PDF), or wants to extract a brand from existing materials, run the standalone [`create-brand`](core-ppt-master-engine/skills/ppt-master/workflows/create-brand.md) workflow. Output goes to `core-ppt-master-engine/skills/ppt-master/templates/brands/<id>/`. Brands apply at SKILL.md Step 3 via the same explicit-path rule as layout templates — the user supplies the brand directory path to apply it; bare brand names never trigger.
 >
-> Visual self-check: only when the user explicitly requests a per-page visual review on the generated SVGs (e.g., "run visual self-check / visual review / visual rubric" (or "跑一下视觉自检 / 视觉回看 / 视觉 rubric"), "visual review", "check each page visually"), run the standalone [`visual-review`](core-ppt-master-engine/skills/ppt-master/workflows/visual-review.md) workflow between the executor and post-processing steps. The main pipeline does NOT invoke it automatically; do not infer or recommend it from deck size, model identity, or any other signal — user request is the only trigger.
+> Visual self-check: only when the user explicitly requests a per-page visual review on the generated SVGs (e.g., "run visual self-check / visual review / visual rubric", "visual review", "check each page visually"), run the standalone [`visual-review`](core-ppt-master-engine/skills/ppt-master/workflows/visual-review.md) workflow between the executor and post-processing steps. The main pipeline does NOT invoke it automatically; do not infer or recommend it from deck size, model identity, or any other signal — user request is the only trigger.
 
 ## Execution Requirements
 
@@ -132,4 +132,22 @@ When merging updates from the upstream remote repository (`https://github.com/cl
 3. Re-apply path prefixing (`core-ppt-master-engine/`) to any root documentation changes.
 4. Run `git reset` to unstage everything, ensuring all synced changes remain in the working tree for manual review and commit.
 
-
+### 6. CJK (Chinese) Character Filtering & Translation
+* **Zero Chinese Characters Rule**: The project repository must remain entirely in English. If a merge or conflict resolution from the remote repository introduces files, text, comments, or documentation containing Chinese characters:
+  * **Conflict Resolution**: During a merge, if conflicts arise in files containing Chinese characters, prioritize resolving them to preserve the logical structure, then translate the resolved Chinese text into natural English.
+  * **Automatic Scanning**: Run the scanner to audit the codebase for CJK characters:
+    ```bash
+    python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --scan
+    ```
+  * **Automatic Translation**: Run the translation tool using the Gemini API (ensuring `GEMINI_API_KEY` is present in your environment or `.env` file) to automatically translate comments, docstrings, config values, and Markdown contents:
+    ```bash
+    python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --translate
+    ```
+  * **Single File Target**: To scan or translate specific files (e.g., modified files or conflicts):
+    ```bash
+    python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --scan --files path/to/file1.py path/to/file2.md
+    python3 core-ppt-master-engine/skills/ppt-master/scripts/check_cjk.py --translate --files path/to/file1.py
+    ```
+  * **Deck Directory Renaming**: Rename any template decks or directories containing Chinese characters to their standard lowercase-with-underscore English IDs (e.g. `china_telecom`, `cmb`, `powerchina_standard`) and update all corresponding index maps (`decks_index.json`) and spec references.
+  * **Punctuation Standards**: Replace full-width CJK punctuation marks (e.g. colons `：`, parentheses `（）`, quotes `「」`, enumeration commas `、`) with standard ASCII equivalents.
+  * **WSL Sync**: Always verify and sync the translation changes to your WSL workspace after the merge.

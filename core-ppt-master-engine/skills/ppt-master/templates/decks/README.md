@@ -4,13 +4,13 @@
 
 Single source of truth for what decks exist: [`decks_index.json`](./decks_index.json) (`deck_id → { summary, canvas_format, page_count, primary_color }`). This README explains the kind; it does **not** enumerate decks.
 
-Full data model: [`docs/zh/templates-architecture.md`](../../../../docs/zh/templates-architecture.md).
+Full data model: [`docs/en/templates-architecture.md`](../../../../docs/en/templates-architecture.md).
 
 ---
 
 ## Trigger rule
 
-Deck selection is **opt-in by explicit path**. The main workflow defaults to free design. A deck is only used when the user gives an explicit directory path in their initial message (e.g. `skills/ppt-master/templates/decks/招商银行/`). Bare names do not trigger. See [`SKILL.md`](../../SKILL.md) Step 3.
+Deck selection is **opt-in by explicit path**. The main workflow defaults to free design. A deck is only used when the user gives an explicit directory path in their initial message (e.g. `skills/ppt-master/templates/decks/China Merchants Bank/`). Bare names do not trigger. See [`SKILL.md`](../../SKILL.md) Step 3.
 
 `decks_index.json` is a **discovery aid**, not a trigger — it lets the AI answer "what decks exist?" by listing ids and paths. Listing alone never advances the pipeline.
 
@@ -69,4 +69,4 @@ The register step updates [`decks_index.json`](./decks_index.json) — the singl
 
 - [`templates/layouts/`](../layouts/) — structure-only templates without identity
 - [`templates/brands/`](../brands/) — identity-only presets without page rosters
-- [`docs/zh/templates-architecture.md`](../../../../docs/zh/templates-architecture.md) — three-class data model + fusion rules
+- [`docs/en/templates-architecture.md`](../../../../docs/en/templates-architecture.md) — three-class data model + fusion rules

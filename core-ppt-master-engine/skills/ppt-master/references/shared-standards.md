@@ -186,16 +186,16 @@ One logical line — even with mixed colors/weights/sizes — MUST be one `<text
 
 ```xml
 <text x="100" y="200" font-size="24" fill="#333333">
-  实现<tspan fill="#1A73E8" font-weight="bold">10倍</tspan>效率提升
+  Achieve<tspan fill="#1A73E8" font-weight="bold">10x</tspan> efficiency improvement
 </text>
 ```
 
 ❌ **DON'T** — three side-by-side `<text>` elements become three separate text frames in PPT (breaks edit-as-one-line, risks alignment drift, makes spacing fragile):
 
 ```xml
-<text x="100" y="200" font-size="24" fill="#333333">实现</text>
-<text x="160" y="200" font-size="24" fill="#1A73E8" font-weight="bold">10倍</text>
-<text x="240" y="200" font-size="24" fill="#333333">效率提升</text>
+<text x="100" y="200" font-size="24" fill="#333333">Achieve</text>
+<text x="160" y="200" font-size="24" fill="#1A73E8" font-weight="bold">10x</text>
+<text x="240" y="200" font-size="24" fill="#333333">efficiency improvement</text>
 ```
 
 **⚠️ Inline tspans must NOT carry `x`/`y`/`dy`** — those mark a new line, and `flatten_tspan` will split into a separate text frame. `dx` is safe (kerning, stays inline). Only set `x`/`y`/`dy` on tspans that genuinely start a new line.
@@ -204,8 +204,8 @@ One logical line — even with mixed colors/weights/sizes — MUST be one `<text
 
 ```xml
 <text x="80" y="190" font-size="18" fill="#333333">
-  <tspan x="80" dy="0">完成率<tspan fill="#4CAF50" font-weight="bold">98%</tspan>超预期</tspan>
-  <tspan x="80" dy="35">成本降低<tspan fill="#F44336" font-weight="bold">¥120万</tspan></tspan>
+  <tspan x="80" dy="0">Completion rate<tspan fill="#4CAF50" font-weight="bold">98%</tspan> exceeding expectations</tspan>
+  <tspan x="80" dy="35">Cost reduced by<tspan fill="#F4436" font-weight="bold">¥1.2 million</tspan></tspan>
 </text>
 ```
 
@@ -213,7 +213,7 @@ One logical line — even with mixed colors/weights/sizes — MUST be one `<text
 
 ```xml
 <text x="100" y="200" font-size="18" fill="#333333">
-  <tspan x="100">左列</tspan><tspan x="600" font-weight="bold">右列</tspan>
+  <tspan x="100">Left column</tspan><tspan x="600" font-weight="bold">Right column</tspan>
 </text>
 ```
 
@@ -221,7 +221,7 @@ One logical line — even with mixed colors/weights/sizes — MUST be one `<text
 
 **Default — lift key information.** Uniform-styled paragraphs read as walls of text. Wrap these in `<tspan fill="..." font-weight="bold">`:
 
-- **Numerical results** — percentages, multipliers (`10x`), absolute amounts (`¥120万`)
+- **Numerical results** — percentages, multipliers (`10x`), absolute amounts (`¥1.2 million`)
 - **Contrasts** — gain/loss, before/after, target/actual
 - **One or two load-bearing nouns per sentence** — the term that carries the insight
 
@@ -233,7 +233,7 @@ Color: use the deck's primary brand color for emphasis. Reserve green/red for ac
 
 ```xml
 <text x="80" y="200" font-size="20" fill="#333333">
-  2024年公司营收同比增长35%达到12亿元创历史新高
+  In 2024, the company's revenue increased by 35% year-on-year to 1.2 billion yuan, reaching a new historical high.
 </text>
 ```
 
@@ -241,7 +241,7 @@ Color: use the deck's primary brand color for emphasis. Reserve green/red for ac
 
 ```xml
 <text x="80" y="200" font-size="20" fill="#333333">
-  2024年公司营收同比<tspan fill="#1A73E8" font-weight="bold">增长35%</tspan>达到<tspan fill="#1A73E8" font-weight="bold">12亿元</tspan>创历史新高
+  In 2024, the company's revenue year-on-year <tspan fill="#1A73E8" font-weight="bold">increased by 35%</tspan> reaching <tspan fill="#1A73E8" font-weight="bold">1.2 billion yuan</tspan> reaching a new historical high
 </text>
 ```
 
@@ -322,7 +322,7 @@ python3 scripts/svg_to_pptx.py <project_path>
 **Optional recorded narration** (only when the user asks for narrated/video export):
 
 ```bash
-python3 scripts/notes_to_audio.py <project_path> --voice zh-CN-XiaoxiaoNeural
+python3 scripts/notes_to_audio.py <project_path> --voice en-US-JennyNeural
 python3 scripts/svg_to_pptx.py <project_path> --recorded-narration audio
 ```
 

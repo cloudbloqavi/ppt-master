@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+    <!-- Template: Content Page - POWERCHINA Classic Style -->
+
+    <defs>
+        <!-- Top Decoration Gradient -->
+        <linearGradient id="topGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#4A90D9;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#00418D;stop-opacity:1" />
+        </linearGradient>
+        <!-- Serial Number Block Gradient -->
+        <linearGradient id="numGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0066CC;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#00418D;stop-opacity:1" />
+        </linearGradient>
+    </defs>
+
+    <!-- White Background -->
+    <rect x="0" y="0" width="1280" height="720" fill="#FFFFFF" />
+
+    <!-- Top Gradient Decoration Line -->
+    <rect x="0" y="0" width="1280" height="6" fill="url(#topGrad)" />
+
+    <!-- Header Navigation Bar -->
+    <!-- Chapter Number Block -->
+    <rect x="60" y="30" width="50" height="50" rx="4" fill="url(#numGrad)" />
+    <text x="85" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF">{{CHAPTER_NUM}}</text>
+
+    <!-- Page Title -->
+    <text x="130" y="65" font-family="Microsoft YaHei, SimHei, sans-serif" font-size="28" font-weight="bold" fill="#1A1A1A">{{PAGE_TITLE}}</text>
+
+    <!-- Top Right Corporate Logo -->
+    <text x="1220" y="50" text-anchor="end" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#00418D" fill-opacity="0.6">POWERCHINA</text>
+    <rect x="1100" y="58" width="120" height="2" fill="url(#topGrad)" fill-opacity="0.4"/>
+
+    <!-- Separator Line -->
+    <line x1="60" y1="95" x2="1220" y2="95" stroke="#E4E7EB" stroke-width="1"/>
+
+    <!-- Content Area Placeholder -->
+    <rect x="60" y="110" width="1160" height="550" fill="none" stroke="#E4E7EB" stroke-width="2" stroke-dasharray="8,8" />
+    <text x="640" y="365" text-anchor="middle" fill="#CBD5E1" font-size="18" font-family="Microsoft YaHei, sans-serif">
+        {{CONTENT_AREA}}
+    </text>
+    <text x="640" y="400" text-anchor="middle" fill="#CBD5E1" font-size="14" font-family="Microsoft YaHei, sans-serif">
+        (Freely laid out by Executor according to actual content)
+    </text>
+
+    <!-- Bottom Decoration Line -->
+    <rect x="0" y="716" width="1280" height="4" fill="#00418D" />
+
+    <!-- Page Number -->
+    <text x="640" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#718096">{{PAGE_NUM}}</text>
+
+    <!-- Bottom Corporate Name -->
+    <text x="1220" y="695" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#718096" fill-opacity="0.6">POWERCHINA</text>
+
+</svg>
