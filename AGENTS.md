@@ -12,7 +12,7 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 
 > Topic-only requests with no source material: run the standalone [`topic-research`](core-ppt-master-engine/skills/ppt-master/workflows/topic-research.md) workflow before SKILL.md Step 1 to gather web materials.
 >
-> Phase B resumption (split-mode execution): when the user opens a fresh chat and says "resume generating projects/<x>" (or "继续生成 projects/<x>") or similar, run the standalone [`resume-execute`](core-ppt-master-engine/skills/ppt-master/workflows/resume-execute.md) workflow to enter Phase B (SVG generation + export) without re-running Phase A.
+> Phase B resumption (split-mode execution): when the user opens a fresh chat and says "resume generating projects/<x>" or similar, run the standalone [`resume-execute`](core-ppt-master-engine/skills/ppt-master/workflows/resume-execute.md) workflow to enter Phase B (SVG generation + export) without re-running Phase A. This can also be triggered automatically for the latest failed runs using `python3 run_agent.py --resume` or `python3 auto_resume.py`.
 >
 > Decks containing data charts: run the standalone [`verify-charts`](core-ppt-master-engine/skills/ppt-master/workflows/verify-charts.md) workflow between the executor and post-processing steps to calibrate chart coordinates.
 >
@@ -60,6 +60,12 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/source_to_md/web_to_md.
 python3 core-ppt-master-engine/skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
 python3 core-ppt-master-engine/skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --move
 python3 core-ppt-master-engine/skills/ppt-master/scripts/project_manager.py validate <project_path>
+
+# Resumption & Watchdog (scans output directory for incomplete runs, restores to workspace, and resumes)
+python3 run_agent.py --resume
+python3 run_agent.py --resume --depth 5
+python3 auto_resume.py
+python3 auto_resume.py --depth 5
 
 # Image tools and SVG quality check
 python3 core-ppt-master-engine/skills/ppt-master/scripts/analyze_images.py <project_path>/images

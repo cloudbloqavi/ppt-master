@@ -116,6 +116,17 @@ def parse_args() -> argparse.Namespace:
             "Also used as the Cloud Run Job override argument."
         ),
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Automatically find and resume the latest failed execution from OUTPUT_ARTIFACTS_DIR.",
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Number of recent project directories to verify when resuming (defaults to WATCHDOG_DEPTH env var or 3).",
+    )
     # Use parse_known_args so unknown flags don't crash the script
     args, _ = parser.parse_known_args()
     return args
@@ -331,7 +342,7 @@ def grep_search(query: str, directory_path: str = ".") -> str:
                 continue
             if any(p.startswith(".") for p in file_path.parts):
                 continue
-            if any(part in file_path.parts for part in ("node_modules", "icons", "__pycache__")):
+            if any(part in file_path.parts for part in ("node_modules", "icons", "__pycache__", "venv", "env", "exports", "images")):
                 continue
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -430,10 +441,10 @@ def copy_output_artifacts(
         return
 
     source_candidates = list(dict.fromkeys([
-        Path(".").resolve() / "core-ppt-master-engine" / "projects",
-        Path(".").resolve() / "projects"
+        Path(__file__).parent.resolve() / "core-ppt-master-engine" / "projects",
+        Path(__file__).parent.resolve() / "projects"
     ]))
-    destination = Path(output_dir_str)
+    destination = Path(output_dir_str).expanduser().resolve()
     timestamp_utc = datetime.now(timezone.utc).isoformat()
 
     logger.info("")
@@ -518,6 +529,92 @@ def copy_output_artifacts(
     logger.info("ARTIFACT COPY STAGE COMPLETE")
     logger.info("═" * 60)
     logger.info("")
+
+
+def find_and_restore_incomplete_project(depth: int | None = None) -> str | None:
+    """Scan OUTPUT_ARTIFACTS_DIR for incomplete projects and restore the latest one.
+
+    Returns:
+        The name of the project if one was restored/found, or None if all are complete/none found.
+    """
+    output_dir_str = os.environ.get("OUTPUT_ARTIFACTS_DIR")
+    if not output_dir_str:
+        logger.warning("OUTPUT_ARTIFACTS_DIR not set. Cannot run auto-resume scan.")
+        return None
+
+    output_dir = Path(output_dir_str).expanduser().resolve()
+    if not output_dir.exists():
+        logger.info(f"Output directory does not exist: {output_dir}. Nothing to resume.")
+        return None
+
+    # Resolve depth
+    if depth is None:
+        env_depth = os.environ.get("WATCHDOG_DEPTH")
+        try:
+            depth = int(env_depth) if env_depth else 3
+        except ValueError:
+            logger.warning(f"Invalid WATCHDOG_DEPTH in env: '{env_depth}'. Using 3.")
+            depth = 3
+
+    logger.info(f"Scanning output directory for incomplete runs: {output_dir} (depth: {depth})")
+
+    # Scan directories
+    import glob
+    projects = []
+    for entry in output_dir.iterdir():
+        if entry.is_dir():
+            # Signature of a started project is that it contains design_spec.md
+            design_spec = entry / "design_spec.md"
+            if design_spec.exists():
+                pptx_files = glob.glob(str(entry / "exports" / "*.pptx"))
+                projects.append({
+                    "name": entry.name,
+                    "path": entry,
+                    "mtime": entry.stat().st_mtime,
+                    "has_pptx": len(pptx_files) > 0
+                })
+
+    if not projects:
+        logger.info("No projects found in the output directory.")
+        return None
+
+    # Sort projects by modification time (newest first)
+    projects.sort(key=lambda p: p["mtime"], reverse=True)
+
+    # Inspect up to depth
+    targets = projects[:depth]
+    for project in targets:
+        logger.info(f"Checking project: {project['name']} (Last modified: {project['mtime']})")
+        if project["has_pptx"]:
+            logger.info(f"  [COMPLETE] PPTX already present.")
+        else:
+            logger.info(f"  [INCOMPLETE] No PPTX found. Initiating resumption...")
+            
+            # Determine workspace candidates
+            workspace_candidates = [
+                Path(__file__).parent.resolve() / "core-ppt-master-engine" / "projects" / project["name"],
+                Path(__file__).parent.resolve() / "projects" / project["name"]
+            ]
+            exists_in_workspace = any(c.exists() for c in workspace_candidates)
+
+            if not exists_in_workspace:
+                target_projects_root = Path(__file__).parent.resolve() / "projects"
+                if (Path(__file__).parent.resolve() / "core-ppt-master-engine" / "projects").exists():
+                    target_projects_root = Path(__file__).parent.resolve() / "core-ppt-master-engine" / "projects"
+                
+                target_project_path = target_projects_root / project["name"]
+                logger.info(f"  [RESTORE] Project folder not found in workspace. Restoring from output artifacts to {target_project_path}...")
+                try:
+                    shutil.copytree(project["path"], target_project_path)
+                    logger.info(f"  [RESTORE] Successfully restored {project['name']} to workspace.")
+                except Exception as exc:
+                    logger.error(f"  [RESTORE FAILED] Could not restore {project['name']} to workspace: {exc}")
+                    sys.exit(1)
+
+            return project["name"]
+
+    logger.info(f"All {len(targets)} scanned projects are already complete.")
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -757,6 +854,16 @@ if __name__ == "__main__":
         sys.exit(0 if success else 1)
 
     prompt = resolve_prompt(ARGS)
+
+    # Auto-resumption check
+    if ARGS.resume or prompt.lower().strip() == "resume":
+        logger.info("Auto-resumption mode activated.")
+        resumed_project = find_and_restore_incomplete_project(ARGS.depth)
+        if not resumed_project:
+            logger.info("No incomplete projects found to resume. Everything is up to date. Exiting successfully.")
+            sys.exit(0)
+        prompt = f"resume generating projects/{resumed_project}"
+        logger.info(f"Target resumption prompt: '{prompt}'")
 
     # Track agent outcome independently so the artifact copy can record it
     # and the process exits with the correct code (Cloud Run Job uses exit code

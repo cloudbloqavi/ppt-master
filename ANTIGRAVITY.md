@@ -48,6 +48,7 @@ These are validated at startup by `run_agent.py`. The runner exits with a clear 
 |:---|:---|:---|
 | `AGENT_PROMPT` | Prompt sent to the agent (env-based alternative to `--prompt`) | `Create a 10-slide deck` |
 | `ANTIGRAVITY_HARNESS_PATH` | Override path to the Go `localharness` binary | `/usr/local/.../localharness` |
+| `WATCHDOG_DEPTH` | Number of recent project folders the auto-resumption checks (defaults to `3`) | `5` |
 
 > **`--self-test` skips validation** — you can run `python run_agent.py --self-test` without any API key to verify the workspace tools work.
 
@@ -578,13 +579,37 @@ resource.type="build"
 | Feature | Detail |
 |:---|:---|
 | **Env validation** | Checks `GEMINI_API_KEY` + `OUTPUT_ARTIFACTS_DIR` at startup; exits with a clear error if missing |
-| **Prompt resolution** | Priority: `--prompt` arg → `AGENT_PROMPT` env → built-in default |
+| **Prompt resolution** | Priority: `--resume` / `--prompt` arg → `AGENT_PROMPT` env → built-in default |
+| **Auto-Resumption** | If `--resume` or prompt matches `"resume"`, automatically scans `OUTPUT_ARTIFACTS_DIR` for incomplete projects within `WATCHDOG_DEPTH` depth, restores them to the workspace, and resumes execution. |
 | **Path resolution** | Workspace tools resolve all relative paths from the repo root |
-| **Search optimization** | `grep_search` skips `.git`, `node_modules`, `__pycache__`, `icons` (< 2s searches) |
+| **Search optimization** | `grep_search` skips `.git`, `node_modules`, `__pycache__`, `icons`, `venv`, `env`, `exports`, `images` (< 2s searches) |
 | **Google Search grounding** | Monkey-patches the SDK to enable native Google Search inside the harness |
 | **Cloud Logging** | Harness stderr is captured and forwarded to Python's `logger` with `[Harness]` prefix |
 | **Artifact copy (FINAL STAGE)** | Always runs — success, failure, or interruption — copies projects → `OUTPUT_ARTIFACTS_DIR` and writes `run_manifest.json` |
 | **Exit codes** | `0` = success, `1` = agent failed, `130` = interrupted (Ctrl+C). Cloud Run Job uses exit code for health tracking. |
+
+---
+
+### 🔄 Native Auto-Resumption
+
+The agent runner supports native auto-resumption of incomplete runs (ideal for running on cron schedules, like Google Cloud Scheduler).
+
+When `--resume` is supplied or the resolved prompt is `"resume"` (case-insensitive):
+1. **Scan**: It scans `OUTPUT_ARTIFACTS_DIR` for the most recent projects up to `WATCHDOG_DEPTH` (defaults to `3`).
+2. **Detect Incomplete**: It checks each project for a `.pptx` file inside the `exports/` folder. The first folder missing a `.pptx` is marked for resumption.
+3. **Restore**: If the project directory is not present locally in the workspace (common in fresh container environments), it copies the project folder from `OUTPUT_ARTIFACTS_DIR` back to the workspace.
+4. **Trigger**: It overrides the prompt to `"resume generating projects/<project_name>"` and starts the agent.
+5. **No-op Exit**: If all projects within the scan depth are already complete, it prints a success log and exits with code `0` immediately without calling the Gemini API.
+
+#### Execution Wrapper
+`auto_resume.py` is provided as a lightweight wrapper that delegates to `run_agent.py --resume`. You can use it as a cron entry point:
+```bash
+# Run with default depth (3)
+python3 auto_resume.py
+
+# Run with a custom depth (5)
+python3 auto_resume.py --depth 5
+```
 
 ---
 
