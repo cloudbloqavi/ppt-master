@@ -26,6 +26,14 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 >
 > Visual self-check: This step is enabled by default (opt-out). The pipeline automatically runs the standalone [`visual-review`](core-ppt-master-engine/skills/ppt-master/workflows/visual-review.md) workflow between the executor and post-processing steps. If the user opts out (e.g., via the `--no-visual-review` CLI argument or explicitly requesting it in their prompt), this step is skipped.
 
+## Subagent and Parallel Execution Policy
+
+Deciding whether to leverage the parallel subagentic approach for background or parallel activities (such as source document processing or batch visual reviews) must be based on a dynamic assessment of system resources:
+- **Resource Check**: Prior to spawning subagents, inspect the system's CPU cores, available memory, and free disk space.
+- **Execution Mode**:
+  - **Parallel Mode**: If the host system has sufficient resources (e.g., >=2 vCPU, >=1 GB RAM, and adequate free disk space e.g. >=1GB), the agent should leverage `invoke_subagent` to execute parallel tasks concurrently.
+  - **Sequential Mode**: If resources are constrained or if running in a resource-limited environment, the agent must fall back to sequential execution inside the main parent agent.
+
 ## Execution Requirements
 
 - For standalone template creation (no source deck), read [`core-ppt-master-engine/skills/ppt-master/workflows/create-template.md`](core-ppt-master-engine/skills/ppt-master/workflows/create-template.md).

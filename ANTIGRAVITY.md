@@ -140,12 +140,16 @@ Your terminal prompt should now show `(.venv)` at the start.
 
 ```bash
 pip install -r requirements.txt
+
+# Install the required headless Chromium browser binary for Playwright (needed for visual review)
+python3 -m playwright install chromium
 ```
 
 What gets installed:
 - `google-antigravity` — the autonomous agent SDK (includes the Go `localharness` binary)
 - `cairosvg` — SVG → PNG rendering for PPTX export
 - `python-dotenv` — `.env` file loading
+- Playwright and the headless Chromium browser binary (used for the visual self-review loop)
 - All PPT Master skill dependencies (python-pptx, PyMuPDF, Pillow, etc.)
 
 Verify the SDK installed correctly:

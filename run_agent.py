@@ -853,6 +853,39 @@ def run_self_test() -> bool:
     return True
 
 
+def check_and_install_dependencies():
+    """Verify and install dependencies in WSL/Linux environments."""
+    is_linux = sys.platform == "linux"
+    if is_linux:
+        logger.info("WSL/Linux detected. Checking Python and browser dependencies...")
+        try:
+            import google.antigravity
+            import cairosvg
+            import playwright
+        except ImportError:
+            logger.info("Missing dependencies detected. Running pip install -r requirements.txt...")
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+            except Exception as pip_exc:
+                logger.error("Failed to run pip install: %s", pip_exc)
+
+        # Check/Install Playwright Chromium
+        if not ARGS.no_visual_review:
+            try:
+                from playwright.sync_api import sync_playwright
+                with sync_playwright() as p:
+                    # Try launching to verify the binary is present and working
+                    browser = p.chromium.launch()
+                    browser.close()
+            except Exception:
+                logger.info("Playwright Chromium browser binary not found or unable to launch. Installing chromium...")
+                try:
+                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    logger.info("Playwright Chromium browser binary installed successfully.")
+                except Exception as play_exc:
+                    logger.error("Failed to install Playwright Chromium: %s", play_exc)
+
+
 # ─────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────
@@ -862,6 +895,7 @@ if __name__ == "__main__":
         success = run_self_test()
         sys.exit(0 if success else 1)
 
+    check_and_install_dependencies()
     prompt = resolve_prompt(ARGS)
 
     # Auto-resumption check
