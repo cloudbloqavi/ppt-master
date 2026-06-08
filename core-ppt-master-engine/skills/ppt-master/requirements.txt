@@ -109,3 +109,10 @@ google-genai>=1.0.0
 # Localhost web editor for annotating SVG elements with edit instructions.
 # Local Web editor for adding editing annotation instructions to SVG elements
 flask>=3.0.0
+
+# ─────────────────────────────────────────────────────────────
+# Visual Review / Visual self-check (skills/ppt-master/scripts/visual_review.py)
+# ─────────────────────────────────────────────────────────────
+# Headless Chromium renderer for capturing SVG slides to PNG proofs.
+playwright>=1.60.0
+

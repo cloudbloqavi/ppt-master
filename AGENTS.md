@@ -24,7 +24,7 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 >
 > Brand identity setup: when the user asks to "set up brand" / "establish brand" / "create brand guidelines", provides a brand asset (logo / brand site URL / branded PPTX / brand PDF), or wants to extract a brand from existing materials, run the standalone [`create-brand`](core-ppt-master-engine/skills/ppt-master/workflows/create-brand.md) workflow. Output goes to `core-ppt-master-engine/skills/ppt-master/templates/brands/<id>/`. Brands apply at SKILL.md Step 3 via the same explicit-path rule as layout templates — the user supplies the brand directory path to apply it; bare brand names never trigger.
 >
-> Visual self-check: only when the user explicitly requests a per-page visual review on the generated SVGs (e.g., "run visual self-check / visual review / visual rubric", "visual review", "check each page visually"), run the standalone [`visual-review`](core-ppt-master-engine/skills/ppt-master/workflows/visual-review.md) workflow between the executor and post-processing steps. The main pipeline does NOT invoke it automatically; do not infer or recommend it from deck size, model identity, or any other signal — user request is the only trigger.
+> Visual self-check: This step is enabled by default (opt-out). The pipeline automatically runs the standalone [`visual-review`](core-ppt-master-engine/skills/ppt-master/workflows/visual-review.md) workflow between the executor and post-processing steps. If the user opts out (e.g., via the `--no-visual-review` CLI argument or explicitly requesting it in their prompt), this step is skipped.
 
 ## Execution Requirements
 
@@ -37,6 +37,7 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 
 - **Repo-wide style rules** — when editing prompt files under [`core-ppt-master-engine/skills/ppt-master/references/`](core-ppt-master-engine/skills/ppt-master/references/), Python under [`core-ppt-master-engine/skills/ppt-master/scripts/`](core-ppt-master-engine/skills/ppt-master/scripts/), or any other code/prose in the repo, follow the matching style rule in [`core-ppt-master-engine/docs/rules/`](core-ppt-master-engine/docs/rules/).
 - **Markdown language consistency** — Markdown files under `core-ppt-master-engine/skills/ppt-master/workflows/`, `core-ppt-master-engine/skills/ppt-master/references/`, and `core-ppt-master-engine/docs/` are currently single-language per directory. New files mirror the language of their siblings; do not mix English scaffolding with Chinese paragraphs (or vice versa) inside one file. Chat replies are unaffected.
+- **Strictly Relative Paths** — Any file link or path reference inside codebase markdown files (.md) MUST be strictly relative. Never use absolute paths (such as `file:///...` or machine-specific prefixes) in repository files.
 
 ## Compatibility Boundary
 
@@ -66,6 +67,9 @@ python3 run_agent.py --resume
 python3 run_agent.py --resume --depth 5
 python3 auto_resume.py
 python3 auto_resume.py --depth 5
+
+# Running with Visual Review Opt-out (enabled by default)
+python3 run_agent.py --no-visual-review --prompt "Your prompt here"
 
 # Image tools and SVG quality check
 python3 core-ppt-master-engine/skills/ppt-master/scripts/analyze_images.py <project_path>/images
@@ -102,6 +106,17 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx.py <project
 - `core-ppt-master-engine/docs/rules/` — repo-wide style rules.
 - `core-ppt-master-engine/examples/` — example projects.
 - `core-ppt-master-engine/projects/` — user project workspace.
+
+## Dependency Auditing & EOL Maintenance
+
+To maintain secure, stable, and up-to-date Python dependencies, this project includes an automated dependency audit log.
+
+*   **Dependency Tracking File**: [DEPENDENCIES.md](DEPENDENCIES.md) in the project root lists package versions, latest stable PyPI releases, EOL status, and action recommendations.
+*   **Audit Command**: Run the following script to automatically parse requirements, fetch the latest PyPI versions, and refresh `DEPENDENCIES.md` (while preserving manual EOL and custom notes):
+    ```bash
+    python3 check_dependencies.py
+    ```
+*   **Auditing Rule**: Any agent running in this workspace MUST review `DEPENDENCIES.md` regularly, execute the check script, and verify package deprecation timelines and compatibility (e.g. NumPy 2.0 API changes).
 
 ## Repo Sync & Pre-Merge Guidelines
 

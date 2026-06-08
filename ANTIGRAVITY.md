@@ -590,6 +590,87 @@ resource.type="build"
 
 ---
 
+### 📡 Programmatic Agent Execution & Tool Flow
+
+The following diagram illustrates how a user prompt moves through the Python runner, the native Go harness, the Gemini API, and dynamic subagent execution, concluding with artifact storage.
+
+```text
++-------------------------------------------------------------------------------+
+|                                USER COMMAND                                   |
+|      python run_agent.py --prompt "Please turn the following into a PPT..."   |
++---------------------------------------+---------------------------------------+
+                                        |
+                                        v
++---------------------------------------+---------------------------------------+
+|  run_agent.py (Python SDK Wrapper)                                            |
+|  - Validates environment (API key, output dir)                               |
+|  - Configures LocalAgentConfig (workspaces=["."], tools=[])                   |
++---------------------------------------+---------------------------------------+
+                                        |
+                                        v  [Launches (Deferred subprocess)]
++---------------------------------------+---------------------------------------+
+|  google.antigravity Go Harness (agy/agy.exe)                                  |
+|  - Sandboxes the workspace & monitors folders                                 |
+|  - Dynamically injects Workspace Tools (read_file, write_file, run_command)   |
+|  - Injects native Platform Tools (invoke_subagent)                            |
++----------------------------------+----+----------------------------------+----+
+                                   |                                       |
+    [Workspace & Shell Tools]      |                                       | [LLM Messages]
+                                   v                                       v
++----------------------------------+----+                       +----------+----+
+|  Local Codebase Filesystem            |                       |  Gemini API   |
+|  - core-ppt-master-engine/projects/   |                       |  (gemini-     |
+|  - scripts (latex_render, etc.)       |                       |  3.5-flash)   |
++---------------------------------------+                       +----+----------+
+                                                                     ^
+                                                                     | [invoke_subagent]
+                                                                     v
+                                                        +------------+----------+
+                                                        | Parallel Subagents    |
+                                                        | (Concurrent Clones)   |
+                                                        | - Visual Review       |
+                                                        | - Source Processing   |
+                                                        +------------+----------+
+                                                                     |
+                                                                     v [Write reports/JSON]
+                                                        +------------+----------+
+                                                        | Local Workspace State |
+                                                        | - .review/*.json      |
+                                                        +------------+----------+
+                                                                     |
+                                                                     | [Execution Ends]
+                                                                     v
++--------------------------------------------------------------------+----------+
+|  FINAL STAGE: copy_output_artifacts()                                         |
+|  - Mirrors projects/ directory tree to OUTPUT_ARTIFACTS_DIR                   |
+|  - Writes run_manifest.json (Run status, metadata)                            |
+|  - GCS FUSE mapping automatically uploads files to Google Cloud Storage       |
++-------------------------------------------------------------------------------+
+```
+
+#### Step-by-Step Scenario Walkthrough
+
+* **Step A: Invocation & Env Validation**  
+  A user runs `python run_agent.py --prompt "Please turn the following into a PPT: ..."` (locally or as a Google Cloud Run Job).  
+  `run_agent.py` validates that `GEMINI_API_KEY` and `OUTPUT_ARTIFACTS_DIR` are present. It loads the `google-antigravity` SDK, resolves the prompt, and creates a `LocalAgentConfig` with `tools=[]` and `workspaces=["."]`.
+
+* **Step B: Booting the Native Go Harness**  
+  The Python SDK boots the Go-based `localharness` binary (`agy.exe` on Windows or `agy` on Linux/macOS) in the background. The harness serves as the sandbox controller and local API server for the agent.
+
+* **Step C: System Tool Injection**  
+  Because the harness manages the workspace directory at the operating system level, it automatically registers and injects standard workspace tools (like `read_file`, `write_file`, `grep_search`, `run_command`, and the subagent-spawning tool `invoke_subagent`) into the agent's LLM context. Consequently, you do not need to register these system tools programmatically in Python (`tools=[]` is kept empty).
+
+* **Step D: Parent Agent Loop & LLM Communication**  
+  The parent agent starts communicating with the Google Gemini API to interpret the prompt and execute the workflow. It reads source files, resolves layouts, runs Latin/formula rendering commands, and writes the `design_spec.md` and `spec_lock.md` files.
+
+* **Step E: Parallel Subagent Execution**  
+  When running a parallelizable step (such as checking pages in the visual review workflow), the parent agent issues concurrent `invoke_subagent` tool calls to the harness with `"wait_for_completion": false`. The harness boots multiple subagent clones (`self` type) in the background. The subagents read the slide SVGs, inspect the rendered PNGs, perform edits, write slide JSON reports to `.review/<page>.json`, and exit. The parent agent receives the completion signals and aggregates the results.
+
+* **Step F: Artifact Copy & Manifest Logging**  
+  Regardless of whether the agent succeeds, fails, or is interrupted (Ctrl+C), a `finally` block in `run_agent.py` always executes the `copy_output_artifacts()` stage. It mirrors the generated project files under `projects/` to the `OUTPUT_ARTIFACTS_DIR` and logs a `run_manifest.json` metadata summary. If running in a Cloud Run Job, the destination directory is mapped transparently to a Google Cloud Storage (GCS) bucket via a Cloud Storage FUSE mount, allowing all outputs to land directly in GCS.
+
+---
+
 ### 🔄 Native Auto-Resumption
 
 The agent runner supports native auto-resumption of incomplete runs (ideal for running on cron schedules, like Google Cloud Scheduler).

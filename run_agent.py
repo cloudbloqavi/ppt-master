@@ -127,6 +127,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Number of recent project directories to verify when resuming (defaults to WATCHDOG_DEPTH env var or 3).",
     )
+    parser.add_argument(
+        "--no-visual-review",
+        action="store_true",
+        help="Opt out of running the visual review phase (which runs by default).",
+    )
     # Use parse_known_args so unknown flags don't crash the script
     args, _ = parser.parse_known_args()
     return args
@@ -704,7 +709,7 @@ def resolve_prompt(args: argparse.Namespace) -> str:
 # ─────────────────────────────────────────────────────────────
 
 
-async def run_agent(prompt_message: str, use_mcp: bool = False):
+async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review: bool = False):
     """Initialize the Antigravity agent and send a single prompt."""
     logger.info("Initializing Agent using Google Antigravity SDK...")
     logger.info("Platform: %s | Python: %s", sys.platform, sys.version.split()[0])
@@ -718,6 +723,10 @@ async def run_agent(prompt_message: str, use_mcp: bool = False):
         "When running steps, proceed logically and verify that outputs (e.g. project directories, spec files, SVGs, PPTX files) "
         "are successfully created."
     )
+    if no_visual_review:
+        system_instructions += "\nUser has opted out of the visual review phase. DO NOT execute the visual self-check / visual-review workflow at Step 6."
+    else:
+        system_instructions += "\nVisual review phase is enabled by default (opt-out mode). You MUST run the visual self-check / visual-review workflow at Step 6 after all SVGs are generated, unless opted out."
 
     mcp_servers = load_mcp_servers() if use_mcp else []
     if use_mcp:
@@ -872,7 +881,7 @@ if __name__ == "__main__":
     _exit_code = 0
 
     try:
-        asyncio.run(run_agent(prompt, use_mcp=ARGS.mcp))
+        asyncio.run(run_agent(prompt, use_mcp=ARGS.mcp, no_visual_review=ARGS.no_visual_review))
         _run_status = "success"
         logger.info("Agent run completed successfully.")
     except KeyboardInterrupt:

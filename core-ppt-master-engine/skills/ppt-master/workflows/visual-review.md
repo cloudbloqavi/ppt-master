@@ -12,7 +12,7 @@ description: Per-page rubric-based visual self-review via parallel subagents. Ru
 
 ## Positioning
 
-This is an **optional auxiliary loop**, opt-in only. The main pipeline (SKILL.md Step 1–7) does not invoke it; trigger only when the user explicitly asks for a visual re-pass on the generated SVGs before export.
+This is an **opt-out review loop**. The main pipeline (SKILL.md Step 1–7) invokes it by default before Step 7 post-processing, unless the user explicitly opts out (e.g. via `--no-visual-review` CLI argument or prompt instruction).
 
 **Token cost**: each batch subagent re-reads the rubric + `design_spec.md` + `spec_lock.md` and processes K SVG+PNG pairs. For a 20-page deck with K=5, expect on the order of 100–150K additional input tokens on top of the main generation run.
 
@@ -21,7 +21,7 @@ This is an **optional auxiliary loop**, opt-in only. The main pipeline (SKILL.md
 - Executor (SKILL.md Step 6) has finished all pages
 - `svg_quality_checker.py` has passed
 - Post-processing (`finalize_svg.py`, `svg_to_pptx.py`) has **not** yet run
-- The user has explicitly requested visual review
+- By default (unless opted out via the `--no-visual-review` CLI flag or prompt instruction)
 
 For decks containing data charts, run [`verify-charts`](./verify-charts.md) first — visual-review focuses on visual rhythm / collision / alignment, not chart coordinate math.
 
@@ -30,7 +30,7 @@ For decks containing data charts, run [`verify-charts`](./verify-charts.md) firs
 - The project has no `svg_output/<page>.svg` files yet — finish Executor first
 - `svg_quality_checker.py` has not been run or has failed — fix static violations first
 - User has already applied annotations via `live-preview` workflow and is in a fixed-edit loop — describe changes directly, do not re-trigger rubric
-- The user has not asked for it — do not auto-invoke based on inferred model capability or deck size
+- The user has explicitly opted out (via `--no-visual-review` CLI flag or prompt instruction)
 
 ---
 
@@ -71,31 +71,19 @@ If any page comes back with `"all_background": true` in the JSON summary, that p
 
 ---
 
-## Step 2 — Spawn the review team
+## Step 2 — Spawn the review team (Antigravity SDK Subagent Orchestration)
 
-Create a team and dispatch one orchestrator agent. The orchestrator partitions the N pages into batches of ≤ K pages (default **K = 5**) and spawns one subagent per batch **in parallel** (single message, `ceil(N/K)` parallel `Agent` calls). Each batch subagent reads the fixed inputs (rubric + `design_spec.md` + `spec_lock.md`) **once**, then iterates over its assigned pages sequentially.
+To parallelize the visual review workflow, the main agent leverages the built-in subagents capability of the Antigravity SDK:
 
-```text
-TeamCreate(team_name="visual-review-<project>", agent_type="orchestrator")
-Agent(
-  team_name="visual-review-<project>",
-  subagent_type="general-purpose",
-  name="orchestrator",
-  prompt=<orchestrator-prompt>,
-)
-```
+1. **Partition the Slides**: Partition the $N$ generated pages into batches of $\le K$ pages (default **K = 5**).
+2. **Invoke Parallel Subagents**: For each batch, invoke a built-in `self` subagent (or define a custom subagent using `define_subagent` if tool restrictions are desired) in parallel. You can invoke them concurrently using the native `invoke_subagent` tool.
+3. **Subagent Configuration**:
+   - **Type**: `self` (inherits all tools including file read/write and image viewing) or custom.
+   - **System Prompt**: 
+     > You are a visual-review subagent. Evaluate the assigned slide SVGs and their pre-rendered PNGs in `.preview/` against the Visual Review Rubric. Back up each slide before editing (`cp` or copy tool to `.review/backup/<page>.iter1.svg`), make precise positioning/alignment fixes directly to the SVG files in-place (do not modify brand colors or copy text), and write a JSON report to `.review/<page>.json` matching §5 of the rubric.
+   - **Initial Prompt**: Pass the rubric content, `design_spec.md` context, `spec_lock.md` context, and the list of specific slides (`svg_path` and `png_path`) for the batch.
 
-The orchestrator prompt must be self-contained and is the **single** place where dispatch shape, batch size, and forbid lists are stated — the rubric (`references/visual-review.md`) defines the contract those prompts must satisfy. Required fields (all absolute paths):
-
-- `<project_path>` — project root
-- Full page list with `page_role` per page (parse `<project>/design_spec.md` §IX outline; if §IX is absent, default every page to `content` and flag this in the final report)
-- Batch size `K` (default 5; raise to 10 for token-sensitive runs on large decks, lower to 3 for high-fidelity short decks — see rubric §6.1)
-- Iteration budget per page (default 1; 2 only for high-stakes / final-cut runs — see [Appendix: Iteration loop](#appendix-iteration-loop-opt-in))
-- Path to the rubric: `skills/ppt-master/references/visual-review.md`
-- Dispatch contract reference: rubric [§6](../references/visual-review.md#6-dispatch--messaging-contract) (batched parallel spawn, self-contained prompts, mandatory `SendMessage` on idle, anonymous-name tolerance)
-- Subagent forbid list: do not edit any other page, `design_spec.md`, `spec_lock.md`, `animations.json`, `image_prompts.json`, or `images/`
-
-**Host compatibility**: `TeamCreate` and `SendMessage` are Claude-Code-specific multi-agent primitives. On hosts without those primitives (Cursor, VS Code + Copilot, Codebuddy, etc.) the main agent processes batches sequentially — same partitioning, same per-batch prompts, no parallel dispatch. Token savings from shared fixed inputs still apply; wall-clock time grows roughly N/K-fold.
+**Host compatibility**: In the Antigravity SDK environment, the orchestrating agent spawns subagents asynchronously in the background. Each subagent runs independently, performs its file and visual review steps, writes the `.json` report, and signals the parent once it transitions to `Idle`.
 
 ---
 

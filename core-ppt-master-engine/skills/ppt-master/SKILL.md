@@ -58,6 +58,7 @@ description: >
 | `${SKILL_DIR}/scripts/finalize_svg.py` | SVG post-processing (unified entry) |
 | `${SKILL_DIR}/scripts/svg_to_pptx.py` | Export to PPTX |
 | `${SKILL_DIR}/scripts/update_spec.py` | Propagate a `spec_lock.md` color / font_family change across all generated SVGs |
+| `check_dependencies.py` (Project Root) | Audit package requirements, query PyPI, and update `DEPENDENCIES.md` |
 
 For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 
@@ -82,7 +83,8 @@ For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 | `verify-charts` | `workflows/verify-charts.md` | Chart coordinate calibration — run after SVG generation if the deck contains data charts |
 | `customize-animations` | `workflows/customize-animations.md` | Object-level PPTX animation customization — run only when the user explicitly asks to tune animation order/effects/timing |
 | `live-preview` | `workflows/live-preview.md` | Browser-based live preview — disabled by default, can be explicitly enabled during generation, and re-enterable any time the user mentions "live preview", "preview", "preview", or wants to click/select a slide element |
-| `visual-review` | `workflows/visual-review.md` | Per-page rubric-based visual self-check — run only when the user explicitly asks for a visual re-pass on the generated SVGs (between Executor and post-processing). Opt-in only; never invoked by the main pipeline. |
+| `visual-review` | `workflows/visual-review.md` | Per-page rubric-based visual self-check — run by default (opt-out) before Step 7 post-processing unless the user explicitly opts out (e.g. via --no-visual-review flag or prompt). |
+| `check-dependencies` | `DEPENDENCIES.md` | Audit all library and package dependencies being used, fetch latest stable versions from PyPI, check EOL/deprecation schedules, and update status |
 
 ---
 
@@ -121,6 +123,8 @@ When the user provides non-Markdown content, convert immediately:
 >
 > Browser-based live preview cannot render EMF (will show blank) — this is expected;
 > the PPTX output is the source of truth.
+
+> **Multi-source Parallel Ingestion (Optimization)**: If the user provides multiple source documents or links (e.g., more than one PDF, DOCX, URL, or sheet), the agent MUST spawn parallel subagents (one per source) using `invoke_subagent` to run the respective conversion scripts (`pdf_to_md.py`, `web_to_md.py`, etc.) and summarize their contents. This parallelizes the conversion overhead and keeps the main agent’s context window clean.
 
 **✅ Checkpoint — Confirm source content is ready, proceed to Step 2.**
 
@@ -447,7 +451,7 @@ python3 ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 
 > **Chart pages?** If this deck contains data charts (bar / line / pie / radar / etc.), run the standalone [`verify-charts`](workflows/verify-charts.md) workflow before Step 7 to calibrate coordinates. AI models routinely introduce 10–50 px errors when mapping data to pixel positions; verify-charts eliminates that class of error. Skip if no chart pages.
 
-> **Visual self-check (opt-in)?** If the user explicitly asked for a per-page visual re-pass on the SVGs ("run a visual self-check / visual review", "visual review", "check pages visually", etc.), run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. Do NOT run it by default and do NOT recommend it based on inferred model capability or deck size — trigger is user request only.
+> **Visual self-check (opt-out)**: By default, always run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. If the user has explicitly opted out (e.g. via the `--no-visual-review` CLI argument or explicitly requesting it in their prompt), skip this step.
 
 ---
 

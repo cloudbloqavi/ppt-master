@@ -1,12 +1,14 @@
 {
   "meta": {
-    "total": 71,
+    "total": 81,
     "defaultViewBox": "0 0 1280 720",
-    "formats": ["ppt169"],
+    "formats": [
+      "ppt169"
+    ],
     "filePattern": "{key}.svg",
     "libraryPositioning": "Visualization template library covering charts, infographics, diagrams, and strategic frameworks. The `charts/` path is retained for backward compatibility. Templates are named by visual structure, not by business-model name — model-specific frameworks (SWOT, BCG, PEST, OKR, Porter's Five Forces, Value Chain, etc.) are matched via keywords in `summary`.",
-    "summaryGrammar": "Each chart's `summary` is a selection rule, not a description. Format: 'Pick for <content shape + scale>. Skip if <reason → alternative>'. Strategist matches every page's content shape against all 71 summaries; no category/keyword index — full-read is intentional.",
-    "updated": "2026-05-13"
+    "summaryGrammar": "Each chart's `summary` is a selection rule, not a description. Format: 'Pick for <content shape + scale>. Skip if <reason → alternative>'. Strategist matches every page's content shape against all 81 summaries; no category/keyword index — full-read is intentional.",
+    "updated": "2026-06-08"
   },
   "charts": {
     "area_chart": {
@@ -221,6 +223,36 @@
     },
     "labeled_card": {
       "summary": "Pick for 3-4 parallel aspects of one subject with per-aspect titles + short body (self-introduction, four-pillar overview, capability quadrant). Skip for plain feature lists (use icon_grid), sequential steps (use numbered_steps), or strategic quadrants (use quadrant_text_bullets / matrix_2x2)."
+    },
+    "monthly_marketing_calendar": {
+      "summary": "Pick for a monthly calendar view showing marketing campaigns, events, or social media scheduling across weeks. Skip for multi-month or annual timelines (use timeline or gantt_chart)."
+    },
+    "quarterly_product_roadmap": {
+      "summary": "Pick for a 4-quarter roadmap (Q1-Q4) grouped by streams or focus areas. Skip for longer multi-year plans (use multi_year_growth_strategy) or simple milestone lists (use timeline)."
+    },
+    "three_year_project_lifecycle": {
+      "summary": "Pick for a 3-year project lifecycle roadmap mapping major phases (e.g. Action, Implement, Review) to Year 1-3. Skip for simpler timelines without phase grouping (use timeline)."
+    },
+    "monthly_strategic_roadmap": {
+      "summary": "Pick for detailed phased roadmap showing monthly or step-by-step activities and outcomes mapped to phases (columns for Phase, Activities, Outcomes). Skip for simple milestones (use timeline) or vertical list (use roadmap_vertical)."
+    },
+    "yearly_strategic_goals_roadmap": {
+      "summary": "Pick for mapping multiple strategic goals (3-5 goals) to specific milestone years or targets (e.g., Year 1 vs Year 2 deliverables). Skip if only showing milestones chronologically (use timeline) or simple lists (use vertical_list)."
+    },
+    "annual_roles_targets_roadmap": {
+      "summary": "Pick for a 3-year strategic roadmap organized by core execution pillars (e.g., Roles, Action Plan, Timelines). Skip for simpler annual targets (use yearly_strategic_goals_roadmap) or more years (use multi_year_growth_strategy)."
+    },
+    "cross_functional_status_board": {
+      "summary": "Pick for a 4-column status board, task tracker, or Kanban board layout where each column contains 4-6 cards with status indicator tabs. Skip for simple vertical column lists (use vertical_pillars) or true timeline gantt charts (use gantt_chart)."
+    },
+    "marketing_milestones_matrix": {
+      "summary": "Pick for a 3x3 matrix layout or 9-step grid where 9 numbered items are grouped under 3 distinct column categories (3 items per column). Skip for un-numbered feature grids (use icon_grid) or simple lists (use numbered_steps)."
+    },
+    "maturity_transformation_roadmap": {
+      "summary": "Pick for a 4-stage maturity curve, capability growth progression, or strategic transformation roadmap from status quo to advanced state. Skip for simple step lists (use numbered_steps) or vertical timelines (use roadmap_vertical)."
+    },
+    "multi_year_growth_strategy": {
+      "summary": "Pick for a 5-year or 5-phase growth strategy roadmap where each year column contains multiple stacked key objectives or focus areas. Skip for shorter timelines (use three_year_strategic_roadmap) or single milestones (use timeline)."
     }
   }
 }

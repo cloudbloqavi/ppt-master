@@ -640,7 +640,9 @@ Color: Default `#0F172A` (neutral dark gray), can be changed to a darker variant
 | §11.2 Nested Card Border | `labeled_card.svg` |
 | §11.3 2×2 Card Grid | `kpi_cards.svg`, `quadrant_text_bullets.svg`, `labeled_card.svg` |
 | §11.3 2×3 Card Grid | `icon_grid.svg` |
-| §11.3 1×3/1×4 Card Grid | `comparison_columns.svg`, `vertical_pillars.svg` |
+| §11.3 1×3/1×4 Card Grid | `comparison_columns.svg`, `vertical_pillars.svg`, `annual_roles_targets_roadmap.svg`, `maturity_transformation_roadmap.svg`, `cross_functional_status_board.svg` |
+| §11.3 3×3 Staggered Grid | `marketing_milestones_matrix.svg` |
+| §11.3 1×5 Column Grid | `multi_year_growth_strategy.svg` |
 | §11.5 Diagonal Dashed Connector | `matrix_2x2.svg` |
 | §11.6 Ground Anchor Ellipse | `team_roster.svg` |
 | §11.7 Bidirectional Interaction Arrows | `client_server_flow.svg` |
