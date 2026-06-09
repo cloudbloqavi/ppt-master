@@ -54,6 +54,23 @@ These are validated at startup by `run_agent.py`. The runner exits with a clear 
 
 ---
 
+## 🎛️ CLI Arguments Reference
+
+The runner scripts support the following command-line options for control and customization:
+
+| Argument | Description | Script(s) | Example / Choices |
+|:---|:---|:---|:---|
+| `--prompt <text>` | The prompt to send to the agent (Overrides `AGENT_PROMPT` env var). | `run_agent.py` | `--prompt "Create a 5-slide deck"` |
+| `--verbose` | Enable verbose execution. Streams thinking blocks and prints detailed tool inputs/outputs. | `run_agent.py` | (Flag) |
+| `--thinking-level <level>` | Manually override the model's thinking level. Defaults to `MEDIUM` (or `HIGH` under `--verbose`). | `run_agent.py` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
+| `--resume` | Automatically resume the latest incomplete run. | `run_agent.py` | (Flag) |
+| `--depth <num>` | Verify `<num>` recent output folders when checking for resumption candidates. | `run_agent.py`, `auto_resume.py` | `--depth 5` |
+| `--no-visual-review` | Skip the visual review / self-check phase entirely. | `run_agent.py` | (Flag) |
+| `--mcp` | Enable loading local MCP servers from `mcp_config.json`. | `run_agent.py` | (Flag) |
+| `--self-test` | Test workspace tools in isolation (does not call LLM / consume API key). | `run_agent.py` | (Flag) |
+
+---
+
 ## 🚀 Local Quick Start (Any Linux / WSL 2)
 
 Follow these steps exactly. Each step builds on the previous one.
@@ -231,6 +248,12 @@ If you see `FAIL` on any step, check that your virtual environment is activated 
 # Run with a custom prompt (recommended for testing)
 python3 run_agent.py --prompt "Create a 5-slide product overview deck for a B2B SaaS company."
 
+# Run with maximum verbosity (detailed tool logs and streamed thinking) and high thinking level
+python3 run_agent.py --verbose --prompt "Create a B2B SaaS product overview deck."
+
+# Run with custom prompt and manual override of the model's thinking level
+python3 run_agent.py --thinking-level LOW --prompt "Create a B2B SaaS product overview deck."
+
 # Run with the built-in default prompt (Memphis-style music festival)
 python3 run_agent.py
 
@@ -238,17 +261,16 @@ python3 run_agent.py
 AGENT_PROMPT="Create a 10-slide investor pitch deck." python3 run_agent.py
 ```
 
-What you will see during a run:
+What you will see during a normal (default, quiet) run:
 ```
 [INFO] Initializing Agent using Google Antigravity SDK...
 [INFO] Platform: linux | Python: 3.11.x
 [INFO] Prompt: Create a 5-slide product overview deck...
 [INFO] MCP servers disabled. Pass --mcp to enable them.
 
-[Thinking] Reading AGENTS.md to understand the workflow...
 [Agent] I'll start by creating a new project and following the SKILL.md workflow...
-[INFO] [Tool Call] 'run_command' args: {...}
-[INFO] [Tool Result] 'run_command' (id: ...): {...}
+[INFO] [Tool Call] 'run_command'
+[INFO] [Tool OK] 'run_command'
 ...
 [INFO] ════════════════════════════════════════════════════════════
 [INFO] ARTIFACT COPY STAGE
@@ -608,7 +630,7 @@ The following diagram illustrates how a user prompt moves through the Python run
 +---------------------------------------+---------------------------------------+
 |  run_agent.py (Python SDK Wrapper)                                            |
 |  - Validates environment (API key, output dir)                               |
-|  - Configures LocalAgentConfig (workspaces=["."], tools=[])                   |
+|  - Configures LocalAgentConfig (with CapabilitiesConfig for subagents)         |
 +---------------------------------------+---------------------------------------+
                                         |
                                         v  [Launches (Deferred subprocess)]
@@ -656,7 +678,7 @@ The following diagram illustrates how a user prompt moves through the Python run
 
 * **Step A: Invocation & Env Validation**  
   A user runs `python run_agent.py --prompt "Please turn the following into a PPT: ..."` (locally or as a Google Cloud Run Job).  
-  `run_agent.py` validates that `GEMINI_API_KEY` and `OUTPUT_ARTIFACTS_DIR` are present. It loads the `google-antigravity` SDK, resolves the prompt, and creates a `LocalAgentConfig` with `tools=[]` and `workspaces=["."]`.
+  `run_agent.py` validates that `GEMINI_API_KEY` and `OUTPUT_ARTIFACTS_DIR` are present. It loads the `google-antigravity` SDK, resolves the prompt, and creates a `LocalAgentConfig` with `tools=[]`, `workspaces=["."]`, and `capabilities=CapabilitiesConfig(enable_subagents=True)` to explicitly enable subagents.
 
 * **Step B: Booting the Native Go Harness**  
   The Python SDK boots the Go-based `localharness` binary (`agy.exe` on Windows or `agy` on Linux/macOS) in the background. The harness serves as the sandbox controller and local API server for the agent.

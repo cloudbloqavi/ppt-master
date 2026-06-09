@@ -75,7 +75,7 @@ If any page comes back with `"all_background": true` in the JSON summary, that p
 
 To parallelize the visual review workflow, the main agent leverages the built-in subagents capability of the Antigravity SDK:
 
-1. **Partition the Slides**: Partition the $N$ generated pages into batches of $\le K$ pages (default **K = 5**).
+1. **Partition the Slides**: If the number of generated pages $N$ is greater than two ($N > 2$), the main agent SHOULD leverage subagents to execute the reviews in parallel. Partition the pages into batches of $\le K$ pages (default **K = 5**).
 2. **Invoke Parallel Subagents**: For each batch, invoke a built-in `self` subagent (or define a custom subagent using `define_subagent` if tool restrictions are desired) in parallel. You can invoke them concurrently using the native `invoke_subagent` tool.
 3. **Subagent Configuration**:
    - **Type**: `self` (inherits all tools including file read/write and image viewing) or custom.

@@ -132,6 +132,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Opt out of running the visual review phase (which runs by default).",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output (e.g. streaming of model thoughts and detailed tool results).",
+    )
+    parser.add_argument(
+        "--thinking-level",
+        type=str,
+        default=None,
+        choices=["MINIMAL", "LOW", "MEDIUM", "HIGH"],
+        help="Explicitly set the model's thinking level (overrides default/verbose defaults).",
+    )
     # Use parse_known_args so unknown flags don't crash the script
     args, _ = parser.parse_known_args()
     return args
@@ -187,7 +199,10 @@ else:
 # ─────────────────────────────────────────────────────────────
 
 try:
-    from google.antigravity import Agent, LocalAgentConfig, GeminiConfig
+    from google.antigravity import (
+        Agent, LocalAgentConfig, GeminiConfig, CapabilitiesConfig,
+        ModelConfig, ModelEntry, GenerationConfig, ThinkingLevel,
+    )
     from google.antigravity.hooks import policy
     from google.antigravity.types import (
         McpStdioServer,
@@ -404,6 +419,9 @@ def run_command(command: str, cwd: str = ".") -> dict:
 def copy_output_artifacts(
     run_status: str = "unknown",
     prompt: str = "",
+    token_usage: dict[str, Any] | None = None,
+    execution_duration: float | None = None,
+    subagent_stats: dict[str, Any] | None = None,
 ) -> None:
     """Copy generated project outputs to OUTPUT_ARTIFACTS_DIR.
 
@@ -514,6 +532,24 @@ def copy_output_artifacts(
         "files_copied": copied,
         "copy_errors": copy_errors,
     }
+    if token_usage:
+        manifest["token_usage"] = token_usage
+    if execution_duration is not None:
+        manifest["execution_duration_seconds"] = round(execution_duration, 2)
+    if subagent_stats is not None:
+        manifest["subagent_stats"] = {
+            "enabled": subagent_stats.get("enabled", False),
+            "total_spawned": subagent_stats.get("total_spawned", 0),
+            "completed": subagent_stats.get("completed", 0),
+            "details": [
+                {
+                    "type": d.get("type", "unknown"),
+                    "task": d.get("task", "")[:200],
+                    "status": d.get("status", "unknown"),
+                }
+                for d in subagent_stats.get("details", [])
+            ],
+        }
 
     if copied_projects:
         for project_dir in copied_projects:
@@ -728,25 +764,74 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
     else:
         system_instructions += "\nVisual review phase is enabled by default (opt-out mode). You MUST run the visual self-check / visual-review workflow at Step 6 after all SVGs are generated, unless opted out."
 
+    # Instruct the agent about subagents capability
+    system_instructions += (
+        "\n\nSubagent Delegation & Coordination Rules:"
+        "\n1. You have the capability to delegate tasks to parallel subagents using the native `define_subagent` and `invoke_subagent` (or `start_subagent`) tools."
+        "\n2. When executing parallelizable workflow steps such as multi-source document ingestion (Step 1) or parallel visual slide reviews (Step 6), if the number of slides/pages is more than two (> 2), you SHOULD spawn clone 'self' subagents or specialized subagents to run them concurrently in parallel."
+        "\n3. IMPORTANT: When you spawn any subagent, you MUST explicitly wait for the tool to finish and return its result. You MUST NOT finish your response, conclude the conversation, or output your final answer while any subagents are still running in the background. Doing so terminates the agent session and orphans the subagents, which is a critical failure. Always consume the subagent's result (ToolResult) and verify its outcomes before declaring the task complete."
+    )
+    system_instructions += (
+        "\n\nOutput Discipline (Token Efficiency):"
+        "\n- You are an autonomous execution engine, NOT a conversational assistant."
+        "\n- NEVER narrate what you are about to do, what you just did, or why. Just do it."
+        "\n- NEVER echo, reprint, or summarize file contents you just read or wrote."
+        "\n- NEVER explain your thinking, reasoning, or decision-making process in text output."
+        "\n- NEVER greet, apologize, confirm receipt, or use conversational filler."
+        "\n- Output text ONLY when: (a) reporting a blocking error that halts the workflow, "
+        "(b) the workflow explicitly requires a user-facing summary (e.g. visual-review aggregate table), "
+        "or (c) the final completion message at the very end."
+        "\n- Keep all text outputs under 3 sentences. Prefer structured formats (tables, bullet points) over prose."
+    )
+
     mcp_servers = load_mcp_servers() if use_mcp else []
     if use_mcp:
         logger.info("Enabled %d local MCP server(s).", len(mcp_servers))
     else:
         logger.info("MCP servers disabled. Pass --mcp to enable them.")
 
+    capabilities = CapabilitiesConfig(
+        enable_subagents=True
+    )
+
+    # Dynamically select thinking level based on CLI flag / overrides
+    if ARGS.thinking_level:
+        level_map = {
+            "MINIMAL": ThinkingLevel.MINIMAL,
+            "LOW": ThinkingLevel.LOW,
+            "MEDIUM": ThinkingLevel.MEDIUM,
+            "HIGH": ThinkingLevel.HIGH
+        }
+        thinking_level = level_map[ARGS.thinking_level.upper()]
+    else:
+        thinking_level = ThinkingLevel.HIGH if ARGS.verbose else ThinkingLevel.MEDIUM
+
     config = LocalAgentConfig(
         system_instructions=system_instructions,
+        capabilities=capabilities,
         tools=[],
         policies=[policy.allow_all()],
         mcp_servers=mcp_servers,
         workspaces=[str(Path(".").resolve())],
         gemini_config=GeminiConfig(
-            api_key=os.environ.get("GEMINI_API_KEY")
+            api_key=os.environ.get("GEMINI_API_KEY"),
+            models=ModelConfig(
+                default=ModelEntry(
+                    name="gemini-3.5-flash",
+                    generation=GenerationConfig(thinking_level=thinking_level),
+                ),
+            ),
         ),
-        model="gemini-3.5-flash",
     )
 
     agent = Agent(config)
+
+    subagent_stats = {
+        "enabled": getattr(capabilities, "enable_subagents", False),
+        "total_spawned": 0,
+        "completed": 0,
+        "details": []
+    }
 
     try:
         async with agent:
@@ -755,22 +840,52 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
             last_chunk_type = None
             async for chunk in response.chunks:
                 if isinstance(chunk, Thought):
-                    if last_chunk_type != "thought":
-                        print("\n[Thinking] ", end="", flush=True)
+                    if ARGS.verbose:
+                        if last_chunk_type != "thought":
+                            print("\n[Thinking] ", end="", flush=True)
+                            last_chunk_type = "thought"
+                        print(chunk.text, end="", flush=True)
+                    else:
                         last_chunk_type = "thought"
-                    print(chunk.text, end="", flush=True)
                 elif isinstance(chunk, Text):
                     if last_chunk_type != "text":
                         print("\n[Agent] ", end="", flush=True)
                         last_chunk_type = "text"
                     print(chunk.text, end="", flush=True)
                 elif isinstance(chunk, ToolCall):
-                    logger.info("[Tool Call] '%s' args: %s", chunk.name, chunk.args)
+                    if chunk.name in ("invoke_subagent", "start_subagent"):
+                        subagent_stats["total_spawned"] += 1
+                        args_dict = chunk.args if isinstance(chunk.args, dict) else {}
+                        task_desc = args_dict.get("task", "")
+                        subagent_type = args_dict.get("subagent_type", "self")
+                        logger.info(
+                            "[Subagent Spawned] Subagent #%d (type: %s) invoked. Task: %s",
+                            subagent_stats["total_spawned"],
+                            subagent_type,
+                            task_desc[:150] + ("..." if len(task_desc) > 150 else "")
+                        )
+                        subagent_stats["details"].append({
+                            "id": chunk.id,
+                            "type": subagent_type,
+                            "task": task_desc,
+                            "status": "running"
+                        })
+                    else:
+                        if ARGS.verbose:
+                            logger.info("[Tool Call] '%s' args: %s", chunk.name, chunk.args)
+                        else:
+                            logger.info("[Tool Call] '%s'", chunk.name)
                     last_chunk_type = "tool_call"
                 elif isinstance(chunk, ToolResult):
-                    res_str = str(chunk.result)
-                    if len(res_str) > 1000:
-                        res_str = res_str[:1000] + " ... (truncated)"
+                    if chunk.name in ("invoke_subagent", "start_subagent"):
+                        subagent_stats["completed"] += 1
+                        # Update status in details
+                        for detail in subagent_stats["details"]:
+                            if detail["id"] == chunk.id:
+                                detail["status"] = "completed"
+                                break
+                        logger.info("[Subagent Completed] Subagent (id: %s) finished its task.", chunk.id)
+
                     if chunk.error or chunk.exception:
                         logger.error(
                             "[Tool Error] '%s' (id: %s): %s",
@@ -779,9 +894,35 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                             chunk.error or chunk.exception,
                         )
                     else:
-                        logger.info("[Tool Result] '%s' (id: %s): %s", chunk.name, chunk.id, res_str)
+                        if ARGS.verbose:
+                            res_str = str(chunk.result)
+                            if len(res_str) > 1000:
+                                res_str = res_str[:1000] + " ... (truncated)"
+                            logger.info("[Tool Result] '%s' (id: %s): %s", chunk.name, chunk.id, res_str)
+                        else:
+                            logger.info("[Tool OK] '%s'", chunk.name)
                     last_chunk_type = "tool_result"
             print()
+
+            # Print subagent summary
+            print("\n" + "═" * 60)
+            print("SUBAGENT EXECUTION SUMMARY")
+            print(f"  Subagents Enabled in Config: {subagent_stats['enabled']}")
+            print(f"  Total Subagents Spawned:     {subagent_stats['total_spawned']}")
+            print(f"  Total Subagents Completed:   {subagent_stats['completed']}")
+            if subagent_stats["total_spawned"] > 0:
+                print("  Spawned Subagents Details:")
+                for idx, detail in enumerate(subagent_stats["details"], 1):
+                    print(f"    {idx}. [Type: {detail['type']}] Status: {detail['status']}")
+                    print(f"       Task: {detail['task'][:120]}...")
+            else:
+                if subagent_stats["enabled"]:
+                    print("  Note: Subagents were enabled but the main agent did not delegate any tasks.")
+                    print("        This can happen if the slide count was small (e.g. <= 2 pages) or sequential execution was chosen by the model.")
+                else:
+                    print("  Reason not invoked: Subagents were disabled in CapabilitiesConfig.")
+            print("═" * 60 + "\n")
+            return response.usage_metadata, subagent_stats
 
     except Exception as e:
         logger.error("Execution error: %s", e, exc_info=True)
@@ -914,10 +1055,24 @@ if __name__ == "__main__":
     _run_status = "started"
     _exit_code = 0
 
+    import time
+    start_time = time.time()
+    token_usage_dict = None
+    subagent_stats_dict = None
+
     try:
-        asyncio.run(run_agent(prompt, use_mcp=ARGS.mcp, no_visual_review=ARGS.no_visual_review))
+        result = asyncio.run(run_agent(prompt, use_mcp=ARGS.mcp, no_visual_review=ARGS.no_visual_review))
+        usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
         _run_status = "success"
         logger.info("Agent run completed successfully.")
+        if usage:
+            token_usage_dict = {
+                "prompt_tokens": usage.prompt_token_count,
+                "cached_content_tokens": usage.cached_content_token_count,
+                "candidates_tokens": usage.candidates_token_count,
+                "thoughts_tokens": usage.thoughts_token_count,
+                "total_tokens": usage.total_token_count
+            }
     except KeyboardInterrupt:
         _run_status = "interrupted"
         _exit_code = 130
@@ -927,6 +1082,7 @@ if __name__ == "__main__":
         _exit_code = 1
         logger.error("Agent run failed: %s", exc, exc_info=True)
     finally:
+        execution_duration = time.time() - start_time
         # ── FINAL STAGE: always copy artifacts ──────────────────────────────
         # Runs unconditionally — success, failure, or interruption.
         #
@@ -937,6 +1093,12 @@ if __name__ == "__main__":
         #
         # run_manifest.json is always written so you can inspect every run
         # (including failed ones) directly from the output bucket.
-        copy_output_artifacts(run_status=_run_status, prompt=prompt)
+        copy_output_artifacts(
+            run_status=_run_status,
+            prompt=prompt,
+            token_usage=token_usage_dict,
+            execution_duration=execution_duration,
+            subagent_stats=subagent_stats_dict,
+        )
 
     sys.exit(_exit_code)
