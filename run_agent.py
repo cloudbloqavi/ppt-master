@@ -12,12 +12,21 @@ current OS/arch is installed automatically.  No manual binary management
 is required.
 
 Usage:
-    python run_agent.py [--mcp] [--self-test] [--prompt "Your prompt here"]
+    python run_agent.py [--prompt "..."] [--verbose] [--thinking-level LEVEL]
+                        [--resume] [--depth N] [--no-visual-review]
+                        [--mcp] [--self-test] [--log-file] [--model MODEL]
 
 Options:
-    --mcp            Enable loading local MCP servers from mcp_config.json.
-    --self-test      Run self-test of the custom tools in isolation (no API key needed).
-    --prompt <text>  The prompt to send to the agent. Overrides AGENT_PROMPT env var.
+    --prompt <text>           The prompt to send to the agent. Overrides AGENT_PROMPT env var.
+    --verbose                 Stream thinking blocks and detailed tool logs. Sets thinking to HIGH.
+    --thinking-level <level>  Override thinking level (MINIMAL, LOW, MEDIUM, HIGH). Default: MEDIUM.
+    --resume                  Automatically resume the latest incomplete run.
+    --depth <num>             Lookback depth when checking for resumption candidates.
+    --no-visual-review        Skip the visual review / self-check phase.
+    --mcp                     Enable loading local MCP servers from mcp_config.json.
+    --self-test               Run self-test of the workspace tools (no API key needed).
+    --log-file                Write logs simultaneously to run_agent.log in OUTPUT_ARTIFACTS_DIR.
+    --model <name>            Google Gemini model name to use for the execution (default: gemini-3.5-flash).
 
 Environment Variables (required at runtime, not at --self-test):
     GEMINI_API_KEY      Your Google Gemini API key.
@@ -144,6 +153,19 @@ def parse_args() -> argparse.Namespace:
         choices=["MINIMAL", "LOW", "MEDIUM", "HIGH"],
         help="Explicitly set the model's thinking level (overrides default/verbose defaults).",
     )
+    parser.add_argument(
+        "--log-file",
+        "--file-log",
+        action="store_true",
+        dest="log_file",
+        help="Simultaneously write execution logs to run_agent.log inside the OUTPUT_ARTIFACTS_DIR.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="gemini-3.5-flash",
+        help="Google Gemini model name to use for the main agent run (default: gemini-3.5-flash).",
+    )
     # Use parse_known_args so unknown flags don't crash the script
     args, _ = parser.parse_known_args()
     return args
@@ -193,6 +215,39 @@ else:
     _api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if _api_key:
         os.environ["GEMINI_API_KEY"] = _api_key
+
+
+def setup_file_logging():
+    """If log_file CLI argument is passed, add a FileHandler to the logging setup with a dynamic filename based on timestamp."""
+    if not ARGS.log_file:
+        return
+
+    output_dir = os.environ.get("OUTPUT_ARTIFACTS_DIR")
+    if not output_dir:
+        # Fallback for self-test or local runs without environment variables set
+        output_dir = "."
+
+    try:
+        from datetime import datetime
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Format: run_agent_YYYYMMDD_HHMMSS.log
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_filepath = output_path / f"run_agent_{timestamp}.log"
+        
+        file_handler = logging.FileHandler(log_filepath, encoding="utf-8")
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+        # Add to the root logger so it catches all library logs + our custom logs
+        logging.getLogger().addHandler(file_handler)
+        logger.info("Writing execution logs simultaneously to file: %s", log_filepath)
+    except Exception as e:
+        logger.warning("Failed to configure file logging: %s", e)
+
+
+setup_file_logging()
 
 # ─────────────────────────────────────────────────────────────
 # SDK Imports (deferred so protobuf env is set first)
@@ -525,6 +580,7 @@ def copy_output_artifacts(
     manifest = {
         "run_status": run_status,
         "timestamp_utc": timestamp_utc,
+        "model": getattr(ARGS, "model", "gemini-3.5-flash"),
         "prompt": prompt[:500] if prompt else "",
         "source_projects_dirs": [str(src) for src in source_candidates],
         "source_projects_dir": ", ".join(str(src) for src in source_candidates),
@@ -532,8 +588,46 @@ def copy_output_artifacts(
         "files_copied": copied,
         "copy_errors": copy_errors,
     }
+    
+    # Calculate token cost if usage metadata is available
     if token_usage:
         manifest["token_usage"] = token_usage
+        try:
+            # Determine the model name from CLI args
+            model_name = getattr(ARGS, "model", "gemini-3.5-flash")
+            prices_path = Path(__file__).parent.resolve() / "gemini_model_prices.json"
+            if prices_path.exists():
+                with open(prices_path, "r", encoding="utf-8") as pf:
+                    prices = _json.load(pf)
+                
+                # Retrieve rates
+                rates = prices.get(model_name)
+                if rates:
+                    input_tokens = token_usage.get("prompt_tokens", 0)
+                    cached_tokens = token_usage.get("cached_content_tokens", 0)
+                    output_tokens = token_usage.get("candidates_tokens", 0)
+                    
+                    # Effective non-cached input tokens
+                    non_cached_input = max(0, input_tokens - cached_tokens)
+                    
+                    input_cost = (non_cached_input / 1_000_000) * rates["input_cost_per_1m"]
+                    cached_cost = (cached_tokens / 1_000_000) * rates["cached_read_cost_per_1m"]
+                    output_cost = (output_tokens / 1_000_000) * rates["output_cost_per_1m"]
+                    
+                    total_cost = input_cost + cached_cost + output_cost
+                    
+                    cost_info = {
+                        "model": model_name,
+                        "total_approx_cost_usd": round(total_cost, 6),
+                        "input_cost_usd": round(input_cost, 6),
+                        "cached_read_cost_usd": round(cached_cost, 6),
+                        "output_cost_usd": round(output_cost, 6)
+                    }
+                    manifest["approximate_cost"] = cost_info
+                    logger.info("Approximate API cost calculated: $%f (%s)", total_cost, model_name)
+        except Exception as cost_exc:
+            logger.warning("Failed to calculate approximate token costs: %s", cost_exc)
+
     if execution_duration is not None:
         manifest["execution_duration_seconds"] = round(execution_duration, 2)
     if subagent_stats is not None:
@@ -806,6 +900,22 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
     else:
         thinking_level = ThinkingLevel.HIGH if ARGS.verbose else ThinkingLevel.MEDIUM
 
+    # Only apply thinking_level configuration to Gemini 3.5 models.
+    # GenerationConfig() carries a default thinking_level even when no args
+    # are passed, so we must omit the `generation` parameter entirely for
+    # models that don't support it (Gemma, Gemini 1.5/2.5, etc.).
+    _supports_thinking = ARGS.model and "gemini-3.5" in ARGS.model.lower()
+
+    if _supports_thinking:
+        model_entry = ModelEntry(
+            name=ARGS.model,
+            generation=GenerationConfig(thinking_level=thinking_level),
+        )
+        logger.info("Model %s: thinking_level=%s", ARGS.model, thinking_level)
+    else:
+        model_entry = ModelEntry(name=ARGS.model)
+        logger.info("Model %s: thinking_level omitted (not supported)", ARGS.model)
+
     config = LocalAgentConfig(
         system_instructions=system_instructions,
         capabilities=capabilities,
@@ -815,12 +925,7 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
         workspaces=[str(Path(".").resolve())],
         gemini_config=GeminiConfig(
             api_key=os.environ.get("GEMINI_API_KEY"),
-            models=ModelConfig(
-                default=ModelEntry(
-                    name="gemini-3.5-flash",
-                    generation=GenerationConfig(thinking_level=thinking_level),
-                ),
-            ),
+            models=ModelConfig(default=model_entry),
         ),
     )
 

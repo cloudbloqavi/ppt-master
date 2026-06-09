@@ -184,6 +184,7 @@ PERSONAL_NOTES.md
 # Use cloud sync (iCloud/Dropbox) for backup and multi-device access
 core-ppt-master-engine/projects/*
 !core-ppt-master-engine/projects/README.md
+/projects/
 
 claude-plugin/*
 .claude-plugin/*
@@ -192,3 +193,5 @@ README_CN.md
 docs
 
 .github/
+
+_TEMP_ERROR_LOG.txt

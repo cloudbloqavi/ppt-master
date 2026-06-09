@@ -68,6 +68,8 @@ The runner scripts support the following command-line options for control and cu
 | `--no-visual-review` | Skip the visual review / self-check phase entirely. | `run_agent.py` | (Flag) |
 | `--mcp` | Enable loading local MCP servers from `mcp_config.json`. | `run_agent.py` | (Flag) |
 | `--self-test` | Test workspace tools in isolation (does not call LLM / consume API key). | `run_agent.py` | (Flag) |
+| `--log-file` | Simultaneously write all execution logs to `run_agent.log` inside `OUTPUT_ARTIFACTS_DIR`. Also accepts `--file-log`. | `run_agent.py` | (Flag) |
+| `--model <name>` | The name of the Google Gemini model to run the agent on. | `run_agent.py` | `--model gemini-2.5-flash` |
 
 ---
 
