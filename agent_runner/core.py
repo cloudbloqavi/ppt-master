@@ -19,7 +19,8 @@ from agent_runner.config import ARGS, logger
 from agent_runner.logging_setup import setup_file_logging
 from agent_runner.status_logger import (
     setup_status_logging, log_status,
-    _check_text_for_status, _check_tool_call_for_status
+    _check_text_for_status, _check_tool_call_for_status,
+    _check_tool_result_for_status
 )
 from agent_runner.tools import run_self_test
 from agent_runner.resumption import find_and_restore_incomplete_project
@@ -221,6 +222,10 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
         "Always execute commands, verify results, and follow the workflows specified in AGENTS.md and SKILL.md. "
         "When running steps, proceed logically and verify that outputs (e.g. project directories, spec files, SVGs, PPTX files) "
         "are successfully created."
+        "\n\nCRITICAL SPEED & IMAGE PATH RULES (MANDATORY):"
+        "\n1. SVG Image References: When designing slide SVGs in `svg_output/`, always reference images using relative paths (e.g. `../images/filename.png`) instead of `images/filename.png`. This is mandatory because slide SVGs are nested under `svg_output/` and referencing them without `../` will fail static checks and trigger expensive file rewrites."
+        "\n2. Command Chaining (Internal Run): Minimize execution latency in Steps 2, 3, and 4 by chaining sequential commands together using '&&' inside a single `run_command` execution. For example, run project initialization, source import, and template copies in one shell execution turn rather than separate command calls. This is done entirely internally; the end user only sees mapped status updates, not raw command outputs."
+        "\n3. Batch Icon Verification: Minimize individual file lookups when checking available icons. Query all required icons in a single batch listing (e.g., using `ls templates/icons/tabler-outline | grep -E 'icon1|icon2|icon3'`) rather than calling sequential individual checks."
     )
     if no_visual_review:
         system_instructions += "\nUser has opted out of the visual review phase. DO NOT execute the visual self-check / visual-review workflow at Step 6."
@@ -232,8 +237,10 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
         "\n1. You MUST delegate parallelizable tasks to subagents using the native `invoke_subagent` tool. Note that `define_subagent` is not supported; use `invoke_subagent` directly to spawn clone 'self' or general-purpose subagents."
         "\n2. Specific delegation scenarios:"
         "\n   - Step 1 (Source Content Ingestion): If the user provides multiple source files or links, spawn one subagent per source to run the conversion scripts (e.g. `pdf_to_md.py`, `web_to_md.py`) concurrently and summarize their outputs."
-        "\n   - Step 6 (Visual Review): If the number of generated slides N is greater than two (> 2), partition the pages into batches of <= 5 pages and spawn parallel subagents concurrently using the `invoke_subagent` tool to execute visual self-checks."
+        "\n   - Step 5 (Image Acquisition): If the design specification requires both AI image generation (`ai` acquisition) and web search (`web` acquisition), you MUST parallelize the work. Spawn a subagent via the `invoke_subagent` tool to perform the web searches concurrently while the main agent executes the AI image generation manifest script (`image_gen.py`)."
+        "\n   - Step 6 (Visual Review): If the number of generated slides N is greater than two (> 2), partition the pages into batches of <= 5 pages and spawn parallel subagents concurrently using the `invoke_subagent` tool to execute visual self-checks. Make sure to launch the local preview server (`python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_editor/server.py <project_path> --no-browser`) beforehand."
         "\n3. IMPORTANT: When you spawn any subagent, you MUST explicitly wait for the tool to finish and return its result. You MUST NOT finish your response, conclude the conversation, or output your final answer while any subagents are still running in the background. Doing so terminates the agent session and orphans the subagents. Always consume the subagent's result (ToolResult) and verify its outcomes before declaring the task complete."
+        "\n4. Explicit Decision Logging: Every time you evaluate a phase where a subagent could be spawned, you MUST output a clear statement of your decision in your text or thought output using the format: `[Subagent Decision] Phase: <PhaseName> | Decision: <Bypass/Spawn> | Reason: <DetailReason>`."
     )
     system_instructions += (
         "\n\nOutput Discipline (Token Efficiency):"
@@ -243,8 +250,9 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
         "\n- NEVER explain your thinking, reasoning, or decision-making process in text output."
         "\n- NEVER greet, apologize, confirm receipt, or use conversational filler."
         "\n- Output text ONLY when: (a) reporting a blocking error that halts the workflow, "
-        "(b) the workflow explicitly requires a user-facing summary (e.g. visual-review aggregate table), "
-        "or (c) the final completion message at the very end."
+        "(b) logging a subagent decision in the format `[Subagent Decision] ...`, "
+        "(c) the workflow explicitly requires a user-facing summary (e.g. visual-review aggregate table), "
+        "or (d) the final completion message at the very end."
         "\n- Keep all text outputs under 3 sentences. Prefer structured formats (tables, bullet points) over prose."
     )
     system_instructions += (
@@ -306,6 +314,30 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
 
     agent = Agent(config)
 
+    logged_decisions = set()
+    accumulated_text = ""
+    accumulated_thoughts = ""
+
+    # Early detection of Step 1 (Ingestion) subagent decision based on user prompt.
+    import re
+    urls = re.findall(r'https?://[^\s]+', prompt_message)
+    files = re.findall(r'[\w\-./\\]+\.(?:pdf|docx|xlsx|pptx|txt|md)', prompt_message)
+    sources_count = len(urls) + len(files)
+    if sources_count <= 1:
+        early_msg = f"[Subagent Decision] Phase: Step 1 (Source Ingestion) | Decision: Bypass | Reason: Single or inline text source provided ({sources_count} files/URLs found in prompt). No parallel conversion subagents required."
+        logger.info(early_msg)
+        logged_decisions.add(early_msg)
+    else:
+        early_msg = f"[Subagent Decision] Phase: Step 1 (Source Ingestion) | Decision: Spawn | Reason: Multiple source files/URLs provided ({sources_count} found in prompt). Invoking parallel conversion subagents."
+        logger.info(early_msg)
+        logged_decisions.add(early_msg)
+
+    # Log Step 6 bypass early if visual review is disabled by command line
+    if no_visual_review:
+        early_visual_msg = "[Subagent Decision] Phase: Step 6 (Visual Review) | Decision: Bypass | Reason: User explicitly opted out via --no-visual-review command line flag."
+        logger.info(early_visual_msg)
+        logged_decisions.add(early_visual_msg)
+
     subagent_stats = {
         "enabled": getattr(capabilities, "enable_subagents", False),
         "total_spawned": 0,
@@ -327,12 +359,32 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                         print(chunk.text, end="", flush=True)
                     else:
                         last_chunk_type = "thought"
+
+                    # Parse thought stream for [Subagent Decision]
+                    accumulated_thoughts += chunk.text
+                    lines = accumulated_thoughts.split("\n")
+                    for line in lines[:-1]:
+                        if "[Subagent Decision]" in line and line.strip() not in logged_decisions:
+                            decision_line = line.strip()
+                            logger.info("%s", decision_line)
+                            logged_decisions.add(decision_line)
+
                 elif isinstance(chunk, Text):
                     if last_chunk_type != "text":
                         print("\n[Agent] ", end="", flush=True)
                         last_chunk_type = "text"
                     print(chunk.text, end="", flush=True)
                     _check_text_for_status(chunk.text)
+
+                    # Parse text stream for [Subagent Decision]
+                    accumulated_text += chunk.text
+                    lines = accumulated_text.split("\n")
+                    for line in lines[:-1]:
+                        if "[Subagent Decision]" in line and line.strip() not in logged_decisions:
+                            decision_line = line.strip()
+                            logger.info("%s", decision_line)
+                            logged_decisions.add(decision_line)
+
                 elif isinstance(chunk, ToolCall):
                     _check_tool_call_for_status(chunk)
                     if chunk.name in ("invoke_subagent", "start_subagent"):
@@ -359,6 +411,7 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                             logger.info("[Tool Call] '%s'", chunk.name)
                     last_chunk_type = "tool_call"
                 elif isinstance(chunk, ToolResult):
+                    _check_tool_result_for_status(chunk)
                     if chunk.name in ("invoke_subagent", "start_subagent"):
                         subagent_stats["completed"] += 1
                         for detail in subagent_stats["details"]:
@@ -384,6 +437,18 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                             logger.info("[Tool OK] '%s'", chunk.name)
                     last_chunk_type = "tool_result"
             print()
+
+            # Final check for any decision lines at the very end (without trailing newlines)
+            for text_source in (accumulated_text, accumulated_thoughts):
+                for line in text_source.split("\n"):
+                    if "[Subagent Decision]" in line and line.strip() not in logged_decisions:
+                        decision_line = line.strip()
+                        logger.info("%s", decision_line)
+                        logged_decisions.add(decision_line)
+
+            # Check if Step 6 was bypassed dynamically (was enabled in config/cli but no subagents spawned)
+            if not no_visual_review and subagent_stats["total_spawned"] == 0:
+                logger.info("[Subagent Decision] Phase: Step 6 (Visual Review) | Decision: Bypass | Reason: Static quality check passed with zero errors, or slide count <= 2, rendering parallel visual-review subagents unnecessary.")
 
             print("\n" + "═" * 60)
             print("SUBAGENT EXECUTION SUMMARY")

@@ -17,6 +17,9 @@ _STATUS_LOG_FILE_PATH: Path | None = None
 _STATUS_LOGGER: Any = None
 _last_status: str | None = None
 
+# Active tool call tracking to match ToolCall to ToolResult
+_active_tool_calls: dict[str, dict[str, Any]] = {}
+
 
 class StatusProgressLogger:
     """Adapter class for status progress updates.
@@ -137,6 +140,70 @@ def get_status_log_file_path() -> Path | None:
     return _STATUS_LOG_FILE_PATH
 
 
+def _get_project_dir_from_path(file_path: str) -> Path | None:
+    """Extracts the active project directory from a file path."""
+    path_str = file_path
+    if path_str.startswith("file:///"):
+        path_str = path_str[8:]
+        if len(path_str) > 2 and path_str[1] == ':' and path_str[0] == '/':
+            path_str = path_str[1:]
+            
+    p = Path(path_str).resolve()
+    
+    # If the file itself is spec_lock.md or design_spec.md, its parent is the project dir
+    if p.name in ("spec_lock.md", "design_spec.md"):
+        return p.parent
+        
+    # If the file is inside a subdirectory of the project (like svg_output, svg_final, etc.)
+    # then its grandparent is the project dir.
+    parent_name = p.parent.name
+    if parent_name in ("svg_output", "svg_final", "images", "sources", "notes", "backup", "exports"):
+        return p.parent.parent
+        
+    # Fallback to current working directory if it contains spec_lock.md
+    cwd = Path(".").resolve()
+    if (cwd / "spec_lock.md").exists():
+        return cwd
+        
+    return None
+
+
+
+def _get_page_rhythm_from_spec_lock(project_dir: Path) -> list[str]:
+    """Reads spec_lock.md and parses page_rhythm to compute total slides."""
+    spec_lock_path = project_dir / "spec_lock.md"
+    if not spec_lock_path.exists():
+        return []
+    
+    pages = []
+    try:
+        with open(spec_lock_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        in_page_rhythm = False
+        for line in lines:
+            line_strip = line.strip()
+            if line_strip.startswith("## page_rhythm"):
+                in_page_rhythm = True
+                continue
+            elif line_strip.startswith("##") and in_page_rhythm:
+                in_page_rhythm = False
+                break
+            
+            if in_page_rhythm:
+                if line_strip.startswith("-"):
+                    parts = line_strip[1:].split(":")
+                    if parts:
+                        page_id = parts[0].strip()
+                        page_id = page_id.lstrip("-").strip()
+                        if page_id:
+                            pages.append(page_id)
+    except Exception as e:
+        logger.warning("Failed to parse spec_lock.md page_rhythm: %s", e)
+    
+    return pages
+
+
 def _check_text_for_status(text: str):
     """Parses agent text outputs to detect role switches or phase checkpoints."""
     if not text:
@@ -159,6 +226,15 @@ def _check_text_for_status(text: str):
 
 def _check_tool_call_for_status(chunk: Any):
     """Parses tool calls to detect and log key pipeline actions."""
+    if not chunk or not hasattr(chunk, "name") or not hasattr(chunk, "id"):
+        return
+        
+    # Track the active tool call for ToolResult matching
+    _active_tool_calls[chunk.id] = {
+        "name": chunk.name,
+        "args": chunk.args
+    }
+
     if chunk.name == "run_command":
         cmd = ""
         # Inspect arguments depending on shape/type
@@ -192,36 +268,98 @@ def _check_tool_call_for_status(chunk: Any):
         elif "image_gen.py" in cmd:
             log_status("Generating tailored AI images for the presentation slides...")
         elif "svg_quality_checker.py" in cmd:
-            log_status("Checking generated slide SVGs for formatting, visual issues, and errors...")
+            log_status("Verifying SVG syntax and style rules for generated slides...")
+        elif "visual_review.py" in cmd:
+            log_status("Rendering visual review previews...")
         elif "total_md_split.py" in cmd:
-            log_status("Splitting speaker notes and aligning them to individual slides...")
+            log_status("Aligning and splitting speaker notes to individual slides...")
         elif "finalize_svg.py" in cmd:
-            log_status("Running post-processing on SVGs: embedding icons and optimizing styles...")
+            log_status("Optimizing slide SVG files and embedding font/icon assets...")
         elif "svg_to_pptx.py" in cmd:
             log_status("Assembling and exporting final slides into native PowerPoint format (.pptx)...")
             
-    elif chunk.name == "write_file":
+    elif chunk.name in ("write_file", "edit_file", "write_to_file", "replace_file_content", "multi_replace_file_content"):
         file_path = ""
         if isinstance(chunk.args, dict):
-            file_path = chunk.args.get("file_path") or chunk.args.get("TargetFile") or ""
+            file_path = (
+                chunk.args.get("filePath") or 
+                chunk.args.get("file_path") or 
+                chunk.args.get("TargetFile") or 
+                chunk.args.get("target_file") or 
+                ""
+            )
         elif isinstance(chunk.args, str):
             file_path = chunk.args
             
         if not file_path:
             return
             
+        # Clean up file:/// prefix
+        if file_path.startswith("file:///"):
+            file_path = file_path[8:]
+            if len(file_path) > 2 and file_path[1] == ':' and file_path[0] == '/':
+                file_path = file_path[1:]
+
+        file_path_norm = file_path.replace("\\", "/")
+        
         # Detect slide SVG writing
-        if "svg_output/" in file_path and file_path.endswith(".svg"):
+        if "svg_output/" in file_path_norm and file_path_norm.endswith(".svg"):
             try:
+                filename = Path(file_path).name
                 slide_name = Path(file_path).stem
-                # Convert slide_1 to 'Slide 1'
-                formatted_slide_name = slide_name.replace("_", " ").title()
-                log_status(f"Designing visual layout and content for {formatted_slide_name}...")
-            except Exception:
+                project_dir = _get_project_dir_from_path(file_path)
+                slide_num = None
+                total_pages = None
+                
+                import re
+                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
+                if match:
+                    slide_num = int(match.group(1))
+                
+                if project_dir:
+                    pages = _get_page_rhythm_from_spec_lock(project_dir)
+                    if pages:
+                        total_pages = len(pages)
+                        
+                if slide_num is not None and total_pages is not None:
+                    log_status(f"Designing slide {slide_num} of {total_pages} ({filename})...")
+                else:
+                    formatted_slide_name = slide_name.replace("_", " ").title()
+                    log_status(f"Designing visual layout and content for {formatted_slide_name}...")
+            except Exception as e:
+                logger.warning("Failed to parse slide number or total pages: %s", e)
                 log_status("Designing visual layout for next slide...")
-        elif "design_spec.md" in file_path:
+                
+        elif "svg_final/" in file_path_norm and file_path_norm.endswith(".svg"):
+            try:
+                filename = Path(file_path).name
+                slide_name = Path(file_path).stem
+                project_dir = _get_project_dir_from_path(file_path)
+                slide_num = None
+                total_pages = None
+                
+                import re
+                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
+                if match:
+                    slide_num = int(match.group(1))
+                
+                if project_dir:
+                    pages = _get_page_rhythm_from_spec_lock(project_dir)
+                    if pages:
+                        total_pages = len(pages)
+                        
+                if slide_num is not None and total_pages is not None:
+                    log_status(f"Optimizing styles and embedding icons for slide {slide_num} of {total_pages} ({filename})...")
+                else:
+                    formatted_slide_name = slide_name.replace("_", " ").title()
+                    log_status(f"Optimizing visual layout for {formatted_slide_name}...")
+            except Exception as e:
+                logger.warning("Failed to parse slide finalization info: %s", e)
+                log_status("Optimizing styles and layout for next slide...")
+                
+        elif "design_spec.md" in file_path_norm:
             log_status("Drafting design specification and structural outline...")
-        elif "spec_lock.md" in file_path:
+        elif "spec_lock.md" in file_path_norm:
             log_status("Creating visual parameter lock for page layout construction...")
             
     elif "search" in chunk.name.lower():
@@ -250,7 +388,98 @@ def _check_tool_call_for_status(chunk: Any):
             log_status(f"Running browser subagent task: {task}...")
         else:
             log_status("Running browser agent to gather web materials...")
-
+            
     elif chunk.name in ("invoke_subagent", "start_subagent"):
-        # Detect parallel subagents
-        log_status("Spawning a parallel subagent to accelerate task execution...")
+        # Detect parallel subagents and check task description
+        task_desc = ""
+        if isinstance(chunk.args, dict):
+            task_desc = chunk.args.get("task") or chunk.args.get("Task") or ""
+            
+        if task_desc:
+            task_desc_lower = task_desc.lower()
+            if "visual" in task_desc_lower or "rubric" in task_desc_lower or "self-check" in task_desc_lower:
+                log_status("Spawning a parallel subagent to perform visual review on slides...")
+            elif "pdf_to_md" in task_desc_lower or "web_to_md" in task_desc_lower or "doc_to_md" in task_desc_lower or "convert" in task_desc_lower:
+                log_status("Spawning a parallel subagent to convert and ingest source content...")
+            else:
+                log_status("Spawning a parallel subagent to accelerate task execution...")
+        else:
+            log_status("Spawning a parallel subagent to accelerate task execution...")
+
+
+def _check_tool_result_for_status(chunk: Any):
+    """Parses tool results to detect and log outcomes of key pipeline steps."""
+    if not chunk or not hasattr(chunk, "name") or not hasattr(chunk, "id"):
+        return
+        
+    tool_call = _active_tool_calls.pop(chunk.id, None)
+    if not tool_call:
+        return
+        
+    tool_name = tool_call["name"]
+    tool_args = tool_call["args"]
+    is_error = bool(chunk.error or chunk.exception)
+    
+    if tool_name == "run_command":
+        cmd = ""
+        if isinstance(tool_args, dict):
+            cmd = tool_args.get("command") or tool_args.get("CommandLine") or ""
+        elif isinstance(tool_args, str):
+            cmd = tool_args
+            
+        if not cmd:
+            return
+            
+        returncode = None
+        if isinstance(chunk.result, dict):
+            returncode = chunk.result.get("returncode")
+        elif isinstance(chunk.result, str):
+            try:
+                res_data = json.loads(chunk.result)
+                returncode = res_data.get("returncode")
+            except Exception:
+                pass
+                
+        failed = is_error or (returncode is not None and returncode != 0)
+        
+        if "pdf_to_md.py" in cmd or "web_to_md.py" in cmd or "ppt_to_md.py" in cmd or "doc_to_md.py" in cmd or "excel_to_md.py" in cmd:
+            if failed:
+                log_status("Source content conversion failed.")
+            else:
+                log_status("Source content successfully converted to editable Markdown.")
+        elif "project_manager.py init" in cmd or "project_manager.py import-sources" in cmd:
+            if failed:
+                log_status("Project initialization / import failed.")
+            else:
+                log_status("Project workspace successfully initialized.")
+        elif "svg_quality_checker.py" in cmd:
+            if failed:
+                log_status("Slide quality check completed: identified formatting/visual errors that need correction.")
+            else:
+                log_status("Slide quality check completed successfully: all SVGs verified.")
+        elif "image_gen.py" in cmd:
+            if failed:
+                log_status("AI image generation failed or encountered errors.")
+            else:
+                log_status("AI images generated successfully.")
+        elif "latex_render.py" in cmd:
+            if failed:
+                log_status("LaTeX mathematical formula rendering encountered errors.")
+            else:
+                log_status("LaTeX mathematical formulas rendered successfully.")
+        elif "visual_review.py" in cmd:
+            if failed:
+                log_status("Visual review rendering encountered errors.")
+            else:
+                log_status("Visual reviews generated successfully.")
+        elif "finalize_svg.py" in cmd:
+            if failed:
+                log_status("SVG post-processing optimization failed.")
+            else:
+                log_status("SVG post-processing completed: embedded icons and optimized layout styles.")
+        elif "svg_to_pptx.py" in cmd:
+            if failed:
+                log_status("PowerPoint presentation assembly and export failed.")
+            else:
+                log_status("PowerPoint presentation (.pptx) successfully assembled and exported!")
+
