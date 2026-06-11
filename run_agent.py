@@ -217,8 +217,14 @@ else:
         os.environ["GEMINI_API_KEY"] = _api_key
 
 
+# Path to the active log file (set by setup_file_logging; used to co-locate the
+# log alongside run_manifest.json at artifact-copy time).
+_LOG_FILE_PATH: Path | None = None
+
+
 def setup_file_logging():
     """If log_file CLI argument is passed, add a FileHandler to the logging setup with a dynamic filename based on timestamp."""
+    global _LOG_FILE_PATH
     if not ARGS.log_file:
         return
 
@@ -242,6 +248,7 @@ def setup_file_logging():
         )
         # Add to the root logger so it catches all library logs + our custom logs
         logging.getLogger().addHandler(file_handler)
+        _LOG_FILE_PATH = log_filepath
         logger.info("Writing execution logs simultaneously to file: %s", log_filepath)
     except Exception as e:
         logger.warning("Failed to configure file logging: %s", e)
@@ -249,6 +256,77 @@ def setup_file_logging():
 
 setup_file_logging()
 
+def _get_max_attempt_count() -> int:
+    """Return total attempt count for the run.
+
+    Value source: RUN_AGENT_MAX_RETRIES env var.
+    Semantics: TOTAL attempts (first attempt + retries).  Minimum is 1.
+    """
+    raw = os.environ.get("RUN_AGENT_MAX_RETRIES", "3").strip()
+    try:
+        value = int(raw)
+        if value < 1:
+            raise ValueError("must be >= 1")
+        return value
+    except Exception:
+        logger.warning("Invalid RUN_AGENT_MAX_RETRIES=%r; using default 3.", raw)
+        return 3
+
+
+def _snapshot_output_pptx_files() -> set[str]:
+    """Snapshot all .pptx files currently present under OUTPUT_ARTIFACTS_DIR."""
+    output_dir_str = os.environ.get("OUTPUT_ARTIFACTS_DIR")
+    if not output_dir_str:
+        return set()
+
+    output_dir = Path(output_dir_str).expanduser().resolve()
+    if not output_dir.exists():
+        return set()
+
+    snapshot: set[str] = set()
+    try:
+        for item in output_dir.rglob("*"):
+            if item.is_file() and item.suffix.lower() == ".pptx":
+                try:
+                    snapshot.add(str(item.resolve()))
+                except Exception:
+                    snapshot.add(str(item))
+    except Exception as exc:
+        logger.warning("Failed to snapshot existing PPTX files in %s: %s", output_dir, exc)
+    return snapshot
+
+
+def _snapshot_project_files() -> dict[str, tuple[float, int]]:
+    """Snapshot all files under the projects directories with their mtimes and sizes."""
+    source_candidates = [
+        Path(__file__).parent.resolve() / "core-ppt-master-engine" / "projects",
+        Path(__file__).parent.resolve() / "projects"
+    ]
+    snapshot = {}
+    for source in source_candidates:
+        if source.exists():
+            try:
+                for item in source.rglob("*"):
+                    if item.is_file():
+                        try:
+                            stat = item.stat()
+                            snapshot[str(item.resolve())] = (stat.st_mtime, stat.st_size)
+                        except Exception:
+                            pass
+            except Exception as exc:
+                logger.warning("Failed to snapshot directory %s: %s", source, exc)
+    return snapshot
+
+
+def _build_retry_prompt(base_prompt: str, attempt_index: int) -> str:
+    """Add a deterministic non-interactive continuation directive for retries."""
+    retry_directive = (
+        "Previous run ended before producing a PPTX. "
+        "Continue fully autonomously in non-interactive mode and complete the pipeline through Step 7 export in this same run. "
+        "Do not ask for confirmations, and do not stop after Eight Confirmations or split-mode hints. "
+        "If anything is ambiguous, choose the best default and proceed."
+    )
+    return f"{base_prompt}\n\n[RETRY ATTEMPT {attempt_index}] {retry_directive}"
 # ─────────────────────────────────────────────────────────────
 # SDK Imports (deferred so protobuf env is set first)
 # ─────────────────────────────────────────────────────────────
@@ -413,11 +491,14 @@ def grep_search(query: str, directory_path: str = ".") -> str:
     try:
         root_dir = Path(directory_path).resolve()
         for file_path in root_dir.rglob("*"):
-            if not file_path.is_file():
-                continue
             if any(p.startswith(".") for p in file_path.parts):
                 continue
             if any(part in file_path.parts for part in ("node_modules", "icons", "__pycache__", "venv", "env", "exports", "images")):
+                continue
+            try:
+                if not file_path.is_file():
+                    continue
+            except Exception:
                 continue
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -477,6 +558,9 @@ def copy_output_artifacts(
     token_usage: dict[str, Any] | None = None,
     execution_duration: float | None = None,
     subagent_stats: dict[str, Any] | None = None,
+    projects_snapshot: dict[str, tuple[float, int]] | None = None,
+    resumed_project: str | None = None,
+    start_time: float | None = None,
 ) -> None:
     """Copy generated project outputs to OUTPUT_ARTIFACTS_DIR.
 
@@ -541,6 +625,55 @@ def copy_output_artifacts(
     # no project files exist (e.g. agent failed before generating anything).
     destination.mkdir(parents=True, exist_ok=True)
 
+    # Identify which project folders were modified/created during this run.
+    active_projects: set[str] = set()
+    if resumed_project:
+        active_projects.add(resumed_project)
+
+    for source in source_candidates:
+        if source.exists():
+            for item in source.rglob("*"):
+                if item.is_file():
+                    rel = item.relative_to(source)
+                    # Skip root-level files directly under the projects directory (like README.md)
+                    if len(rel.parts) <= 1:
+                        continue
+
+                    project_name = rel.parts[0]
+                    resolved_path = str(item.resolve())
+                    is_modified = False
+
+                    if projects_snapshot is not None:
+                        if resolved_path in projects_snapshot:
+                            old_mtime, old_size = projects_snapshot[resolved_path]
+                            try:
+                                stat = item.stat()
+                                if stat.st_mtime > old_mtime or stat.st_size != old_size:
+                                    is_modified = True
+                            except Exception:
+                                pass
+                        else:
+                            # New file
+                            is_modified = True
+                    elif start_time is not None:
+                        try:
+                            stat = item.stat()
+                            if stat.st_mtime >= start_time - 2:  # 2 second window
+                                is_modified = True
+                        except Exception:
+                            pass
+                    else:
+                        # Fallback: copy everything if we have no state references
+                        is_modified = True
+
+                    if is_modified:
+                        active_projects.add(project_name)
+
+    if active_projects:
+        logger.info("  Active project(s) identified for copying: %s", ", ".join(active_projects))
+    else:
+        logger.info("  No active project folder identified from execution.")
+
     copied = 0
     copy_errors: list[str] = []
     found_files = False
@@ -555,13 +688,18 @@ def copy_output_artifacts(
                     if len(rel.parts) <= 1:
                         continue
 
+                    project_name = rel.parts[0]
+                    # Only copy files for active projects
+                    if project_name not in active_projects:
+                        continue
+
                     found_files = True
                     dest_file = destination / rel
                     try:
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(item, dest_file)
                         copied += 1
-                        copied_projects.add(rel.parts[0])
+                        copied_projects.add(project_name)
                     except Exception as exc:
                         msg = f"{rel}: {exc}"
                         copy_errors.append(msg)
@@ -572,7 +710,7 @@ def copy_output_artifacts(
         if copy_errors:
             logger.warning("  Copy errors:  %d file(s) failed", len(copy_errors))
     else:
-        logger.info("  No project output files found in checked source dirs — skipping file copy.")
+        logger.info("  No active project output files found in checked source dirs — skipping file copy.")
 
     # ── Write run manifest ───────────────────────────────────
     # Written inside each copied project folder. If no project files were
@@ -645,6 +783,23 @@ def copy_output_artifacts(
             ],
         }
 
+    def _copy_log_alongside(manifest_dir: Path) -> None:
+        """Copy the active log file into *manifest_dir* unless it is already there."""
+        if not _LOG_FILE_PATH or not _LOG_FILE_PATH.exists():
+            return
+        log_dest = manifest_dir / _LOG_FILE_PATH.name
+        if log_dest.resolve() == _LOG_FILE_PATH.resolve():
+            return  # already in the right place
+        try:
+            # Flush all file handlers so the copy contains the latest entries.
+            for handler in logging.getLogger().handlers:
+                if isinstance(handler, logging.FileHandler):
+                    handler.flush()
+            shutil.copy2(_LOG_FILE_PATH, log_dest)
+            logger.info("  Log file copied to: %s", log_dest)
+        except Exception as exc:
+            logger.warning("  Failed to copy log file alongside manifest: %s", exc)
+
     if copied_projects:
         for project_dir in copied_projects:
             manifest_path = destination / project_dir / "run_manifest.json"
@@ -653,6 +808,7 @@ def copy_output_artifacts(
                 logger.info("  Manifest written: %s", manifest_path)
             except Exception as exc:
                 logger.error("  Failed to write run manifest inside project %s: %s", project_dir, exc)
+            _copy_log_alongside(manifest_path.parent)
     else:
         manifest_path = destination / "run_manifest.json"
         try:
@@ -660,6 +816,36 @@ def copy_output_artifacts(
             logger.info("  Manifest written to root (fallback): %s", manifest_path)
         except Exception as exc:
             logger.error("  Failed to write fallback run manifest: %s", exc)
+        _copy_log_alongside(manifest_path.parent)
+
+    # ── Cleanup workspace folders for successful active projects ──────
+    if run_status == "success" and copied_projects:
+        for project_name in copied_projects:
+            dest_proj_dir = destination / project_name
+            # Check if there is at least one .pptx file in the destination project folder
+            has_pptx = False
+            try:
+                if dest_proj_dir.exists():
+                    for f in dest_proj_dir.rglob("*.pptx"):
+                        if f.is_file():
+                            has_pptx = True
+                            break
+            except Exception as exc:
+                logger.warning("Error checking for PPTX in destination %s: %s", dest_proj_dir, exc)
+
+            if has_pptx:
+                logger.info("Project '%s' successfully generated and copied to destination. Cleaning up workspace folder...", project_name)
+                # Delete the project folder from all source candidates
+                for source in source_candidates:
+                    src_proj_dir = source / project_name
+                    if src_proj_dir.exists():
+                        try:
+                            shutil.rmtree(src_proj_dir)
+                            logger.info("Deleted workspace folder: %s", src_proj_dir)
+                        except Exception as exc:
+                            logger.error("Failed to delete workspace folder %s: %s", src_proj_dir, exc)
+            else:
+                logger.warning("No PPTX file found in destination for project '%s'. Skipping cleanup.", project_name)
 
     logger.info("ARTIFACT COPY STAGE COMPLETE")
     logger.info("═" * 60)
@@ -698,9 +884,10 @@ def find_and_restore_incomplete_project(depth: int | None = None) -> str | None:
     projects = []
     for entry in output_dir.iterdir():
         if entry.is_dir():
-            # Signature of a started project is that it contains design_spec.md
+            # Signature of a started project is that it contains README.md or design_spec.md
+            readme = entry / "README.md"
             design_spec = entry / "design_spec.md"
-            if design_spec.exists():
+            if readme.exists() or design_spec.exists():
                 pptx_files = glob.glob(str(entry / "exports" / "*.pptx"))
                 projects.append({
                     "name": entry.name,
@@ -876,6 +1063,16 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
         "(b) the workflow explicitly requires a user-facing summary (e.g. visual-review aggregate table), "
         "or (c) the final completion message at the very end."
         "\n- Keep all text outputs under 3 sentences. Prefer structured formats (tables, bullet points) over prose."
+    )
+    system_instructions += (
+        "\n\nNon-Interactive Batch Execution (Highest Priority):"
+        "\n- This run is fully programmatic: there is no human-in-the-loop after the initial prompt."
+        "\n- NEVER ask for user confirmation, approval, choice, or clarification during execution."
+        "\n- For Step 4 Eight Confirmations, treat them as non-blocking and continue immediately."
+        "\n- NEVER stop after split-mode guidance; default to continuous mode in this session."
+        "\n- Continue autonomously through Strategist -> (Image Acquisition if needed) -> Executor -> Step 7 export."
+        "\n- If details are missing or ambiguous, pick a strong default and proceed."
+        "\n- The task is complete only when at least one native PPTX has been exported."
     )
 
     mcp_servers = load_mcp_servers() if use_mcp else []
@@ -1145,6 +1342,7 @@ if __name__ == "__main__":
     prompt = resolve_prompt(ARGS)
 
     # Auto-resumption check
+    resumed_project = None
     if ARGS.resume or prompt.lower().strip() == "resume":
         logger.info("Auto-resumption mode activated.")
         resumed_project = find_and_restore_incomplete_project(ARGS.depth)
@@ -1154,56 +1352,122 @@ if __name__ == "__main__":
         prompt = f"resume generating projects/{resumed_project}"
         logger.info(f"Target resumption prompt: '{prompt}'")
 
-    # Track agent outcome independently so the artifact copy can record it
-    # and the process exits with the correct code (Cloud Run Job uses exit code
-    # to mark success/failure in the Execution history).
-    _run_status = "started"
-    _exit_code = 0
 
     import time
-    start_time = time.time()
-    token_usage_dict = None
-    subagent_stats_dict = None
+    max_attempts = _get_max_attempt_count()
+    exit_code = 1
+    final_status = "failed"
 
-    try:
-        result = asyncio.run(run_agent(prompt, use_mcp=ARGS.mcp, no_visual_review=ARGS.no_visual_review))
-        usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
-        _run_status = "success"
-        logger.info("Agent run completed successfully.")
-        if usage:
-            token_usage_dict = {
-                "prompt_tokens": usage.prompt_token_count,
-                "cached_content_tokens": usage.cached_content_token_count,
-                "candidates_tokens": usage.candidates_token_count,
-                "thoughts_tokens": usage.thoughts_token_count,
-                "total_tokens": usage.total_token_count
-            }
-    except KeyboardInterrupt:
-        _run_status = "interrupted"
-        _exit_code = 130
-        logger.warning("Agent run interrupted by user (KeyboardInterrupt).")
-    except Exception as exc:
-        _run_status = "failed"
-        _exit_code = 1
-        logger.error("Agent run failed: %s", exc, exc_info=True)
-    finally:
-        execution_duration = time.time() - start_time
-        # ── FINAL STAGE: always copy artifacts ──────────────────────────────
-        # Runs unconditionally — success, failure, or interruption.
-        #
-        # Local mode:  files land in the path you set in OUTPUT_ARTIFACTS_DIR.
-        # Cloud Run:   OUTPUT_ARTIFACTS_DIR is a GCS FUSE mount; files are
-        #              automatically written to your GCS bucket with no extra
-        #              configuration.  The container treats it as a local path.
-        #
-        # run_manifest.json is always written so you can inspect every run
-        # (including failed ones) directly from the output bucket.
-        copy_output_artifacts(
-            run_status=_run_status,
-            prompt=prompt,
-            token_usage=token_usage_dict,
-            execution_duration=execution_duration,
-            subagent_stats=subagent_stats_dict,
-        )
+    logger.info(
+        "Run guard active: total attempts=%d. Silent failure is defined as no new PPTX output.",
+        max_attempts,
+    )
 
-    sys.exit(_exit_code)
+    for attempt in range(1, max_attempts + 1):
+        attempt_prompt = prompt if attempt == 1 else _build_retry_prompt(prompt, attempt)
+
+        if attempt > 1:
+            logger.warning(
+                "Retrying run: attempt %d/%d.",
+                attempt,
+                max_attempts,
+            )
+
+        projects_snapshot = _snapshot_project_files()
+        pptx_before = _snapshot_output_pptx_files()
+        start_time = time.time()
+        token_usage_dict = None
+        subagent_stats_dict = None
+        run_status = "started"
+        interrupted = False
+
+        try:
+            result = asyncio.run(
+                run_agent(
+                    attempt_prompt,
+                    use_mcp=ARGS.mcp,
+                    no_visual_review=ARGS.no_visual_review,
+                )
+            )
+            usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
+            run_status = "success"
+            logger.info("Agent run completed successfully.")
+            if usage:
+                token_usage_dict = {
+                    "prompt_tokens": usage.prompt_token_count,
+                    "cached_content_tokens": usage.cached_content_token_count,
+                    "candidates_tokens": usage.candidates_token_count,
+                    "thoughts_tokens": usage.thoughts_token_count,
+                    "total_tokens": usage.total_token_count,
+                }
+        except KeyboardInterrupt:
+            run_status = "interrupted"
+            exit_code = 130
+            interrupted = True
+            logger.warning("Agent run interrupted by user (KeyboardInterrupt).")
+        except Exception as exc:
+            run_status = "failed"
+            logger.error("Agent run failed: %s", exc, exc_info=True)
+        finally:
+            execution_duration = time.time() - start_time
+            # ── FINAL STAGE: always copy artifacts ──────────────────────────────
+            # Runs unconditionally — success, failure, or interruption.
+            #
+            # Local mode:  files land in the path you set in OUTPUT_ARTIFACTS_DIR.
+            # Cloud Run:   OUTPUT_ARTIFACTS_DIR is a GCS FUSE mount; files are
+            #              automatically written to your GCS bucket with no extra
+            #              configuration.  The container treats it as a local path.
+            #
+            # run_manifest.json is always written so you can inspect every run
+            # (including failed ones) directly from the output bucket.
+            copy_output_artifacts(
+                run_status=run_status,
+                prompt=attempt_prompt,
+                token_usage=token_usage_dict,
+                execution_duration=execution_duration,
+                subagent_stats=subagent_stats_dict,
+                projects_snapshot=projects_snapshot,
+                resumed_project=resumed_project,
+                start_time=start_time,
+            )
+
+        if interrupted:
+            final_status = run_status
+            break
+
+        pptx_after = _snapshot_output_pptx_files()
+        new_pptx = sorted(pptx_after - pptx_before)
+
+        if run_status == "success" and new_pptx:
+            logger.info("Detected %d new PPTX output artifact(s).", len(new_pptx))
+            exit_code = 0
+            final_status = "success"
+            break
+
+        if run_status == "success" and not new_pptx:
+            run_status = "silent_failure"
+            logger.error(
+                "Silent failure detected: run completed without producing any new .pptx artifact."
+            )
+        else:
+            logger.error("Run attempt ended with status: %s", run_status)
+
+        final_status = run_status
+        exit_code = 1
+
+        if attempt < max_attempts:
+            logger.warning(
+                "Will retry after status '%s' (attempt %d/%d).",
+                run_status,
+                attempt,
+                max_attempts,
+            )
+        else:
+            logger.error(
+                "Exhausted all attempts (%d). Final status: %s.",
+                max_attempts,
+                final_status,
+            )
+
+    logger.info("Runner finished with status: %s", final_status)
+    sys.exit(exit_code)

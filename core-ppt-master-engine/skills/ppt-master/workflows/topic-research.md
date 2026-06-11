@@ -20,7 +20,7 @@ This workflow is **independent**: it owns the source-acquisition step when no fi
 
 ## Step 1: Confirm topic
 
-⛔ **BLOCKING**: confirm scope as a single bundled clarifier. Skip when the user's initial message already covers it.
+Confirm scope autonomously using the defaults below. Skip when the user's initial message already covers it.
 
 | Item | Default if user did not specify |
 |---|---|
@@ -30,7 +30,7 @@ This workflow is **independent**: it owns the source-acquisition step when no fi
 | Output language | Match user input |
 | Slug for files (`<topic_slug>`) | snake_case English identifier derived from topic |
 
-**Forbidden — itemized confirmation**: do NOT ask each row separately. One bundled clarifier or none.
+**Forbidden — itemized confirmation**: do NOT ask each row separately. Auto-apply defaults and proceed.
 
 ---
 
@@ -44,7 +44,7 @@ This workflow is **independent**: it owns the source-acquisition step when no fi
 | Cursor / Codebuddy / VS Code + Copilot | provider-equivalent built-in | provider-equivalent built-in |
 | None available | — | fallback below |
 
-**Fallback when no IDE web tools** — pause, ask the user for 2–4 authoritative URLs (Wikipedia / official site / institutional release), then fetch each:
+**Fallback when no IDE web tools** — derive 2–4 authoritative Wikipedia URLs from the topic name, then fetch each:
 
 ```bash
 python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>

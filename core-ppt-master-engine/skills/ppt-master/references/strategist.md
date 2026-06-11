@@ -22,9 +22,9 @@ As a top-tier AI presentation strategist, receive source documents, perform cont
 
 🚧 **GATE — Mandatory read first**: `read_file templates/design_spec_reference.md` before any analysis or writing. The `design_spec.md` output MUST follow that template's 11-section structure exactly. After writing, self-check each section is present: I Project Info → II Canvas → III Visual Theme → IV Typography → V Layout → VI Icon → VII Visualization → VIII Image → IX Outline → X Speaker Notes → XI Tech Constraints.
 
-⛔ **BLOCKING**: After the read, present professional recommendations for the eight items below as a bundled package and wait for explicit user confirmation.
+Present professional recommendations for the eight items below as a non-blocking summary, make the best autonomous choice for each, and immediately proceed to generate the Design Specification without halting.
 
-> **Execution discipline**: This is the last BLOCKING checkpoint in the pipeline. After confirmation, complete the Design Spec and proceed to image generation / SVG / post-processing without further pauses.
+> **Execution discipline**: This checkpoint is non-blocking. After presenting the summary with chosen defaults, complete the Design Spec and proceed to image generation / SVG / post-processing without pauses.
 
 ### a. Canvas Format Confirmation
 
@@ -131,7 +131,7 @@ See [`../templates/icons/README.md`](../templates/icons/README.md) for the curre
 >     -   **Brand-logo exception**: `simple-icons` is NOT a stylistic library. Add it to the deck's icon inventory **only when** the deck genuinely contains real company / product / service brand marks (customer logos, tech-stack icons, social handles). Never substitute it for a missing generic icon.
 > 2.  **Stroke weight lock (stroke-style libraries only)** — for stroke-based libraries (currently `tabler-outline`), pick one deck-wide value from `{1.5, 2, 3}` (default `2`). For heavier presence, switch library instead of going above `3`.
 >
-> **After all eight confirmations are approved — when writing `design_spec.md` §VI / `spec_lock.md`**, then materialize the icon inventory:
+> **When writing `design_spec.md` §VI / `spec_lock.md`**, then materialize the icon inventory:
 >
 > 3.  Enumerate the concepts the deck actually needs (home, chart, users, …) based on the confirmed outline.
 > 4.  Search for each concept's filename in the chosen library: `ls skills/ppt-master/templates/icons/<chosen-library>/ | grep <keyword>`
