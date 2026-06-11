@@ -56,7 +56,7 @@ Branch by the type of reference source the user supplied. This step produces ana
 Run the unified preparation helper:
 
 ```bash
-python3 skills/ppt-master/scripts/pptx_template_import.py "<reference_template.pptx>"
+python3 core-ppt-master-engine/skills/ppt-master/scripts/pptx_template_import.py "<reference_template.pptx>"
 ```
 
 This produces, in one workspace:
@@ -211,10 +211,10 @@ Step 4 MUST NOT run until `[TEMPLATE_BRIEF_CONFIRMED]` has been emitted in the c
 Create the final template directory:
 
 ```bash
-mkdir -p "skills/ppt-master/templates/layouts/<template_id>"
+mkdir -p "core-ppt-master-engine/skills/ppt-master/templates/layouts/<template_id>"
 ```
 
-> **Output location**: Global templates go to `skills/ppt-master/templates/layouts/`; project templates go to `projects/<project>/templates/`
+> **Output location**: Global templates go to `core-ppt-master-engine/skills/ppt-master/templates/layouts/`; project templates go to `projects/<project>/templates/`
 >
 > The generated directory name must match the final template ID used in `layouts_index.json`.
 
@@ -267,13 +267,13 @@ Mirror mode does **not** invoke the "reconstruct into clean SVG" pathway. The sp
 
 ```bash
 # Replace <kind_dir> with "decks" or "layouts" depending on the kind decided above
-ls -la "skills/ppt-master/templates/<kind_dir>/<template_id>"
+ls -la "core-ppt-master-engine/skills/ppt-master/templates/<kind_dir>/<template_id>"
 ```
 
 Run SVG validation on the template directory:
 
 ```bash
-python3 skills/ppt-master/scripts/svg_quality_checker.py "skills/ppt-master/templates/<kind_dir>/<template_id>" --template-mode --format <canvas_format>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_quality_checker.py "core-ppt-master-engine/skills/ppt-master/templates/<kind_dir>/<template_id>" --template-mode --format <canvas_format>
 ```
 
 `--template-mode` makes the checker:
@@ -305,10 +305,10 @@ Run the unified registrar with the kind flag; it derives the corresponding index
 
 ```bash
 # For deck (default)
-python3 skills/ppt-master/scripts/register_template.py <template_id> --kind deck
+python3 core-ppt-master-engine/skills/ppt-master/scripts/register_template.py <template_id> --kind deck
 
 # For layout
-python3 skills/ppt-master/scripts/register_template.py <template_id> --kind layout
+python3 core-ppt-master-engine/skills/ppt-master/scripts/register_template.py <template_id> --kind layout
 ```
 
 Outputs by kind (the JSON index is the single source of truth — READMEs describe the kind in prose but do not enumerate templates):
@@ -350,8 +350,8 @@ The index file is a **discovery index** — it lets the AI answer "what template
 > To rebuild every entry at once (e.g. after editing many specs), run:
 >
 > ```bash
-> python3 skills/ppt-master/scripts/register_template.py --kind deck --rebuild-all
-> python3 skills/ppt-master/scripts/register_template.py --kind layout --rebuild-all
+> python3 core-ppt-master-engine/skills/ppt-master/scripts/register_template.py --kind deck --rebuild-all
+> python3 core-ppt-master-engine/skills/ppt-master/scripts/register_template.py --kind layout --rebuild-all
 > ```
 
 README files describe each kind in prose only — they do not list templates. Discovery happens against the JSON index file; the registrar does not touch READMEs.

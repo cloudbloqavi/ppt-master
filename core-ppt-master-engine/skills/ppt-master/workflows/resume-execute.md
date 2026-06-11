@@ -40,7 +40,7 @@ If any required artifact is missing → report which one(s) and stop. Do NOT aut
 ## Step 2: Load SKILL.md, proceed from Step 6
 
 ```
-Read skills/ppt-master/SKILL.md
+Read core-ppt-master-engine/skills/ppt-master/SKILL.md
 ```
 
 Then jump to `### Step 6: Executor Phase` and run the documented pipeline:

@@ -72,7 +72,7 @@ If you're unsure, open an issue to ask — that's always welcome.
 
 ## SVG Guidelines
 
-If your contribution involves SVG files, follow the technical constraints documented in [CLAUDE.md](./CLAUDE.md):
+If your contribution involves SVG files, follow the technical constraints documented in [shared-standards.md](core-ppt-master-engine/skills/ppt-master/references/shared-standards.md):
 
 - Do not use: `mask`, `<style>`, `class`, external CSS, `<foreignObject>`, `<animate*>`, `<script>`, `<symbol>+<use>`
 - Use `fill-opacity` / `stroke-opacity` instead of `rgba()`

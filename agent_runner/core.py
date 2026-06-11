@@ -1,0 +1,617 @@
+"""
+Core Execution Module for PPT Master Agent Runner
+
+Coordinates SDK setup, imports, dependencies checking, main runner execution loop
+(with retry attempt logic), and auto-resumption entry.
+"""
+import os
+import sys
+import time
+import shutil
+import subprocess
+import asyncio
+import json
+import argparse
+from pathlib import Path
+from typing import Any
+
+from agent_runner.config import ARGS, logger
+from agent_runner.logging_setup import setup_file_logging
+from agent_runner.status_logger import (
+    setup_status_logging, log_status,
+    _check_text_for_status, _check_tool_call_for_status
+)
+from agent_runner.tools import run_self_test
+from agent_runner.resumption import find_and_restore_incomplete_project
+from agent_runner.artifacts import (
+    copy_output_artifacts, _snapshot_project_files, _snapshot_output_pptx_files
+)
+
+# ─────────────────────────────────────────────────────────────
+# SDK Imports (deferred so protobuf env is set first in config)
+# ─────────────────────────────────────────────────────────────
+
+try:
+    from google.antigravity import (
+        Agent, LocalAgentConfig, GeminiConfig, CapabilitiesConfig,
+        ModelConfig, ModelEntry, GenerationConfig, ThinkingLevel,
+    )
+    from google.antigravity.hooks import policy
+    from google.antigravity.types import (
+        McpStdioServer,
+        Text,
+        Thought,
+        ToolCall,
+        ToolResult,
+    )
+
+    # Monkey-patch LocalConnectionStrategy to inject enable_google_search=True in HarnessConfig.
+    # This enables native Google Search grounding inside the Go localharness.
+    from google.antigravity.connections.local.local_connection import LocalConnectionStrategy
+    _orig_build_harness_config = LocalConnectionStrategy._build_harness_config
+
+    def _patched_build_harness_config(self):
+        harness_config = _orig_build_harness_config(self)
+        if harness_config.gemini_config:
+            harness_config.gemini_config.enable_google_search = True
+        return harness_config
+
+    LocalConnectionStrategy._build_harness_config = _patched_build_harness_config
+
+    # Monkey-patch subprocess.Popen to insert "localharness" argument when launching agy/agy.exe.
+    import subprocess as _subprocess
+    _orig_popen = _subprocess.Popen
+
+    def _patched_popen(args, *pargs, **kwargs):
+        if isinstance(args, list) and len(args) > 0 and isinstance(args[0], str):
+            cmd_lower = args[0].lower()
+            if (
+                cmd_lower.endswith("agy.exe")
+                or cmd_lower.endswith("agy")
+                or "agy/bin/agy" in cmd_lower.replace("\\", "/")
+            ):
+                if len(args) == 1:
+                    args = [args[0], "localharness"]
+        return _orig_popen(args, *pargs, **kwargs)
+
+    _subprocess.Popen = _patched_popen
+
+    # Monkey-patch LocalConnection to stream harness stderr to Python's stderr.
+    # This ensures all harness (Go) logs appear in Google Cloud Logging in Cloud Run Jobs.
+    from google.antigravity.connections.local.local_connection import LocalConnection
+    _orig_start_stderr_reader = LocalConnection._start_stderr_reader
+
+    class _CloudLoggingStreamWrapper:
+        """Wraps the harness stderr stream to log each line to Python stderr.
+
+        In Cloud Run Jobs, anything written to stderr is automatically
+        captured and indexed by Google Cloud Logging. The [Harness] prefix
+        makes it easy to filter harness-specific lines in the Logs Explorer.
+        """
+
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            line = next(self.stream)
+            try:
+                decoded = line.decode("utf-8", errors="replace").rstrip("\n")
+                if decoded:
+                    logger.info("[Harness] %s", decoded)
+            except Exception:
+                pass
+            return line
+
+    def _patched_start_stderr_reader(self, stderr_stream):
+        wrapped = _CloudLoggingStreamWrapper(stderr_stream)
+        return _orig_start_stderr_reader(self, wrapped)
+
+    LocalConnection._start_stderr_reader = _patched_start_stderr_reader
+
+except ImportError as e:
+    if not ARGS.self_test:
+        logger.error("Failed to import Google Antigravity SDK: %s", e)
+        logger.error("Install it with:  pip install google-antigravity")
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────────────────────
+# Prompt Resolution & Execution
+# ─────────────────────────────────────────────────────────────
+
+_DEFAULT_PROMPT = (
+    "Please turn the following into a PPT: "
+    "Fictional music festival annual book in the Memphis design movement's "
+    "flat-graphic, hi-saturation style — geometric shapes, terrazzo, 80s typography."
+)
+
+
+def resolve_prompt(args) -> str:
+    """Resolve the agent prompt from CLI arg > env var > built-in default."""
+    if args.prompt:
+        logger.info("Using prompt from --prompt argument.")
+        return args.prompt
+
+    env_prompt = os.environ.get("AGENT_PROMPT", "").strip()
+    if env_prompt:
+        logger.info("Using prompt from AGENT_PROMPT environment variable.")
+        return env_prompt
+
+    logger.info("No --prompt or AGENT_PROMPT set — using built-in default prompt.")
+    return _DEFAULT_PROMPT
+
+
+def _get_max_attempt_count() -> int:
+    """Return total attempt count for the run from RUN_AGENT_MAX_RETRIES."""
+    raw = os.environ.get("RUN_AGENT_MAX_RETRIES", "3").strip()
+    try:
+        value = int(raw)
+        if value < 1:
+            raise ValueError("must be >= 1")
+        return value
+    except Exception:
+        logger.warning("Invalid RUN_AGENT_MAX_RETRIES=%r; using default 3.", raw)
+        return 3
+
+
+def _build_retry_prompt(base_prompt: str, attempt_index: int) -> str:
+    """Add a deterministic non-interactive continuation directive for retries."""
+    retry_directive = (
+        "Previous run ended before producing a PPTX. "
+        "Continue fully autonomously in non-interactive mode and complete the pipeline through Step 7 export in this same run. "
+        "Do not ask for confirmations, and do not stop after Eight Confirmations or split-mode hints. "
+        "If anything is ambiguous, choose the best default and proceed."
+    )
+    return f"{base_prompt}\n\n[RETRY ATTEMPT {attempt_index}] {retry_directive}"
+
+
+def load_mcp_servers() -> list:
+    """Read the local IDE mcp_config.json to load all enabled local MCP servers."""
+    servers: list = []
+    home = Path.home()
+
+    candidates = [
+        home / ".gemini" / "antigravity-ide" / "mcp_config.json",
+    ]
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates.append(Path(local_app_data) / "agy" / "mcp_config.json")
+
+    config_file = None
+    for p in candidates:
+        if p.exists():
+            config_file = p
+            break
+
+    if not config_file:
+        logger.info("mcp_config.json not found — skipping local MCP servers.")
+        return servers
+
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        for name, cfg in data.get("mcpServers", {}).items():
+            if cfg.get("disabled", False):
+                continue
+            command = cfg.get("command")
+            args = cfg.get("args", [])
+            if command:
+                servers.append(McpStdioServer(name=name, command=command, args=args))
+                logger.info("Loaded MCP server: '%s' (%s %s)", name, command, " ".join(args))
+    except Exception as e:
+        logger.warning("Failed to load MCP configurations: %s", e)
+
+    return servers
+
+
+async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review: bool = False):
+    """Initialize the Antigravity agent and send a single prompt."""
+    logger.info("Initializing Agent using Google Antigravity SDK...")
+    logger.info("Platform: %s | Python: %s", sys.platform, sys.version.split()[0])
+    logger.info("Prompt: %s", prompt_message[:120] + ("..." if len(prompt_message) > 120 else ""))
+
+    system_instructions = (
+        "You are an expert AI developer and strategist inside the 'ppt-master' repository. "
+        "Your goal is to execute repository-specific workflows. "
+        "You have tools to read/write files, search code, list directories, run shell commands, and do web searches. "
+        "Always execute commands, verify results, and follow the workflows specified in AGENTS.md and SKILL.md. "
+        "When running steps, proceed logically and verify that outputs (e.g. project directories, spec files, SVGs, PPTX files) "
+        "are successfully created."
+    )
+    if no_visual_review:
+        system_instructions += "\nUser has opted out of the visual review phase. DO NOT execute the visual self-check / visual-review workflow at Step 6."
+    else:
+        system_instructions += "\nVisual review phase is enabled by default (opt-out mode). You MUST run the visual self-check / visual-review workflow at Step 6 after all SVGs are generated, unless opted out."
+
+    system_instructions += (
+        "\n\nSubagent Delegation & Coordination Rules:"
+        "\n1. You MUST delegate parallelizable tasks to subagents using the native `invoke_subagent` tool. Note that `define_subagent` is not supported; use `invoke_subagent` directly to spawn clone 'self' or general-purpose subagents."
+        "\n2. Specific delegation scenarios:"
+        "\n   - Step 1 (Source Content Ingestion): If the user provides multiple source files or links, spawn one subagent per source to run the conversion scripts (e.g. `pdf_to_md.py`, `web_to_md.py`) concurrently and summarize their outputs."
+        "\n   - Step 6 (Visual Review): If the number of generated slides N is greater than two (> 2), partition the pages into batches of <= 5 pages and spawn parallel subagents concurrently using the `invoke_subagent` tool to execute visual self-checks."
+        "\n3. IMPORTANT: When you spawn any subagent, you MUST explicitly wait for the tool to finish and return its result. You MUST NOT finish your response, conclude the conversation, or output your final answer while any subagents are still running in the background. Doing so terminates the agent session and orphans the subagents. Always consume the subagent's result (ToolResult) and verify its outcomes before declaring the task complete."
+    )
+    system_instructions += (
+        "\n\nOutput Discipline (Token Efficiency):"
+        "\n- You are an autonomous execution engine, NOT a conversational assistant."
+        "\n- NEVER narrate what you are about to do, what you just did, or why. Just do it."
+        "\n- NEVER echo, reprint, or summarize file contents you just read or wrote."
+        "\n- NEVER explain your thinking, reasoning, or decision-making process in text output."
+        "\n- NEVER greet, apologize, confirm receipt, or use conversational filler."
+        "\n- Output text ONLY when: (a) reporting a blocking error that halts the workflow, "
+        "(b) the workflow explicitly requires a user-facing summary (e.g. visual-review aggregate table), "
+        "or (c) the final completion message at the very end."
+        "\n- Keep all text outputs under 3 sentences. Prefer structured formats (tables, bullet points) over prose."
+    )
+    system_instructions += (
+        "\n\nNon-Interactive Batch Execution (Highest Priority):"
+        "\n- This run is fully programmatic: there is no human-in-the-loop after the initial prompt."
+        "\n- NEVER ask for user confirmation, approval, choice, or clarification during execution."
+        "\n- For Step 4 Eight Confirmations, treat them as non-blocking and continue immediately."
+        "\n- NEVER stop after split-mode guidance; default to continuous mode in this session."
+        "\n- Continue autonomously through Strategist -> (Image Acquisition if needed) -> Executor -> Step 7 export."
+        "\n- If details are missing or ambiguous, pick a strong default and proceed."
+        "\n- The task is complete only when at least one native PPTX has been exported."
+    )
+
+    mcp_servers = load_mcp_servers() if use_mcp else []
+    if use_mcp:
+        logger.info("Enabled %d local MCP server(s).", len(mcp_servers))
+    else:
+        logger.info("MCP servers disabled. Pass --mcp to enable them.")
+
+    capabilities = CapabilitiesConfig(
+        enable_subagents=True
+    )
+
+    if ARGS.thinking_level:
+        level_map = {
+            "MINIMAL": ThinkingLevel.MINIMAL,
+            "LOW": ThinkingLevel.LOW,
+            "MEDIUM": ThinkingLevel.MEDIUM,
+            "HIGH": ThinkingLevel.HIGH
+        }
+        thinking_level = level_map[ARGS.thinking_level.upper()]
+    else:
+        thinking_level = ThinkingLevel.HIGH if ARGS.verbose else ThinkingLevel.MEDIUM
+
+    _supports_thinking = ARGS.model and "gemini-3.5" in ARGS.model.lower()
+
+    if _supports_thinking:
+        model_entry = ModelEntry(
+            name=ARGS.model,
+            generation=GenerationConfig(thinking_level=thinking_level),
+        )
+        logger.info("Model %s: thinking_level=%s", ARGS.model, thinking_level)
+    else:
+        model_entry = ModelEntry(name=ARGS.model)
+        logger.info("Model %s: thinking_level omitted (not supported)", ARGS.model)
+
+    config = LocalAgentConfig(
+        system_instructions=system_instructions,
+        capabilities=capabilities,
+        tools=[],
+        policies=[policy.allow_all()],
+        mcp_servers=mcp_servers,
+        workspaces=[str(Path(".").resolve())],
+        gemini_config=GeminiConfig(
+            api_key=os.environ.get("GEMINI_API_KEY"),
+            models=ModelConfig(default=model_entry),
+        ),
+    )
+
+    agent = Agent(config)
+
+    subagent_stats = {
+        "enabled": getattr(capabilities, "enable_subagents", False),
+        "total_spawned": 0,
+        "completed": 0,
+        "details": []
+    }
+
+    try:
+        async with agent:
+            response = await agent.chat(prompt_message)
+
+            last_chunk_type = None
+            async for chunk in response.chunks:
+                if isinstance(chunk, Thought):
+                    if ARGS.verbose:
+                        if last_chunk_type != "thought":
+                            print("\n[Thinking] ", end="", flush=True)
+                            last_chunk_type = "thought"
+                        print(chunk.text, end="", flush=True)
+                    else:
+                        last_chunk_type = "thought"
+                elif isinstance(chunk, Text):
+                    if last_chunk_type != "text":
+                        print("\n[Agent] ", end="", flush=True)
+                        last_chunk_type = "text"
+                    print(chunk.text, end="", flush=True)
+                    _check_text_for_status(chunk.text)
+                elif isinstance(chunk, ToolCall):
+                    _check_tool_call_for_status(chunk)
+                    if chunk.name in ("invoke_subagent", "start_subagent"):
+                        subagent_stats["total_spawned"] += 1
+                        args_dict = chunk.args if isinstance(chunk.args, dict) else {}
+                        task_desc = args_dict.get("task", "")
+                        subagent_type = args_dict.get("subagent_type", "self")
+                        logger.info(
+                            "[Subagent Spawned] Subagent #%d (type: %s) invoked. Task: %s",
+                            subagent_stats["total_spawned"],
+                            subagent_type,
+                            task_desc[:150] + ("..." if len(task_desc) > 150 else "")
+                        )
+                        subagent_stats["details"].append({
+                            "id": chunk.id,
+                            "type": subagent_type,
+                            "task": task_desc,
+                            "status": "running"
+                        })
+                    else:
+                        if ARGS.verbose:
+                            logger.info("[Tool Call] '%s' args: %s", chunk.name, chunk.args)
+                        else:
+                            logger.info("[Tool Call] '%s'", chunk.name)
+                    last_chunk_type = "tool_call"
+                elif isinstance(chunk, ToolResult):
+                    if chunk.name in ("invoke_subagent", "start_subagent"):
+                        subagent_stats["completed"] += 1
+                        for detail in subagent_stats["details"]:
+                            if detail["id"] == chunk.id:
+                                detail["status"] = "completed"
+                                break
+                        logger.info("[Subagent Completed] Subagent (id: %s) finished its task.", chunk.id)
+
+                    if chunk.error or chunk.exception:
+                        logger.error(
+                            "[Tool Error] '%s' (id: %s): %s",
+                            chunk.name,
+                            chunk.id,
+                            chunk.error or chunk.exception,
+                        )
+                    else:
+                        if ARGS.verbose:
+                            res_str = str(chunk.result)
+                            if len(res_str) > 1000:
+                                res_str = res_str[:1000] + " ... (truncated)"
+                            logger.info("[Tool Result] '%s' (id: %s): %s", chunk.name, chunk.id, res_str)
+                        else:
+                            logger.info("[Tool OK] '%s'", chunk.name)
+                    last_chunk_type = "tool_result"
+            print()
+
+            print("\n" + "═" * 60)
+            print("SUBAGENT EXECUTION SUMMARY")
+            print(f"  Subagents Enabled in Config: {subagent_stats['enabled']}")
+            print(f"  Total Subagents Spawned:     {subagent_stats['total_spawned']}")
+            print(f"  Total Subagents Completed:   {subagent_stats['completed']}")
+            if subagent_stats["total_spawned"] > 0:
+                print("  Spawned Subagents Details:")
+                for idx, detail in enumerate(subagent_stats["details"], 1):
+                    print(f"    {idx}. [Type: {detail['type']}] Status: {detail['status']}")
+                    print(f"       Task: {detail['task'][:120]}...")
+            else:
+                if subagent_stats["enabled"]:
+                    print("  Note: Subagents were enabled but the main agent did not delegate any tasks.")
+                    print("        This can happen if the slide count was small (e.g. <= 2 pages) or sequential execution was chosen by the model.")
+                else:
+                    print("  Reason not invoked: Subagents were disabled in CapabilitiesConfig.")
+            print("═" * 60 + "\n")
+            return response.usage_metadata, subagent_stats
+
+    except Exception as e:
+        logger.error("Execution error: %s", e, exc_info=True)
+        raise
+
+
+def check_and_install_dependencies():
+    """Verify and install dependencies in WSL/Linux environments."""
+    is_linux = sys.platform == "linux"
+    if is_linux:
+        logger.info("WSL/Linux detected. Checking Python and browser dependencies...")
+        try:
+            import google.antigravity
+            import cairosvg
+            import playwright
+        except ImportError:
+            project_root = Path(__file__).parent.parent.resolve()
+            req_path = project_root / "requirements.txt"
+            logger.info("Missing dependencies detected. Running pip install -r %s...", req_path)
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_path)], check=True)
+            except Exception as pip_exc:
+                logger.error("Failed to run pip install: %s", pip_exc)
+
+        if not ARGS.no_visual_review:
+            try:
+                from playwright.sync_api import sync_playwright
+                with sync_playwright() as p:
+                    browser = p.chromium.launch()
+                    browser.close()
+            except Exception:
+                logger.info("Playwright Chromium browser binary not found or unable to launch. Installing chromium...")
+                try:
+                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    logger.info("Playwright Chromium browser binary installed successfully.")
+                except Exception as play_exc:
+                    logger.error("Failed to install Playwright Chromium: %s", play_exc)
+
+
+def main_run() -> int:
+    """Main execution entry point for agent runner."""
+    if ARGS.self_test:
+        success = run_self_test()
+        return 0 if success else 1
+
+    setup_file_logging()
+    check_and_install_dependencies()
+    prompt = resolve_prompt(ARGS)
+
+    setup_status_logging()
+    log_status("Agent runner initialized. Resolving configuration and validating environment...")
+
+    # Auto-resumption check
+    resumed_project = None
+    if ARGS.resume or prompt.lower().strip() == "resume":
+        log_status("Scanning for incomplete projects to resume...")
+        logger.info("Auto-resumption mode activated.")
+        resumed_project = find_and_restore_incomplete_project(ARGS.depth)
+        if not resumed_project:
+            log_status("No incomplete projects found to resume. Workflow is up to date.")
+            logger.info("No incomplete projects found to resume. Everything is up to date. Exiting successfully.")
+            return 0
+        prompt = f"resume generating projects/{resumed_project}"
+        log_status(f"Resuming generation for project '{resumed_project}'...")
+        logger.info(f"Target resumption prompt: '{prompt}'")
+
+    max_attempts = _get_max_attempt_count()
+    exit_code = 1
+    final_status = "failed"
+
+    logger.info(
+        "Run guard active: total attempts=%d. Silent failure is defined as no new PPTX output.",
+        max_attempts,
+    )
+
+    for attempt in range(1, max_attempts + 1):
+        attempt_prompt = prompt if attempt == 1 else _build_retry_prompt(prompt, attempt)
+
+        if attempt > 1:
+            log_status(f"Starting execution retry (attempt {attempt}/{max_attempts})...")
+            logger.warning(
+                "Retrying run: attempt %d/%d.",
+                attempt,
+                max_attempts,
+            )
+        else:
+            log_status("Launching main agent execution workflow...")
+
+        projects_snapshot = _snapshot_project_files()
+        pptx_before = _snapshot_output_pptx_files()
+        start_time = time.time()
+        token_usage_dict = None
+        subagent_stats_dict = None
+        run_status = "started"
+        interrupted = False
+
+        try:
+            result = asyncio.run(
+                run_agent(
+                    attempt_prompt,
+                    use_mcp=ARGS.mcp,
+                    no_visual_review=ARGS.no_visual_review,
+                )
+            )
+            usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
+            run_status = "success"
+            log_status("Agent execution completed successfully.")
+            logger.info("Agent run completed successfully.")
+            if usage:
+                token_usage_dict = {
+                    "prompt_tokens": usage.prompt_token_count,
+                    "cached_content_tokens": usage.cached_content_token_count,
+                    "candidates_tokens": usage.candidates_token_count,
+                    "thoughts_tokens": usage.thoughts_token_count,
+                    "total_tokens": usage.total_token_count,
+                }
+        except KeyboardInterrupt:
+            run_status = "interrupted"
+            log_status("Agent execution interrupted by user.")
+            exit_code = 130
+            interrupted = True
+            logger.warning("Agent run interrupted by user (KeyboardInterrupt).")
+        except Exception as exc:
+            run_status = "failed"
+            log_status(f"Agent execution failed: {exc}")
+            logger.error("Agent run failed: %s", exc, exc_info=True)
+        finally:
+            log_status("Synchronizing generated artifacts and writing run metadata...")
+            execution_duration = time.time() - start_time
+            copy_output_artifacts(
+                run_status=run_status,
+                prompt=attempt_prompt,
+                token_usage=token_usage_dict,
+                execution_duration=execution_duration,
+                subagent_stats=subagent_stats_dict,
+                projects_snapshot=projects_snapshot,
+                resumed_project=resumed_project,
+                start_time=start_time,
+            )
+
+        if interrupted:
+            final_status = run_status
+            break
+
+        pptx_after = _snapshot_output_pptx_files()
+        new_pptx = sorted(pptx_after - pptx_before)
+
+        if run_status == "success" and new_pptx:
+            logger.info("Detected %d new PPTX output artifact(s).", len(new_pptx))
+            exit_code = 0
+            final_status = "success"
+            break
+
+        if run_status == "success" and not new_pptx:
+            run_status = "silent_failure"
+            logger.error(
+                "Silent failure detected: run completed without producing any new .pptx artifact."
+            )
+        else:
+            logger.error("Run attempt ended with status: %s", run_status)
+
+        final_status = run_status
+        exit_code = 1
+
+        if attempt < max_attempts:
+            logger.warning(
+                "Will retry after status '%s' (attempt %d/%d).",
+                run_status,
+                attempt,
+                max_attempts,
+            )
+        else:
+            logger.error(
+                "Exhausted all attempts (%d). Final status: %s.",
+                max_attempts,
+                final_status,
+            )
+
+    log_status(f"Workflow execution finished with status: {final_status}")
+    logger.info("Runner finished with status: %s", final_status)
+    return exit_code
+
+
+def main_resume() -> int:
+    """Main execution entry point for auto-resumption watchdog wrapper."""
+    parser = argparse.ArgumentParser(description="PPT Master Auto Resumption Watchdog Wrapper")
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Number of recent project directories to verify (defaults to WATCHDOG_DEPTH env var or 3).",
+    )
+    args = parser.parse_args()
+
+    # Locate and run run_agent.py at project root
+    project_root = Path(__file__).parent.parent.resolve()
+    runner_script = project_root / "run_agent.py"
+    if not runner_script.exists():
+        logger.error(f"Runner script not found: {runner_script}")
+        return 1
+
+    cmd = [sys.executable, str(runner_script), "--resume"]
+    if args.depth is not None:
+        cmd.extend(["--depth", str(args.depth)])
+
+    logger.info(f"Delegating to agent runner: {' '.join(cmd)}")
+    try:
+        res = subprocess.run(cmd, check=True)
+        return res.returncode
+    except subprocess.CalledProcessError as err:
+        logger.error(f"Agent runner failed with exit code {err.returncode}")
+        return err.returncode

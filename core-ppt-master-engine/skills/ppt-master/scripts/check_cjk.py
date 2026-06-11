@@ -234,7 +234,7 @@ def sync_to_wsl(search_dir: Path):
     wsl_check = os.environ.get("WSL_DISTRIBUTION_NAME") or os.path.exists("/run/WSL")
     if not wsl_check:
         print("Note: If you are running on Windows, make sure to sync these changes to your WSL environment:")
-        print("  rsync -avz --exclude '.git' --exclude 'node_modules' /mnt/c/Users/aviji/repo/ai-builder-engine/ ~/development/ai-builder-engine/")
+        print("  rsync -avzc --delete --exclude '.git' --exclude 'node_modules' /mnt/c/Users/aviji/repo/ai-builder-engine/ ~/development/ai-builder-engine/")
 
 def main() -> int:
     # Set console encoding to UTF-8

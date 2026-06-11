@@ -147,12 +147,14 @@ Quick version: download Python from [python.org](https://www.python.org/download
 
 ```bash
 # macOS
-brew install python
+brew install python cairo
 pip install -r requirements.txt
+python3 -m playwright install chromium
 
-# Ubuntu / Debian
-sudo apt install python3 python3-pip
+# Ubuntu / Debian / WSL 2
+sudo apt update && sudo apt install -y python3 python3-pip libcairo2 libcairo2-dev
 pip install -r requirements.txt
+python3 -m playwright install chromium
 ```
 </details>
 

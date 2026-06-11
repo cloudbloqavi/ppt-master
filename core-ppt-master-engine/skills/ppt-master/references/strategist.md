@@ -134,7 +134,7 @@ See [`../templates/icons/README.md`](../templates/icons/README.md) for the curre
 > **When writing `design_spec.md` §VI / `spec_lock.md`**, then materialize the icon inventory:
 >
 > 3.  Enumerate the concepts the deck actually needs (home, chart, users, …) based on the confirmed outline.
-> 4.  Search for each concept's filename in the chosen library: `ls skills/ppt-master/templates/icons/<chosen-library>/ | grep <keyword>`
+> 4.  Search for each concept's filename in the chosen library: `ls core-ppt-master-engine/skills/ppt-master/templates/icons/<chosen-library>/ | grep <keyword>`
 > 5.  Use the verified filename (without `.svg`) as the icon name; always include the library prefix (e.g., `chunk-filled/home`).
 > 6.  List the final icon inventory and chosen library in `design_spec.md` §VI; record the same in `spec_lock.md icons` (including `stroke_width` for stroke-style libraries). Executor may only use icons from this list.
 >
@@ -250,7 +250,7 @@ Formula rendering is part of Typography confirmation. Recommend one policy and l
 
 ```bash
 mkdir -p <project_path>/images
-python3 skills/ppt-master/scripts/latex_render.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/latex_render.py <project_path>
 ```
 
 Write the manifest first at `<project_path>/images/formula_manifest.json`. Use this shape:

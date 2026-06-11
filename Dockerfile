@@ -62,8 +62,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy root-level runner and configuration files
-COPY run_agent.py ANTIGRAVITY.md AGENTS.md pyproject.toml ./
+# Copy root-level runner, configuration files, and wrapper scripts
+COPY run_agent.py auto_resume.py ANTIGRAVITY.md AGENTS.md pyproject.toml gemini_model_prices.json ./
+COPY agent_runner/ ./agent_runner/
 
 # Copy the core application engine (skills, scripts, templates)
 COPY core-ppt-master-engine/ ./core-ppt-master-engine/

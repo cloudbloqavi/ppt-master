@@ -4,7 +4,7 @@ description: Generate a brand-only template under `templates/brands/<id>/` — a
 
 # Create Brand Workflow
 
-> Standalone preset-creation workflow. Output is a brand template package at `skills/ppt-master/templates/brands/<brand_id>/`. Structurally a brand is a template minus the SVG page roster — Strategist locks the brand's color / typography / logo / voice as truth; Executor designs pages freely under those constraints.
+> Standalone preset-creation workflow. Output is a brand template package at `core-ppt-master-engine/skills/ppt-master/templates/brands/<brand_id>/`. Structurally a brand is a template minus the SVG page roster — Strategist locks the brand's color / typography / logo / voice as truth; Executor designs pages freely under those constraints.
 
 This workflow edits the global brand library, not any specific `projects/<x>/`. Consumption follows the same explicit-path rule as layout templates (see [Downstream consumption](#downstream-consumption-informational) at the end).
 
@@ -41,9 +41,9 @@ Read assets directly using existing converters — no dedicated extraction scrip
 |---|---|---|
 | SVG logo | `Read` the SVG; grep `fill=` / `stroke=` for HEX | colors (literal), logo file |
 | PNG/JPG logo | `Read` (multimodal); AI vision identifies dominant colors | colors (approximate HEX, label `[approx]`), logo file |
-| Brand site URL | `python3 skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>`, then `Read` the result | color references, font references, voice/tone |
-| Branded PPTX | `python3 skills/ppt-master/scripts/source_to_md/ppt_to_md.py <file>`, then read theme XML | colors, typography (literal) |
-| Brand PDF | `python3 skills/ppt-master/scripts/source_to_md/pdf_to_md.py <file>` | voice/tone; sometimes color/font references |
+| Brand site URL | `python3 core-ppt-master-engine/skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>`, then `Read` the result | color references, font references, voice/tone |
+| Branded PPTX | `python3 core-ppt-master-engine/skills/ppt-master/scripts/source_to_md/ppt_to_md.py <file>`, then read theme XML | colors, typography (literal) |
+| Brand PDF | `python3 core-ppt-master-engine/skills/ppt-master/scripts/source_to_md/pdf_to_md.py <file>` | voice/tone; sometimes color/font references |
 
 Identify which of (colors / typography / logo / voice / icon style) the asset did NOT cover, then proceed to Step 3 for the rest. Most single assets cover 1–2 categories well.
 
@@ -90,7 +90,7 @@ For fields not covered by the asset, ask the user in a single bundled message. S
 Create the package directory:
 
 ```bash
-mkdir -p "skills/ppt-master/templates/brands/<brand_id>"
+mkdir -p "core-ppt-master-engine/skills/ppt-master/templates/brands/<brand_id>"
 ```
 
 ### Mandatory: `design_spec.md`
@@ -188,17 +188,17 @@ Emit the confirmation card:
 
 ```markdown
 ## ✅ Brand Saved
-- Path: `skills/ppt-master/templates/brands/<brand_id>/`
+- Path: `core-ppt-master-engine/skills/ppt-master/templates/brands/<brand_id>/`
 - Files: design_spec.md{, logo.<ext>}{, images/}{, illustrations/}{, icons/}
 - Fields locked: <list>
 - Provenance: <fact / approx / user counts>
 
 How to use in a project:
-- Include the brand directory path in your initial Step 3 input — e.g. "Create a Q4 summary PPT, using the brand at skills/ppt-master/templates/brands/<brand_id>/ "
+- Include the brand directory path in your initial Step 3 input — e.g. "Create a Q4 summary PPT, using the brand at core-ppt-master-engine/skills/ppt-master/templates/brands/<brand_id>/ "
 - Same explicit-path rule as layout templates: bare brand names never trigger
 - May be supplied together with a layout template path; Step 3 fuses both into a single `design_spec.md` (brand wins on identity tokens, layout wins on page structure) — see `SKILL.md` Step 3
 - To list available brands: open `templates/brands/brands_index.json`
-- To edit: modify `templates/brands/<brand_id>/design_spec.md` directly, then re-run `python3 skills/ppt-master/scripts/register_template.py --kind brand <brand_id>`
+- To edit: modify `templates/brands/<brand_id>/design_spec.md` directly, then re-run `python3 core-ppt-master-engine/skills/ppt-master/scripts/register_template.py --kind brand <brand_id>`
 ```
 
 ---

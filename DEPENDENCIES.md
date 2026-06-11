@@ -13,27 +13,28 @@ This file tracks the third-party libraries used across this project, their curre
 
 | Dependency | Current Version | Latest Version | EOL / Deprecation Status | Action Required (Yes/No) | Last Audited | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `beautifulsoup4` | `>=4.12.0` | `4.15.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `cairosvg` | `>=2.7.0` | `2.9.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `curl-cffi` | `>=0.7.0` | `0.15.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `ebooklib` | `>=0.18` | `0.20` | 🔴 Legacy (Mammoth/Markdownify preferred) | **Yes** | 2026-06-08 | - |
-| `edge-tts` | `>=7.2.8` | `7.2.8` | 🟢 Active | No | 2026-06-08 | - |
-| `flask` | `>=3.0.0` | `3.1.3` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `google-antigravity` | `Any` | `0.1.2` | 🟢 Active (Core SDK) | No | 2026-06-08 | - |
-| `google-genai` | `>=1.0.0` | `2.8.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `mammoth` | `>=1.6.0` | `1.12.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `markdownify` | `>=0.11.6` | `1.2.2` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `nbconvert` | `>=7.0.0` | `7.17.1` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `numpy` | `>=1.20.0` | `2.4.6` | ⚠️ NumPy 1.x EOL expected late 2026; NumPy 2.x is active. | **Yes** | 2026-06-08 | - |
-| `openpyxl` | `>=3.1.0` | `3.1.5` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `pillow` | `>=9.0.0` | `12.2.0` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `playwright` | `>=1.60.0` | `1.60.0` | 🟢 Active | No | 2026-06-08 | - |
-| `pymupdf` | `>=1.23.0` | `1.27.2.3` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `python-dotenv` | `>=1.0.0` | `1.2.2` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `python-pptx` | `>=0.6.21` | `1.0.2` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `reportlab` | `>=4.0.0` | `4.5.1` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `requests` | `>=2.31.0` | `2.34.2` | 🟢 Active | **Yes** | 2026-06-08 | - |
-| `svglib` | `>=1.5.0` | `1.6.0` | 🔴 Legacy (Unmaintained, CairoSVG preferred) | **Yes** | 2026-06-08 | - |
+| `beautifulsoup4` | `>=4.12.0` | `4.15.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `cairosvg` | `>=2.7.0` | `2.9.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `curl-cffi` | `>=0.7.0` | `0.15.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `ebooklib` | `>=0.18` | `0.20` | 🔴 Legacy (Mammoth/Markdownify preferred) | **Yes** | 2026-06-11 | - |
+| `edge-tts` | `>=7.2.8` | `7.2.8` | 🟢 Active | No | 2026-06-11 | - |
+| `flask` | `>=3.0.0` | `3.1.3` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `google-antigravity` | `Any` | `0.1.2` | 🟢 Active (Core SDK) | No | 2026-06-11 | - |
+| `google-cloud-pubsub` | `>=2.19.0` | `2.39.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `google-genai` | `>=1.0.0` | `2.8.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `mammoth` | `>=1.6.0` | `1.12.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `markdownify` | `>=0.11.6` | `1.2.2` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `nbconvert` | `>=7.0.0` | `7.17.1` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `numpy` | `>=1.20.0` | `2.4.6` | ⚠️ NumPy 1.x EOL expected late 2026; NumPy 2.x is active. | **Yes** | 2026-06-11 | - |
+| `openpyxl` | `>=3.1.0` | `3.1.5` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `pillow` | `>=9.0.0` | `12.2.0` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `playwright` | `>=1.60.0` | `1.60.0` | 🟢 Active | No | 2026-06-11 | - |
+| `pymupdf` | `>=1.23.0` | `1.27.2.3` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `python-dotenv` | `>=1.0.0` | `1.2.2` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `python-pptx` | `>=0.6.21` | `1.0.2` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `reportlab` | `>=4.0.0` | `4.5.1` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `requests` | `>=2.31.0` | `2.34.2` | 🟢 Active | **Yes** | 2026-06-11 | - |
+| `svglib` | `>=1.5.0` | `1.6.0` | 🔴 Legacy (Unmaintained, CairoSVG preferred) | **Yes** | 2026-06-11 | - |
 
 ## Agentic Audit Guidelines
 

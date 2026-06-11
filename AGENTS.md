@@ -29,9 +29,8 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 ## Subagent and Parallel Execution Policy
 
 Deciding whether to leverage the parallel subagentic approach for background or parallel activities (such as source document processing or batch visual reviews) must be based on a dynamic assessment of system resources:
-- **Resource Check**: Prior to spawning subagents, inspect the system's CPU cores, available memory, and free disk space.
 - **Execution Mode**:
-  - **Parallel Mode**: If the host system has sufficient resources (e.g., >=2 vCPU, >=1 GB RAM, and adequate free disk space e.g. >=1GB), the agent should leverage `invoke_subagent` to execute parallel tasks concurrently.
+  - **Parallel Mode**: If the host system has sufficient resources, the agent should leverage `invoke_subagent` to execute parallel tasks concurrently.
   - **Sequential Mode**: If resources are constrained or if running in a resource-limited environment, the agent must fall back to sequential execution inside the main parent agent.
 
 ## Execution Requirements

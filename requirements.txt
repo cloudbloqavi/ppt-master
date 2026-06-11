@@ -33,3 +33,9 @@ python-dotenv>=1.0.0
 # Core PPT Master skill dependencies
 # ─────────────────────────────────────────────────────────────
 -r core-ppt-master-engine/skills/ppt-master/requirements.txt
+
+# ─────────────────────────────────────────────────────────────
+# OPTIONAL: GCP Pub/Sub (for production status updates)
+# ─────────────────────────────────────────────────────────────
+google-cloud-pubsub>=2.19.0
+

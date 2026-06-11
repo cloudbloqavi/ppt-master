@@ -42,7 +42,7 @@ pip install playwright
 python3 -m playwright install chromium
 
 # 2. live-preview server running for this project (provides inlined SVG fetch)
-python3 skills/ppt-master/scripts/svg_editor/server.py <project_path> --no-browser
+python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_editor/server.py <project_path> --no-browser
 # (single instance per project — if it's already running, skip)
 ```
 
@@ -55,7 +55,7 @@ The renderer (`visual_review.py`) does **not** auto-start the live-preview serve
 ## Step 1 — Pre-render all PNGs
 
 ```bash
-python3 skills/ppt-master/scripts/visual_review.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/visual_review.py <project_path>
 ```
 
 This writes one PNG per page to `<project_path>/.preview/<page>.png` at 1280×720, with `<use data-icon>` inlined and `<image href>` resolved exactly as the live-preview browser sees them. Renders are serialized via a project-local file lock — safe to invoke concurrently.
@@ -76,9 +76,9 @@ If any page comes back with `"all_background": true` in the JSON summary, that p
 To parallelize the visual review workflow, the main agent leverages the built-in subagents capability of the Antigravity SDK:
 
 1. **Partition the Slides**: If the number of generated pages $N$ is greater than two ($N > 2$), the main agent SHOULD leverage subagents to execute the reviews in parallel. Partition the pages into batches of $\le K$ pages (default **K = 5**).
-2. **Invoke Parallel Subagents**: For each batch, invoke a built-in `self` subagent (or define a custom subagent using `define_subagent` if tool restrictions are desired) in parallel. You can invoke them concurrently using the native `invoke_subagent` tool.
+2. **Invoke Parallel Subagents**: For each batch, invoke a built-in `self` subagent (or general-purpose subagent) in parallel. Note that custom subagent definition via `define_subagent` is not supported in this environment; you must invoke subagents concurrently using the native `invoke_subagent` tool.
 3. **Subagent Configuration**:
-   - **Type**: `self` (inherits all tools including file read/write and image viewing) or custom.
+   - **Type**: `self` (inherits all tools including file read/write and image viewing) or general-purpose.
    - **System Prompt**: 
      > You are a visual-review subagent. Evaluate the assigned slide SVGs and their pre-rendered PNGs in `.preview/` against the Visual Review Rubric. Back up each slide before editing (`cp` or copy tool to `.review/backup/<page>.iter1.svg`), make precise positioning/alignment fixes directly to the SVG files in-place (do not modify brand colors or copy text), and write a JSON report to `.review/<page>.json` matching §5 of the rubric.
    - **Initial Prompt**: Pass the rubric content, `design_spec.md` context, `spec_lock.md` context, and the list of specific slides (`svg_path` and `png_path`) for the batch.
@@ -122,9 +122,9 @@ If `brand_review.json` is non-empty, that's a single decision applied across the
 After the table is clean, continue to post-processing per [`SKILL.md`](../SKILL.md) Step 7:
 
 ```bash
-python3 skills/ppt-master/scripts/total_md_split.py <project_path>
-python3 skills/ppt-master/scripts/finalize_svg.py <project_path>
-python3 skills/ppt-master/scripts/svg_to_pptx.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/total_md_split.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/finalize_svg.py <project_path>
+python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx.py <project_path>
 ```
 
 ---
