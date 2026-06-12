@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - SVG Position Calculation and Validation Tool
+Presentation Builder - SVG Position Calculation and Validation Tool
 
 Provides pre-calculation and post-validation of chart coordinates,
 outputting clear coordinate tables.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - SVG Post-processing Tool (Unified Entry Point)
+Presentation Builder - SVG Post-processing Tool (Unified Entry Point)
 
 Processes SVG files from svg_output/ and outputs them to svg_final/.
 By default, all processing steps are executed. You can also specify
@@ -258,7 +258,7 @@ def finalize_project(
 def main() -> None:
     """Run the CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='PPT Master - SVG Post-processing Tool',
+        description='Presentation Builder - SVG Post-processing Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:

@@ -1,5 +1,5 @@
 """
-Logging Configuration Module for PPT Master Agent Runner
+Logging Configuration Module for Presentation Builder Agent Runner
 
 Handles creation of file-based logger handlers when --log-file is selected,
 allowing execution logs to be co-located with output artifacts.

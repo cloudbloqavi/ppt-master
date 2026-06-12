@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-# PPT Master - Production Dockerfile
+# Presentation Builder - Production Dockerfile
 # ─────────────────────────────────────────────────────────────
 # Designed for Google Cloud Run Jobs.
 #
@@ -58,7 +58,7 @@ COPY requirements.txt ./
 #   google-antigravity  — Antigravity SDK (autonomous agent runtime)
 #   cairosvg            — SVG → PNG rendering for PPTX export
 #   python-dotenv       — .env file loading
-#   + all core PPT Master skill dependencies
+#   + all core Presentation Builder skill dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 

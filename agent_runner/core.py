@@ -1,5 +1,5 @@
 """
-Core Execution Module for PPT Master Agent Runner
+Core Execution Module for Presentation Builder Agent Runner
 
 Coordinates SDK setup, imports, dependencies checking, main runner execution loop
 (with retry attempt logic), and auto-resumption entry.
@@ -653,7 +653,7 @@ def main_run() -> int:
 
 def main_resume() -> int:
     """Main execution entry point for auto-resumption watchdog wrapper."""
-    parser = argparse.ArgumentParser(description="PPT Master Auto Resumption Watchdog Wrapper")
+    parser = argparse.ArgumentParser(description="Presentation Builder Auto Resumption Watchdog Wrapper")
     parser.add_argument(
         "--depth",
         type=int,

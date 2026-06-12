@@ -6,7 +6,7 @@ description: >
   "create PPT", "make PPT", "prepare presentation", or mentions "ppt-master".
 ---
 
-# PPT Master Skill
+# Presentation Builder Skill
 
 > AI-driven multi-format SVG content generation system. Converts source documents into high-quality SVG pages through multi-role collaboration and exports to PPTX.
 
@@ -115,7 +115,7 @@ When the user provides non-Markdown content, convert immediately:
 > alongside bitmap images. After `import-sources`, these land in `images/`
 > together with `image_manifest.json` and are first-class assets in §VIII Image Resource List.
 >
-> **Do NOT convert EMF/WMF to PNG.** The PPT Master pipeline preserves them as external
+> **Do NOT convert EMF/WMF to PNG.** The Presentation Builder pipeline preserves them as external
 > references (`finalize_svg.py` skips them) and `svg_to_pptx.py` embeds them as
 > PPTX-native media via `image/x-emf` / `image/x-wmf` MIME — PowerPoint renders them at full vector fidelity.
 > Converting via LibreOffice/Inkscape introduces CJK font substitution drift and

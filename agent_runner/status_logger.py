@@ -1,5 +1,5 @@
 """
-Status Progress Logging & Pub/Sub Adapter Module for PPT Master Agent Runner
+Status Progress Logging & Pub/Sub Adapter Module for Presentation Builder Agent Runner
 
 Handles user-facing, non-technical status progress logging, either to a local
 text log file during local testing or publishing to GCP Pub/Sub in production.

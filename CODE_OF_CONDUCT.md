@@ -2,7 +2,7 @@
 
 ## Our Commitment
 
-We want PPT Master to be a welcoming, respectful, and professional open-source community for everyone.
+We want Presentation Builder to be a welcoming, respectful, and professional open-source community for everyone.
 
 As maintainers, contributors, and participants, we are committed to making participation in this project harassment-free for all people, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity or expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, color, religion, or sexual identity and orientation.
 

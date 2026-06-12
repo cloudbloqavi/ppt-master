@@ -1,6 +1,6 @@
 # AI Image Comparison — Three-Dimension Reference Gallery
 
-PPT Master's AI images are governed by three orthogonal dimensions: **rendering (visual style) × palette (color behavior) × type (internal composition)**.
+Presentation Builder's AI images are governed by three orthogonal dimensions: **rendering (visual style) × palette (color behavior) × type (internal composition)**.
 This directory uses **controlled-variable comparison** — vary one dimension while holding the other two fixed — so you can see exactly what each dimension contributes.
 
 > This is **not** an example project (see `examples/` for those). It is a dimension-selection reference for the Strategist role and end users when picking AI image parameters.
@@ -31,7 +31,7 @@ Each subdirectory contains:
 
 ## How the images were generated
 
-> Reference images were generated with the **OpenAI gpt-image-2** backend. Other backends (gemini / doubao / qwen / etc.) will produce visually different results — this reflects model-level differences, not differences in PPT Master's dimension system.
+> Reference images were generated with the **OpenAI gpt-image-2** backend. Other backends (gemini / doubao / qwen / etc.) will produce visually different results — this reflects model-level differences, not differences in Presentation Builder's dimension system.
 
 To reproduce or regenerate:
 

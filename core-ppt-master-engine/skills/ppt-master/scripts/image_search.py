@@ -92,7 +92,7 @@ ORIENTATION_CHOICES = ("any", "landscape", "portrait", "square")
 
 
 def _load_search_env_file() -> None:
-    """Load image-search keys from the shared PPT Master .env locations."""
+    """Load image-search keys from the shared Presentation Builder .env locations."""
     load_prefixed_env_file(("PEXELS_", "PIXABAY_"))
 
 

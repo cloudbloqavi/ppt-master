@@ -207,7 +207,7 @@ The imported PPTX is a **reference source**, not a direct conversion target.
 
 Do:
 - preserve brand assets, recurring backgrounds, and stable structural motifs
-- rebuild the layout into a clean SVG structure aligned with PPT Master constraints
+- rebuild the layout into a clean SVG structure aligned with Presentation Builder constraints
 - simplify repeated decorative fragments into a smaller number of maintainable SVG elements
 - use a background image asset when the original decorative layer is too complex to recreate cleanly
 - use cleaned slide SVG references to inspect composition, spacing, text hierarchy, and fixed decorative structure only after factual metadata has been anchored

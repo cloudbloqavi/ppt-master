@@ -1,6 +1,6 @@
 # Shared Technical Standards
 
-Common technical constraints for PPT Master, eliminating cross-role file duplication.
+Common technical constraints for Presentation Builder, eliminating cross-role file duplication.
 
 ---
 

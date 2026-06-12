@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPT Master project management helpers.
+"""Presentation Builder project management helpers.
 
 Usage:
     python3 scripts/project_manager.py init <project_name> [--format ppt169] [--dir <path>]

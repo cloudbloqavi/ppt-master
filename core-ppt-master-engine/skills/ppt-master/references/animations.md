@@ -1,6 +1,6 @@
 # Page Transitions & Per-Element Animations
 
-PPT Master's exported PPTX supports **page transitions** (slide-to-slide) and **per-element entrance animations** (within a slide). Both are controlled by `svg_to_pptx.py` CLI flags and ship as real OOXML — they animate inside PowerPoint and Keynote, no embedded video.
+Presentation Builder's exported PPTX supports **page transitions** (slide-to-slide) and **per-element entrance animations** (within a slide). Both are controlled by `svg_to_pptx.py` CLI flags and ship as real OOXML — they animate inside PowerPoint and Keynote, no embedded video.
 
 ## Defaults
 

@@ -6,7 +6,7 @@ This file is the project entry point for general AI agents.
 
 ## Project Overview
 
-PPT Master is an AI-driven presentation generation system. Multi-role collaboration (Strategist → Image_Generator → Executor) converts source documents (PDF/DOCX/URL/Markdown) into natively editable PPTX with real PowerPoint shapes (DrawingML).
+Presentation Builder is an AI-driven presentation generation system. Multi-role collaboration (Strategist → Image_Generator → Executor) converts source documents (PDF/DOCX/URL/Markdown) into natively editable PPTX with real PowerPoint shapes (DrawingML).
 
 **Core Pipeline**: `Source Document → Create Project → [Template] → Strategist Eight Confirmations → [Image_Generator] → Executor Live Preview → Quality Check → Post-processing → Export PPTX`
 
@@ -144,6 +144,7 @@ When merging updates from the upstream remote repository (`https://github.com/cl
   * **Live Preview**: MUST remain **Disabled by default** (do not start the preview server server.py by default).
 * **`.env.example` Files**: Do **NOT** blindly overwrite `.env.example` (both at the root and inside the skill directory). Preserve local custom configurations (e.g. root mandatory runtime variables and optional agent prompt config) and merge them with incoming remote parameters. Translate all Chinese comments, headers, or explanations to English during the merge.
 * **CLAUDE.md and AGENTS.md Sync**: If any changes are detected in the remote `CLAUDE.md` during a sync, they must be merged into the local `AGENTS.md` as custom rules or quick references. `CLAUDE.md` itself must always be kept clean and contain only a reference link to `AGENTS.md` to keep documentation fully in sync and avoid duplication.
+* **Generic Branding Preservation**: Do not allow the upstream "PPT Master" name to overwrite the local "Presentation Builder" generic branding. Keep human-readable names generic.
 
 ### 4. Gitignore Filtering
 * **Check against `.gitignore`**: Prior to merging or copying any incoming files from the remote, check their destination path against the local `.gitignore` rules (using a command like `git check-ignore`). Any file matching an ignore pattern must NOT be merged or copied.
@@ -152,7 +153,11 @@ When merging updates from the upstream remote repository (`https://github.com/cl
 1. Add the remote if missing and checkout/export files to a temporary workspace.
 2. Selectively copy files to their mapped target paths. Prior to copying any file, check its destination path against local `.gitignore` rules (using `git check-ignore <path>`). If it is flagged as ignored, skip copying it.
 3. Re-apply path prefixing (`core-ppt-master-engine/`) to any root documentation changes.
-4. Run `git reset` to unstage everything, ensuring all synced changes remain in the working tree for manual review and commit.
+4. Run the branding normalization utility to automatically translate all incoming "PPT Master" occurrences to "Presentation Builder":
+   ```bash
+   python3 normalize_branding.py
+   ```
+5. Run `git reset` to unstage everything, ensuring all synced changes remain in the working tree for manual review and commit.
 
 ### 6. CJK (Chinese) Character Filtering & Translation
 * **Zero Chinese Characters Rule**: The project repository must remain entirely in English. If a merge or conflict resolution from the remote repository introduces files, text, comments, or documentation containing Chinese characters:

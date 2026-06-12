@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We provide security updates for the latest version of PPT Master.
+We provide security updates for the latest version of Presentation Builder.
 
 | Version | Supported |
 |---------|-----------|
@@ -11,7 +11,7 @@ We provide security updates for the latest version of PPT Master.
 
 ## Scope
 
-This policy covers the PPT Master source code in this repository, including:
+This policy covers the Presentation Builder source code in this repository, including:
 
 - Python scripts in `core-ppt-master-engine/skills/ppt-master/scripts/`
 

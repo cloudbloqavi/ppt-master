@@ -1,4 +1,4 @@
-# PPT Master - Root Dependencies
+# Presentation Builder - Root Dependencies
 # =============================================
 #
 # Install everything needed to run the autonomous agent:
@@ -30,7 +30,7 @@ cairosvg>=2.7.0
 python-dotenv>=1.0.0
 
 # ─────────────────────────────────────────────────────────────
-# Core PPT Master skill dependencies
+# Core Presentation Builder skill dependencies
 # ─────────────────────────────────────────────────────────────
 -r core-ppt-master-engine/skills/ppt-master/requirements.txt
 

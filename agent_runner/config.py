@@ -1,5 +1,5 @@
 """
-Configuration & Environment Module for PPT Master Agent Runner
+Configuration & Environment Module for Presentation Builder Agent Runner
 
 Handles command-line arguments parsing, environment validation, logging logger
 creation, and early runtime configuration.
@@ -54,7 +54,7 @@ os.environ["NO_GCE_CHECK"] = "true"
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
     parser = argparse.ArgumentParser(
-        description="PPT Master - Antigravity SDK Agent Runner",
+        description="Presentation Builder - Antigravity SDK Agent Runner",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

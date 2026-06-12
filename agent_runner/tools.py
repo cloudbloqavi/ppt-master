@@ -1,5 +1,5 @@
 """
-Workspace Tools & Self-Test Module for PPT Master Agent Runner
+Workspace Tools & Self-Test Module for Presentation Builder Agent Runner
 
 Defines helper tools (read_file, write_file, list_directory, grep_search,
 run_command) exposed to the agent loop and validates them in run_self_test().

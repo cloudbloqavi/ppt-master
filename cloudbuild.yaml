@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-# PPT Master — Google Cloud Build Pipeline
+# Presentation Builder — Google Cloud Build Pipeline
 # ─────────────────────────────────────────────────────────────
 #
 # Builds the Docker image, pushes it to Artifact Registry, and

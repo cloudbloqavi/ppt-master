@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Unified Configuration Management Module
+Presentation Builder - Unified Configuration Management Module
 
 Centrally manages all project configuration items to ensure consistency and maintainability.
 
@@ -694,7 +694,7 @@ class Config:
 
 def print_usage() -> None:
     """Print CLI usage information."""
-    print("PPT Master - Configuration Management Tool\n")
+    print("Presentation Builder - Configuration Management Tool\n")
     print("Usage:")
     print("  python3 scripts/config.py list-formats     # List all canvas formats")
     print("  python3 scripts/config.py list-colors      # List all color schemes")

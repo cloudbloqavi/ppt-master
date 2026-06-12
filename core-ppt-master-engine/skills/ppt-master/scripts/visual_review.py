@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Visual Review Renderer
+Presentation Builder - Visual Review Renderer
 
 Renders project SVGs to 1280x720 PNGs that match the live-preview browser view
 (inlined <use data-icon>, resolved <image href>, full font fallback including CJK).

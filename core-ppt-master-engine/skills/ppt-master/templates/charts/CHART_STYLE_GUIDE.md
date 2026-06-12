@@ -162,7 +162,7 @@ Key data text in charts should be highlighted by default:
 - `<feComponentTransfer>` + `<feFuncA slope=...>` → Use `<feFlood flood-color flood-opacity>` instead
 - `flood-opacity > 0.20` → Shadow too heavy, max 0.15-0.20
 
-> **What is forbidden is the sub-element, not `<filter>` itself.** `<filter>` is allowed by PPT Master and is the officially recommended path for shadows/glows (see [`shared-standards.md`](../../references/shared-standards.md) §1 blacklist does not include filter, §6 lists filter shadow as the official implementation of drop-shadow). The converter [`svg_to_pptx/drawingml_styles.py`](../../scripts/svg_to_pptx/drawingml_styles.py) also actively maps `feGaussianBlur` + `feOffset` + `feFlood` + `feComposite` + `feMerge` (and `feDropShadow` shorthand) to DrawingML `<a:outerShdw>`.
+> **What is forbidden is the sub-element, not `<filter>` itself.** `<filter>` is allowed by Presentation Builder and is the officially recommended path for shadows/glows (see [`shared-standards.md`](../../references/shared-standards.md) §1 blacklist does not include filter, §6 lists filter shadow as the official implementation of drop-shadow). The converter [`svg_to_pptx/drawingml_styles.py`](../../scripts/svg_to_pptx/drawingml_styles.py) also actively maps `feGaussianBlur` + `feOffset` + `feFlood` + `feComposite` + `feMerge` (and `feDropShadow` shorthand) to DrawingML `<a:outerShdw>`.
 >
 > The reason for specifically forbidding `feComponentTransfer/feFuncA(slope)`: **it can physically only adjust transparency, not carry color**. When the converter reads `feFuncA slope`, it treats it only as alpha, and the color field remains the default `'000000'`—the shadow color appears normal on the SVG side (because SourceAlpha itself is black), but after exporting to PPTX, the shadow color will be fixed to pure black `#000000`, creating a visually noticeable warm/cool color difference compared to other cards on the same page using `feFlood flood-color="#0F172A"`.
 >
@@ -458,7 +458,7 @@ echo "Small fonts:" && grep -c 'font-size="[0-9]"' "skills/ppt-master/templates/
 
 ## 11. Card Container Patterns
 
-Container cards are the most frequently reused visual units in PPT Master (KPI cards, section cards, info cards). The following three patterns are verified "reference implementations" compatible with PPTX round-tripping. New templates should prioritize adopting them, rather than inventing equivalent but poorly implemented alternatives.
+Container cards are the most frequently reused visual units in Presentation Builder (KPI cards, section cards, info cards). The following three patterns are verified "reference implementations" compatible with PPTX round-tripping. New templates should prioritize adopting them, rather than inventing equivalent but poorly implemented alternatives.
 
 ### 11.1 Half-Rounded Section Tab
 

@@ -68,7 +68,7 @@ def main() -> None:
     )
 
     parser = argparse.ArgumentParser(
-        description='PPT Master - SVG to PPTX Tool (Office Compatibility Mode)',
+        description='Presentation Builder - SVG to PPTX Tool (Office Compatibility Mode)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f'''
 Examples:
@@ -512,7 +512,7 @@ Recorded narration:
     # --- Native shapes version (primary) ---
     if gen_native:
         if verbose:
-            print("PPT Master - SVG to PPTX Tool")
+            print("Presentation Builder - SVG to PPTX Tool")
             print("=" * 50)
             print(f"  Project path: {project_path}")
             print(f"  SVG directory: {native_source_dir}")
@@ -537,7 +537,7 @@ Recorded narration:
             if gen_native:
                 print()
                 print("-" * 50)
-            print("PPT Master - SVG to PPTX Tool (SVG Reference)")
+            print("Presentation Builder - SVG to PPTX Tool (SVG Reference)")
             print("=" * 50)
             print(f"  Project path: {project_path}")
             print(f"  SVG directory: {legacy_source_dir}")

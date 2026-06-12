@@ -1,4 +1,4 @@
-# PPT Master Agent Runner — Quick Start Guide
+# Presentation Builder Agent Runner — Quick Start Guide
 
 This guide is the primary user onboarding document for the `ppt-master` presentation generation runner. It covers workspace setup and execution commands for running the autonomous agent locally or in development.
 
@@ -94,7 +94,7 @@ Your terminal prompt should now show `(.venv)` at the start.
 
 ### Step 4: Install the Google Antigravity SDK and Dependencies
 
-`requirements.txt` is the single source of truth — it installs the SDK, CairoSVG, and all PPT Master skill tools in one command:
+`requirements.txt` is the single source of truth — it installs the SDK, CairoSVG, and all Presentation Builder skill tools in one command:
 
 ```bash
 pip install -r requirements.txt

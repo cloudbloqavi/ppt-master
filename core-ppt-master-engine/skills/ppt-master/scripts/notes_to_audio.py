@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate per-slide narration audio from PPT Master notes.
+"""Generate per-slide narration audio from Presentation Builder notes.
 
 This script uses provider backends for the same per-slide output contract on
 macOS, Linux, and Windows. `edge-tts` remains the default no-key backend.

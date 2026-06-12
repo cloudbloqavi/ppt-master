@@ -1,4 +1,4 @@
-# PPT Master Dependencies / PPT Master Dependencies
+# Presentation Builder Dependencies / Presentation Builder Dependencies
 # =============================================
 #
 # Most tools use only the Python standard library. Below are optional dependencies.
@@ -115,4 +115,4 @@ flask>=3.0.0
 # ─────────────────────────────────────────────────────────────
 # Headless Chromium renderer for capturing SVG slides to PNG proofs.
 playwright>=1.60.0
-
+

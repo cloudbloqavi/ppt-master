@@ -1,4 +1,4 @@
-# Contributing to PPT Master
+# Contributing to Presentation Builder
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 ## Before You Open a PR
 
-PPT Master is solo-maintained with limited review bandwidth. To keep things healthy for everyone:
+Presentation Builder is solo-maintained with limited review bandwidth. To keep things healthy for everyone:
 
 - **Tiny fixes** (typos, one-line usage/doc corrections, obvious small inconsistencies) — please open an issue instead of a PR. A clear report is usually faster for the maintainer to apply directly
 - **Focused bug fixes** — PRs are welcome when the fix is self-contained, has clear reproduction steps, and includes local verification
@@ -50,7 +50,7 @@ This isn't gatekeeping — it protects your time. A PR should be a meaningful, i
 **Not a fit (please don't open PRs for these):**
 - Introducing `uv`, `poetry`, or other tools as required dependencies — `pip + requirements.txt` is the only official install path
 - Adding CI, test frameworks, pre-commit hooks, or linting infrastructure — deliberately out of scope for a solo-maintained project
-- Repackaging the skill as a CLI, SaaS, desktop app, or installer — PPT Master is a chat-driven skill for AI IDEs by design
+- Repackaging the skill as a CLI, SaaS, desktop app, or installer — Presentation Builder is a chat-driven skill for AI IDEs by design
 - Architectural refactors or large-scale renames — incremental cleanup only
 - "Drive-by" cosmetic reformatting unrelated to a real fix
 

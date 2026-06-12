@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Speaker Notes Splitting Tool
+Presentation Builder - Speaker Notes Splitting Tool
 
 Splits the total.md speaker notes file into multiple individual notes files,
 each corresponding to one SVG page.
@@ -268,7 +268,7 @@ def split_notes(notes: dict[str, str], output_dir: Path, verbose: bool = True) -
 def main() -> None:
     """Run the CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='PPT Master - Speaker Notes Splitting Tool',
+        description='Presentation Builder - Speaker Notes Splitting Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
@@ -304,7 +304,7 @@ Features:
     verbose = not args.quiet
 
     if verbose:
-        print("PPT Master - Speaker Notes Splitting Tool")
+        print("Presentation Builder - Speaker Notes Splitting Tool")
         print("=" * 50)
         print(f"  Project path: {project_path}")
         print(f"  Output directory: {output_dir}")

@@ -1,6 +1,6 @@
 # Pipeline Steps and Status Logging Mapping
 
-This document provides a reference mapping of the PPT Master agent runner pipeline steps, the corresponding tool actions or script executions, and the clean, user-friendly status progress messages written to the progress logs.
+This document provides a reference mapping of the Presentation Builder agent runner pipeline steps, the corresponding tool actions or script executions, and the clean, user-friendly status progress messages written to the progress logs.
 
 | Pipeline Step | Tool Action / Event | User-Facing Progress Status Message |
 | :--- | :--- | :--- |

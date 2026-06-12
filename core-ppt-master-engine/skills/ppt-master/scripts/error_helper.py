@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Error Message Helper
+Presentation Builder - Error Message Helper
 
 Provides user-friendly error messages and specific fix suggestions.
 """
@@ -406,7 +406,7 @@ class ErrorHelper:
     @classmethod
     def print_help(cls):
         """Print all error types and solutions."""
-        print("PPT Master - Error Types and Solutions\n")
+        print("Presentation Builder - Error Types and Solutions\n")
         print("=" * 80)
 
         for error_type, info in cls.ERROR_SOLUTIONS.items():

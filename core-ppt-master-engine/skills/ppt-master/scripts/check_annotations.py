@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - SVG Annotation Checker
+Presentation Builder - SVG Annotation Checker
 
 Scans SVG files for edit annotations (data-edit-target / data-edit-annotation attributes)
 and prints a human-readable summary. Used by AI agents to discover pending annotations.

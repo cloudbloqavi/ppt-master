@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPT Master - PPTX Template Fill (thin wrapper).
+"""Presentation Builder - PPTX Template Fill (thin wrapper).
 
 Delegates to the template_fill_pptx package. Kept as the CLI entry point so the
 documented command paths keep working:

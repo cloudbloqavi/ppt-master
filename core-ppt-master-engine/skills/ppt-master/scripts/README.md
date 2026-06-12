@@ -1,4 +1,4 @@
-# PPT Master Toolset
+# Presentation Builder Toolset
 
 This directory contains user-facing scripts for conversion, project setup, direct PPTX template filling, SVG processing, export, recorded narration, and image generation.
 

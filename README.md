@@ -1,4 +1,4 @@
-# PPT Master — AI generates natively editable PPTX from any document
+# Presentation Builder — AI generates natively editable PPTX from any document
 
 [![Version](https://img.shields.io/badge/version-v2.8.0-blue.svg)](https://github.com/hugohe3/ppt-master/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -30,7 +30,7 @@
   <a href="mailto:heyug3@gmail.com"><strong>Contact</strong></a>
 </p>
 
-<h3 align="center">Download the new <a href="https://raw.githubusercontent.com/hugohe3/ppt-master/main/core-ppt-master-engine/examples/ppt169_attention_is_all_you_need/exports/attention_is_all_you_need_narrated.pptx">narrated <em>Attention Is All You Need</em> deck</a> — play it in PowerPoint and every slide reads itself out loud. That's just the tip of what PPT Master can do.</h3>
+<h3 align="center">Download the new <a href="https://raw.githubusercontent.com/hugohe3/ppt-master/main/core-ppt-master-engine/examples/ppt169_attention_is_all_you_need/exports/attention_is_all_you_need_narrated.pptx">narrated <em>Attention Is All You Need</em> deck</a> — play it in PowerPoint and every slide reads itself out loud. That's just the tip of what Presentation Builder can do.</h3>
 <h3 align="center">Of course, you can also download any of the six example decks below — opening the raw .pptx in PowerPoint is the fastest way to see this project's real capability ceiling.</h3>
 
 <table>
@@ -71,44 +71,44 @@
 </table>
 
 <p align="center">
-  <sub>Generated with Claude Opus 4.7 + <code>gpt-image-2</code>. <a href="https://hugohe3.github.io/ppt-master/">Flip through all examples online →</a> · <a href="core-ppt-master-engine/examples/"><code>core-ppt-master-engine/examples/</code> directory</a> · <a href="core-ppt-master-engine/docs/why-ppt-master.md">Why PPT Master?</a></sub>
+  <sub>Generated with Claude Opus 4.7 + <code>gpt-image-2</code>. <a href="https://hugohe3.github.io/ppt-master/">Flip through all examples online →</a> · <a href="core-ppt-master-engine/examples/"><code>core-ppt-master-engine/examples/</code> directory</a> · <a href="core-ppt-master-engine/docs/why-ppt-master.md">Why Presentation Builder?</a></sub>
 </p>
 
 ---
 
 Drop in a PDF, DOCX, URL, or Markdown — get back a **natively editable PowerPoint** with real shapes, real text boxes, and real charts. Not images. Click anything and edit it.
 
-> **⚠️ PPT Master is a harness, not a complete agent.** `harness + model = agent` — the tool owns the workflow; the model sets the ceiling. To form a genuinely high-quality agent, use **Claude with a large context window (~1M tokens) + AI image generation (`gpt-image-2`)**. Other models can run the pipeline but cannot reach the same quality ceiling. If results disappoint, upgrade the model — don't blame the harness.
+> **⚠️ Presentation Builder is a harness, not a complete agent.** `harness + model = agent` — the tool owns the workflow; the model sets the ceiling. To form a genuinely high-quality agent, use **Claude with a large context window (~1M tokens) + AI image generation (`gpt-image-2`)**. Other models can run the pipeline but cannot reach the same quality ceiling. If results disappoint, upgrade the model — don't blame the harness.
 
-> **Live Preview & Visual Edits** — during generation, a browser preview at `http://localhost:5050` opens automatically. Click any element, write what to change, hit **Submit annotations**, then return to the chat and say "apply my annotations" — the AI rewrites the SVG and re-exports the PPTX. Originally PPT Master was chat-only by design, but enough users asked for visual editing that we folded it in. Built on top of [@WodenJay](https://github.com/WodenJay)'s [PR #85](https://github.com/hugohe3/ppt-master/pull/85) — thank you. See [Live Preview Workflow →](core-ppt-master-engine/skills/ppt-master/workflows/live-preview.md).
+> **Live Preview & Visual Edits** — during generation, a browser preview at `http://localhost:5050` opens automatically. Click any element, write what to change, hit **Submit annotations**, then return to the chat and say "apply my annotations" — the AI rewrites the SVG and re-exports the PPTX. Originally Presentation Builder was chat-only by design, but enough users asked for visual editing that we folded it in. Built on top of [@WodenJay](https://github.com/WodenJay)'s [PR #85](https://github.com/hugohe3/ppt-master/pull/85) — thank you. See [Live Preview Workflow →](core-ppt-master-engine/skills/ppt-master/workflows/live-preview.md).
 
-> **Template Replication** — hand the AI any `.pptx` you like and say "replicate it as a template via `/create-template`" — you get a layout set PPT Master can invoke directly. Theme colors, fonts, master/layout structure, reusable images, even sprite-sheet crop relationships are extracted straight from OOXML, so covers, chapter dividers and decoration-heavy pages all reproduce reliably. You're no longer limited to the built-in templates: a company brand deck, a client's winning template, or any high-quality reference can become a private template in your own library. See [Templates Guide →](core-ppt-master-engine/docs/templates-guide.md).
+> **Template Replication** — hand the AI any `.pptx` you like and say "replicate it as a template via `/create-template`" — you get a layout set Presentation Builder can invoke directly. Theme colors, fonts, master/layout structure, reusable images, even sprite-sheet crop relationships are extracted straight from OOXML, so covers, chapter dividers and decoration-heavy pages all reproduce reliably. You're no longer limited to the built-in templates: a company brand deck, a client's winning template, or any high-quality reference can become a private template in your own library. See [Templates Guide →](core-ppt-master-engine/docs/templates-guide.md).
 
 > **Animations** — exported decks support **page transitions** and **per-element entrance animations** as real OOXML, not embedded video. By default, elements cascade in automatically on slide entry — no clicking needed. Plays natively in PowerPoint and Keynote, no extra tooling. See [Animations & Transitions →](core-ppt-master-engine/skills/ppt-master/references/animations.md).
 
 > **Narration & Video** — generate per-slide voice narration from the speaker notes (`edge-tts` by default, optional cloud TTS providers for high-quality narration), embed the audio back into the PPTX, and let PowerPoint export the deck as an MP4 video — synced narration + transitions, no third-party tools. See [Audio Narration & Video Export →](core-ppt-master-engine/docs/audio-narration.md).
 >
-> **Voice Cloning** — bring your own cloned voice from ElevenLabs / MiniMax / Qwen / CosyVoice and have the entire deck narrated in *your* voice (or a presenter's, with permission). Clone once in the provider's console, then pass the `voice_id` — PPT Master reads every slide's notes in that voice and embeds the result back into the PPTX. See [Use a cloned voice →](core-ppt-master-engine/docs/audio-narration.md#use-a-cloned-voice).
+> **Voice Cloning** — bring your own cloned voice from ElevenLabs / MiniMax / Qwen / CosyVoice and have the entire deck narrated in *your* voice (or a presenter's, with permission). Clone once in the provider's console, then pass the `voice_id` — Presentation Builder reads every slide's notes in that voice and embeds the result back into the PPTX. See [Use a cloned voice →](core-ppt-master-engine/docs/audio-narration.md#use-a-cloned-voice).
 
-> **How it works** — PPT Master is a workflow (a "skill") that works inside AI IDEs like Claude Code, Cursor, VS Code + Copilot, or Codebuddy. You chat with the AI — "make a deck from this PDF" — and it follows the workflow to produce a real editable `.pptx` on your computer. No coding on your side; the IDE is just where the conversation happens.
+> **How it works** — Presentation Builder is a workflow (a "skill") that works inside AI IDEs like Claude Code, Cursor, VS Code + Copilot, or Codebuddy. You chat with the AI — "make a deck from this PDF" — and it follows the workflow to produce a real editable `.pptx` on your computer. No coding on your side; the IDE is just where the conversation happens.
 >
 > **What you'll do**: install Python, install an AI IDE, drop in your material.
 
-PPT Master is different:
+Presentation Builder is different:
 
-- **Real PowerPoint** — if a file can't be opened and edited in PowerPoint, it shouldn't be called a PPT. Every element PPT Master outputs is directly clickable and editable
+- **Real PowerPoint** — if a file can't be opened and edited in PowerPoint, it shouldn't be called a PPT. Every element Presentation Builder outputs is directly clickable and editable
 - **Transparent, predictable cost** — the tool is free and open source; the only cost is your AI model usage. As AI tools move to usage-based billing, you pay exactly what you consume — no separate PPT subscription added on top
 - **Data stays local** — your files shouldn't have to be uploaded to someone else's server just to make a presentation. Apart from AI model communication, the entire pipeline runs on your machine
 - **No platform lock-in** — your workflow shouldn't be held hostage by any single company. Works with Claude Code, Cursor, VS Code Copilot, and more; supports Claude, GPT, Gemini, Kimi, and other models
 
-AI presentation tools roughly fall into four categories. PPT Master only does the last one:
+AI presentation tools roughly fall into four categories. Presentation Builder only does the last one:
 
 | Category | Output | Editable element-by-element in PowerPoint? |
 |---|---|:---:|
 | Template fill-in | PPTX built from a fixed template | Partially — limited by the template |
 | Image-based | One large image per slide, packed into PPTX | ❌ each slide is a picture |
 | HTML presentation | Web-based deck | ❌ not a PPTX |
-| **Native editable (PPT Master)** | **Real DrawingML shapes, text boxes, charts** | ✅ click any element to edit |
+| **Native editable (Presentation Builder)** | **Real DrawingML shapes, text boxes, charts** | ✅ click any element to edit |
 
 ---
 
@@ -174,7 +174,7 @@ sudo apt install pandoc
 
 ### 2. Pick an Agent
 
-PPT Master runs in **any tool with agent capability** — read/write files, execute commands, and sustain multi-turn conversation.
+Presentation Builder runs in **any tool with agent capability** — read/write files, execute commands, and sustain multi-turn conversation.
 
 | Type | Examples | Notes |
 |---|---|---|
@@ -263,7 +263,7 @@ mkdir -p ~/.ppt-master
 cp /path/to/installed/ai-builder-engine/.env.example ~/.ppt-master/.env
 ```
 
-PPT Master reads the current process environment first, then the first `.env` found in this order: current working directory, clone repo root, `~/.ppt-master/.env`.
+Presentation Builder reads the current process environment first, then the first `.env` found in this order: current working directory, clone repo root, `~/.ppt-master/.env`.
 
 **A) AI generation** — `image_gen.py`. Set `IMAGE_BACKEND` plus the provider's `*_API_KEY` (`OPENAI_API_KEY`, `GEMINI_API_KEY`, etc.), and the pipeline calls it automatically. Run `python3 core-ppt-master-engine/skills/ppt-master/scripts/image_gen.py --list-backends` for the full backend list. `gpt-image-2` is currently the best default.
 
@@ -278,7 +278,7 @@ PPT Master reads the current process environment first, then the first `.env` fo
 | | Document | Description |
 |---|----------|-------------|
 | 📘 | [Getting Started](core-ppt-master-engine/docs/getting-started.md) | First deck in 3 steps, plus how to use templates, live preview, animations, narration, voice cloning (**new users start here**) |
-| 🆚 | [Why PPT Master](core-ppt-master-engine/docs/why-ppt-master.md) | How it compares to Gamma, Copilot, and other AI tools |
+| 🆚 | [Why Presentation Builder](core-ppt-master-engine/docs/why-ppt-master.md) | How it compares to Gamma, Copilot, and other AI tools |
 | 🪟 | [Windows Installation](core-ppt-master-engine/docs/windows-installation.md) | Step-by-step setup guide for Windows users |
 | 📖 | [SKILL.md](core-ppt-master-engine/skills/ppt-master/SKILL.md) | Core workflow and rules |
 | 🎨 | [Templates Guide](core-ppt-master-engine/docs/templates-guide.md) | Use, derive (the focus), and template boundaries; covers `standard` vs `fidelity` modes |
@@ -306,7 +306,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to get involved.
 
 ## Contact & Collaboration
 
-Looking to collaborate, integrate PPT Master into your workflow, or just have questions?
+Looking to collaborate, integrate Presentation Builder into your workflow, or just have questions?
 
 - 💬 **Questions & sharing** — [GitHub Discussions](https://github.com/hugohe3/ppt-master/discussions)
 - 🐛 **Bug reports & feature requests** — [GitHub Issues](https://github.com/hugohe3/ppt-master/issues)
@@ -328,7 +328,7 @@ Looking to collaborate, integrate PPT Master into your workflow, or just have qu
 
 ## Sponsors & Support
 
-PPT Master is currently built and maintained primarily by me. Every new template, bug fix, and documentation update takes ongoing resources — currently shared by the sponsors and individual supporters below.
+Presentation Builder is currently built and maintained primarily by me. Every new template, bug fix, and documentation update takes ongoing resources — currently shared by the sponsors and individual supporters below.
 
 **Corporate sponsors**
 
@@ -340,7 +340,7 @@ PPT Master is currently built and maintained primarily by me. Every new template
 
 **Individual support**
 
-If PPT Master has been helpful to you, individual support of any amount helps keep the project moving and free.
+If Presentation Builder has been helpful to you, individual support of any amount helps keep the project moving and free.
 
 <a href="https://paypal.me/hugohe3"><img src="https://img.shields.io/badge/PayPal-Sponsor-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Sponsor via PayPal" /></a>
 

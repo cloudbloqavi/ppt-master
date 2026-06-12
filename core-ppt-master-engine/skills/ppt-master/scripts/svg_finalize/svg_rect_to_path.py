@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - SVG Rounded Rectangle to Path Tool
+Presentation Builder - SVG Rounded Rectangle to Path Tool
 
 Solves the issue of rounded corners being lost when using "Convert to Shape" in PowerPoint:
 Converts <rect> elements with rx/ry to equivalent <path> elements.
@@ -227,7 +227,7 @@ def find_svg_files(project_path: Path, source: str = 'output') -> tuple[list[Pat
 def main() -> None:
     """Run the CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='PPT Master - SVG Rounded Rectangle to Path Tool',
+        description='Presentation Builder - SVG Rounded Rectangle to Path Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
@@ -261,7 +261,7 @@ What it does:
     quiet = args.quiet
     
     if not quiet:
-        print("PPT Master - SVG Rounded Rectangle to Path Tool")
+        print("Presentation Builder - SVG Rounded Rectangle to Path Tool")
         print("=" * 50)
     
     total_converted = 0

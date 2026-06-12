@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - SVG Annotation Utilities
+Presentation Builder - SVG Annotation Utilities
 
 Read, write, and manage edit annotations in SVG files.
 Annotations are stored as custom XML attributes (data-edit-target, data-edit-annotation)

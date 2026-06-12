@@ -1,5 +1,5 @@
 """
-Auto-Resumption Watchdog Module for PPT Master Agent Runner
+Auto-Resumption Watchdog Module for Presentation Builder Agent Runner
 
 Handles scanning of OUTPUT_ARTIFACTS_DIR for incomplete projects and
 restoring/preparing them in the active workspace to resume generation.

@@ -1,5 +1,5 @@
 /* ============================================================
-   PPT Master - SVG Editor  |  app.js
+   Presentation Builder - SVG Editor  |  app.js
    Vanilla JS, IIFE pattern
    ============================================================ */
 (function () {
@@ -8,7 +8,7 @@
     // ---- i18n -------------------------------------------------------
     var MESSAGES = {
         en: {
-            page_title: "PPT Master - Live Preview",
+            page_title: "Presentation Builder - Live Preview",
             panel_slides: "Slides",
             panel_annotations: "Annotations",
             placeholder_select_slide: "Select a slide on the left to begin",

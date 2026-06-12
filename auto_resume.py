@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Auto Resumption Watchdog Wrapper
+Presentation Builder - Auto Resumption Watchdog Wrapper
 
 Thin delegation script that invokes the resumption watchdog modularized
 under the `agent_runner` package. This keeps the root interface backward compatible

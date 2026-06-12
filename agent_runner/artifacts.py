@@ -1,5 +1,5 @@
 """
-Artifacts & Manifest Replication Module for PPT Master Agent Runner
+Artifacts & Manifest Replication Module for Presentation Builder Agent Runner
 
 Handles final mirroring of files in projects/ to OUTPUT_ARTIFACTS_DIR, copies
 log files alongside outputs, and calculates Gemini token usage costs.

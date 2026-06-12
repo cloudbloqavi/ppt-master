@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Antigravity SDK Agent Runner Entry Wrapper
+Presentation Builder - Antigravity SDK Agent Runner Entry Wrapper
 
 Thin delegation script that invokes the core agent execution flow modularized
 under the `agent_runner` package. This keeps the root interface backward compatible

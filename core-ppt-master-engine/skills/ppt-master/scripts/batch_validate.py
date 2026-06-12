@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PPT Master - Batch Project Validation Tool
+Presentation Builder - Batch Project Validation Tool
 
 Checks the structural integrity and compliance of multiple projects at once.
 
@@ -218,7 +218,7 @@ class BatchValidator:
             output_file: Output file path
         """
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write("PPT Master Project Validation Report\n")
+            f.write("Presentation Builder Project Validation Report\n")
             f.write("=" * 80 + "\n\n")
 
             for result in self.results:
@@ -256,7 +256,7 @@ class BatchValidator:
 
 def print_usage() -> None:
     """Print CLI usage information."""
-    print("PPT Master - Batch Project Validation Tool\n")
+    print("Presentation Builder - Batch Project Validation Tool\n")
     print("Usage:")
     print("  python3 scripts/batch_validate.py <directory>")
     print("  python3 scripts/batch_validate.py <dir1> <dir2> ...")
