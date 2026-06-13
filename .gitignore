@@ -180,6 +180,10 @@ yarn.lock
 TODO.md
 PERSONAL_NOTES.md
 
+# Source reference decks (inputs, not deliverables)
+/Infographics_Library_v1.1.pptx
+/Strategic-Roadmap-Template-00.pptx
+
 # Projects directory - Work-in-progress projects (not version controlled)
 # Completed projects should be moved to examples/
 # Use cloud sync (iCloud/Dropbox) for backup and multi-device access
@@ -196,3 +200,9 @@ docs
 .github/
 
 _TEMP_ERROR_LOG.txt
+_PROMPT_TEST.md
+
+_verbatim_proof/
+_refined_charts_backup_20260613/
+.venv/
+.venv_wsl/
