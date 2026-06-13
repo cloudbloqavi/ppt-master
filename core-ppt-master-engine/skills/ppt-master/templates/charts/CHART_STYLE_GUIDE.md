@@ -1,7 +1,9 @@
 # Chart SVG Style Guide
 
-> This document defines the visual specifications for all SVG chart templates under `templates/charts/`.
-> When adding or modifying charts, the following standards **must** be adhered to to ensure visual consistency across the entire library.
+> This document defines the visual specifications for the **stock** SVG chart templates under `templates/charts/`.
+> When adding or modifying these charts, the following standards **must** be adhered to to ensure visual consistency across the stock library.
+>
+> **Exemption:** the company catalog in [`powerslides_infographics/`](./powerslides_infographics/) carries its own visual specifications and does **not** follow this guide — see [`powerslides_infographics/STYLE_GUIDE.md`](./powerslides_infographics/STYLE_GUIDE.md). When recreating a matched company infographic, preserve its source styling.
 
 ## 0. Upstream Specification Reference
 
@@ -640,9 +642,7 @@ Color: Default `#0F172A` (neutral dark gray), can be changed to a darker variant
 | §11.2 Nested Card Border | `labeled_card.svg` |
 | §11.3 2×2 Card Grid | `kpi_cards.svg`, `quadrant_text_bullets.svg`, `labeled_card.svg` |
 | §11.3 2×3 Card Grid | `icon_grid.svg` |
-| §11.3 1×3/1×4 Card Grid | `comparison_columns.svg`, `vertical_pillars.svg`, `annual_roles_targets_roadmap.svg`, `maturity_transformation_roadmap.svg`, `cross_functional_status_board.svg` |
-| §11.3 3×3 Staggered Grid | `marketing_milestones_matrix.svg` |
-| §11.3 1×5 Column Grid | `multi_year_growth_strategy.svg` |
+| §11.3 1×3/1×4 Card Grid | `comparison_columns.svg`, `vertical_pillars.svg` |
 | §11.5 Diagonal Dashed Connector | `matrix_2x2.svg` |
 | §11.6 Ground Anchor Ellipse | `team_roster.svg` |
 | §11.7 Bidirectional Interaction Arrows | `client_server_flow.svg` |
