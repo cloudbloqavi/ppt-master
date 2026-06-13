@@ -7,6 +7,7 @@ log files alongside outputs, and calculates Gemini token usage costs.
 import os
 import shutil
 import logging
+import time
 import json as _json
 from pathlib import Path
 from datetime import datetime, timezone
@@ -40,25 +41,43 @@ def _snapshot_output_pptx_files() -> set[str]:
 
 
 def _snapshot_project_files() -> dict[str, tuple[float, int]]:
-    """Snapshot all files under the projects directories with their mtimes and sizes."""
+    """Snapshot all files under the projects directories with their mtimes and sizes.
+    
+    Skips known-heavy directories that don't need diffing (e.g., .git,
+    __pycache__, node_modules) to reduce NTFS stat call overhead on Windows.
+    """
+    _SKIP_DIRS = frozenset({
+        ".git", "__pycache__", "node_modules", ".mypy_cache",
+        ".pytest_cache", ".tox", "venv", ".venv", "env",
+    })
+    
     project_root = Path(__file__).parent.parent.resolve()
     source_candidates = [
         project_root / "core-ppt-master-engine" / "projects",
         project_root / "projects"
     ]
     snapshot = {}
+    t_start = time.time()
+    file_count = 0
     for source in source_candidates:
         if source.exists():
             try:
                 for item in source.rglob("*"):
-                    if item.is_file():
-                        try:
-                            stat = item.stat()
-                            snapshot[str(item.resolve())] = (stat.st_mtime, stat.st_size)
-                        except Exception:
-                            pass
+                    # Skip heavy directories
+                    if item.is_dir():
+                        continue
+                    if any(part in _SKIP_DIRS for part in item.parts):
+                        continue
+                    try:
+                        stat = item.stat()
+                        snapshot[str(item.resolve())] = (stat.st_mtime, stat.st_size)
+                        file_count += 1
+                    except Exception:
+                        pass
             except Exception as exc:
                 logger.warning("Failed to snapshot directory %s: %s", source, exc)
+    t_dur = time.time() - t_start
+    logger.info("Project snapshot: %d files indexed in %.2fs.", file_count, t_dur)
     return snapshot
 
 
@@ -114,49 +133,62 @@ def copy_output_artifacts(
     # no project files exist (e.g. agent failed before generating anything).
     destination.mkdir(parents=True, exist_ok=True)
 
-    # Identify which project folders were modified/created during this run.
+    # Identify active projects AND collect files to copy in a SINGLE PASS.
+    # This replaces the previous approach of two separate rglob iterations,
+    # reducing filesystem stat overhead significantly on Windows/NTFS.
+    t_scan_start = time.time()
     active_projects: set[str] = set()
+    files_to_copy: list[tuple[Path, Path, str]] = []  # (src_file, rel_path, project_name)
+    
     if resumed_project:
         active_projects.add(resumed_project)
 
     for source in source_candidates:
-        if source.exists():
-            for item in source.rglob("*"):
-                if item.is_file():
-                    rel = item.relative_to(source)
-                    # Skip root-level files directly under the projects directory (like README.md)
-                    if len(rel.parts) <= 1:
-                        continue
+        if not source.exists():
+            continue
+        for item in source.rglob("*"):
+            if not item.is_file():
+                continue
+            rel = item.relative_to(source)
+            # Skip root-level files directly under the projects directory (like README.md)
+            if len(rel.parts) <= 1:
+                continue
 
-                    project_name = rel.parts[0]
-                    resolved_path = str(item.resolve())
-                    is_modified = False
+            project_name = rel.parts[0]
+            resolved_path = str(item.resolve())
+            is_modified = False
 
-                    if projects_snapshot is not None:
-                        if resolved_path in projects_snapshot:
-                            old_mtime, old_size = projects_snapshot[resolved_path]
-                            try:
-                                stat = item.stat()
-                                if stat.st_mtime > old_mtime or stat.st_size != old_size:
-                                    is_modified = True
-                            except Exception:
-                                pass
-                        else:
-                            # New file
+            if projects_snapshot is not None:
+                if resolved_path in projects_snapshot:
+                    old_mtime, old_size = projects_snapshot[resolved_path]
+                    try:
+                        stat = item.stat()
+                        if stat.st_mtime > old_mtime or stat.st_size != old_size:
                             is_modified = True
-                    elif start_time is not None:
-                        try:
-                            stat = item.stat()
-                            if stat.st_mtime >= start_time - 2:  # 2 second window
-                                is_modified = True
-                        except Exception:
-                            pass
-                    else:
-                        # Fallback: copy everything if we have no state references
+                    except Exception:
+                        pass
+                else:
+                    # New file
+                    is_modified = True
+            elif start_time is not None:
+                try:
+                    stat = item.stat()
+                    if stat.st_mtime >= start_time - 2:  # 2 second window
                         is_modified = True
+                except Exception:
+                    pass
+            else:
+                # Fallback: copy everything if we have no state references
+                is_modified = True
 
-                    if is_modified:
-                        active_projects.add(project_name)
+            if is_modified:
+                active_projects.add(project_name)
+            
+            # Collect for potential copy (we filter by active_projects later)
+            files_to_copy.append((item, rel, project_name))
+
+    t_scan_dur = time.time() - t_scan_start
+    logger.info("  File scan completed in %.2fs (%d files examined).", t_scan_dur, len(files_to_copy))
 
     if active_projects:
         logger.info("  Active project(s) identified for copying: %s", ", ".join(active_projects))
@@ -168,34 +200,26 @@ def copy_output_artifacts(
     found_files = False
     copied_projects: set[str] = set()
 
-    for source in source_candidates:
-        if source.exists() and any(source.iterdir()):
-            for item in source.rglob("*"):
-                if item.is_file():
-                    rel = item.relative_to(source)
-                    # Skip root-level files directly under the projects directory (like README.md)
-                    if len(rel.parts) <= 1:
-                        continue
-
-                    project_name = rel.parts[0]
-                    # Only copy files for active projects
-                    if project_name not in active_projects:
-                        continue
-
-                    found_files = True
-                    dest_file = destination / rel
-                    try:
-                        dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(item, dest_file)
-                        copied += 1
-                        copied_projects.add(project_name)
-                    except Exception as exc:
-                        msg = f"{rel}: {exc}"
-                        copy_errors.append(msg)
-                        logger.error("  Copy error — %s", msg)
+    # Copy only files belonging to active projects (single pass, no second rglob)
+    t_copy_start = time.time()
+    for item, rel, project_name in files_to_copy:
+        if project_name not in active_projects:
+            continue
+        found_files = True
+        dest_file = destination / rel
+        try:
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, dest_file)
+            copied += 1
+            copied_projects.add(project_name)
+        except Exception as exc:
+            msg = f"{rel}: {exc}"
+            copy_errors.append(msg)
+            logger.error("  Copy error — %s", msg)
+    t_copy_dur = time.time() - t_copy_start
 
     if found_files:
-        logger.info("  Files copied: %d", copied)
+        logger.info("  Files copied: %d in %.2fs", copied, t_copy_dur)
         if copy_errors:
             logger.warning("  Copy errors:  %d file(s) failed", len(copy_errors))
     else:

@@ -90,7 +90,7 @@ Drop in a PDF, DOCX, URL, or Markdown — get back a **natively editable PowerPo
 >
 > **Voice Cloning** — bring your own cloned voice from ElevenLabs / MiniMax / Qwen / CosyVoice and have the entire deck narrated in *your* voice (or a presenter's, with permission). Clone once in the provider's console, then pass the `voice_id` — Presentation Builder reads every slide's notes in that voice and embeds the result back into the PPTX. See [Use a cloned voice →](core-ppt-master-engine/docs/audio-narration.md#use-a-cloned-voice).
 
-> **How it works** — Presentation Builder is a workflow (a "skill") that works inside AI IDEs like Claude Code, Cursor, VS Code + Copilot, or Codebuddy. You chat with the AI — "make a deck from this PDF" — and it follows the workflow to produce a real editable `.pptx` on your computer. No coding on your side; the IDE is just where the conversation happens.
+> **How it works** — Presentation Builder is a workflow (a "skill") that works inside AI IDEs and SDKs like Antigravity SDK, Claude Code, Cursor, VS Code + Copilot, or Codebuddy. You chat with the AI — "make a deck from this PDF" — and it follows the workflow to produce a real editable `.pptx` on your computer. No coding on your side; the IDE/SDK is just where the conversation happens.
 >
 > **What you'll do**: install Python, install an AI IDE, drop in your material.
 
@@ -99,7 +99,7 @@ Presentation Builder is different:
 - **Real PowerPoint** — if a file can't be opened and edited in PowerPoint, it shouldn't be called a PPT. Every element Presentation Builder outputs is directly clickable and editable
 - **Transparent, predictable cost** — the tool is free and open source; the only cost is your AI model usage. As AI tools move to usage-based billing, you pay exactly what you consume — no separate PPT subscription added on top
 - **Data stays local** — your files shouldn't have to be uploaded to someone else's server just to make a presentation. Apart from AI model communication, the entire pipeline runs on your machine
-- **No platform lock-in** — your workflow shouldn't be held hostage by any single company. Works with Claude Code, Cursor, VS Code Copilot, and more; supports Claude, GPT, Gemini, Kimi, and other models
+- **No platform lock-in** — your workflow shouldn't be held hostage by any single company. Works with Antigravity SDK, Claude Code, Cursor, VS Code Copilot, and more; supports Claude, GPT, Gemini, Kimi, and other models
 
 AI presentation tools roughly fall into four categories. Presentation Builder only does the last one:
 
@@ -180,7 +180,7 @@ Presentation Builder runs in **any tool with agent capability** — read/write f
 |---|---|---|
 | **IDE-native agent** | • VS Code architecture ([VS Code](https://code.visualstudio.com/) itself, plus forks & derivatives): [Cursor](https://cursor.sh/), Trae, Codebuddy IDE, [Windsurf](https://codeium.com/windsurf), Void, etc.<br>• Other architectures: [Zed](https://zed.dev/), etc. | Editor with a built-in agent |
 | **IDE plugin / extension** | [GitHub Copilot](https://github.com/features/copilot), [Claude Code](https://claude.ai/code) (VS Code / JetBrains extension), [Cline](https://cline.bot/), [Continue](https://continue.dev/), Roo Code, etc. | Installed inside hosts like VS Code or JetBrains |
-| **CLI agent** | [Claude Code](https://claude.ai/code) CLI, [Codex CLI](https://github.com/openai/codex), [Aider](https://aider.chat/), Gemini CLI, etc. | Runs in the terminal; suits scripting, remote, or server use |
+| **CLI agent / SDK** | [Antigravity SDK](https://github.com/google-deepmind), [Claude Code](https://claude.ai/code) CLI, [Codex CLI](https://github.com/openai/codex), [Aider](https://aider.chat/), Gemini CLI, etc. | Runs in the terminal or executes programmatically; suits scripting, remote, or server use |
 
 > **Model recommendation**: prefer **Claude Opus / Sonnet** with a large context window and `gpt-image-2` for images — see the note above for why.
 
@@ -208,7 +208,7 @@ To update later (Option A / B): `python3 core-ppt-master-engine/skills/ppt-maste
 > **Option C — Skill marketplace**: the repo ships `.claude-plugin/marketplace.json`, so it can be installed through the [Claude Code plugin marketplace](https://code.claude.com/core-ppt-master-engine/docs/en/plugin-marketplaces) ecosystem:
 >
 > ```bash
-> # Cross-agent CLI (Claude Code, Cursor, Codex, etc.)
+> # Cross-agent CLI / SDK (Antigravity SDK, Claude Code, Cursor, Codex, etc.)
 > npx skills add hugohe3/ppt-master
 >
 > # Or inside Claude Code

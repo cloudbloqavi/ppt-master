@@ -36,15 +36,18 @@ Confirm scope autonomously using the defaults below. Skip when the user's initia
 
 ## Step 2: Gather via web search
 
-**Tools** — use the web search and web fetch tools the current IDE provides:
+**Tools** — Use the web search and web fetch tools provided by the active agentic SDK or IDE environment:
 
-| IDE | Web search | Web fetch |
+| Environment / IDE | Web Search Tool | Web Fetch Tool / Method |
 |---|---|---|
+| Antigravity SDK / Agentic SDK (Google Search supported) | `search_web` | `read_url_content` |
 | Claude Code | `WebSearch` | `WebFetch` |
-| Cursor / Codebuddy / VS Code + Copilot | provider-equivalent built-in | provider-equivalent built-in |
-| None available | — | fallback below |
+| Cursor / Codebuddy / VS Code | Built-in search capabilities | Built-in link/fetch capabilities |
+| Standard Terminal / Fallback | — | `python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` |
 
-**Fallback when no IDE web tools** — derive 2–4 authoritative Wikipedia URLs from the topic name, then fetch each:
+**Usage Guidance**:
+- Prioritize built-in SDK/IDE search and fetch tools (such as `search_web`/`read_url_content` or `WebSearch`/`WebFetch`) to perform efficient information retrieval.
+- Fall back to the local `web_to_md.py` command for URL fetching if built-in tools are missing, restricted, or return incomplete/empty content (e.g. JavaScript-rendered single-page applications):
 
 ```bash
 python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>
@@ -52,11 +55,11 @@ python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>
 
 **Search strategy**:
 
-| Phase | Action |
-|---|---|
-| Landscape | One broad search; identify authoritative sources |
-| Deep fetch | Pull 2–4 highest-signal pages in full |
-| Targeted fill | Search for subtopics the deep fetch flagged |
+| Phase | Tool Type | Action |
+|---|---|---|
+| Landscape | Web Search | Run a broad search on the topic; identify 2–4 authoritative source URLs from the results |
+| Deep fetch | Web Fetch | Fetch each identified URL in full; extract concrete facts, names, dates, metrics |
+| Targeted fill | Web Search | Run 1–3 focused follow-up queries for subtopics or gaps the deep fetch surfaced |
 
 **Source priority**:
 
