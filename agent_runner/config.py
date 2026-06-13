@@ -159,7 +159,9 @@ def _validate_env():
         )
         sys.exit(1)
 
-    # Normalise GEMINI_API_KEY
+    # Normalise GEMINI_API_KEY (guaranteed non-None here: a falsy api_key
+    # would have been appended to `errors` above, triggering sys.exit).
+    assert api_key
     os.environ["GEMINI_API_KEY"] = api_key
 
 

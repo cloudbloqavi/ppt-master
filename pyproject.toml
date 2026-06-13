@@ -1,5 +1,8 @@
 [tool.pyright]
-include = ["core-ppt-master-engine/skills/ppt-master/scripts"]
+include = [
+    "core-ppt-master-engine/skills/ppt-master/scripts",
+    "agent_runner",
+]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -16,3 +19,14 @@ extraPaths = [
 ]
 pythonVersion = "3.10"
 useLibraryCodeForTypes = true
+
+# The Google Antigravity SDK ships partial/loose stubs whose ToolCall /
+# ToolResult / StreamChunk union types trigger many false-positive
+# attribute-access errors. Silence that noise so real bugs (possibly-unbound
+# variables, undefined names) stay visible. cairosvg/pubsub_v1 are optional
+# runtime deps not installed in every dev env.
+reportAttributeAccessIssue = "none"
+reportMissingImports = "warning"
+# Keep the checks that actually catch UnboundLocalError-class bugs loud:
+reportPossiblyUnboundVariable = "error"
+reportUnboundVariable = "error"

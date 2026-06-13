@@ -12,6 +12,44 @@ from agent_runner.config import ARGS, logger
 
 # Global track of the active log file path.
 _LOG_FILE_PATH: Path | None = None
+# Per-run subfolder (under OUTPUT_ARTIFACTS_DIR) that holds the log files while a
+# run is in progress. Computed once, shared by the execution log and the status
+# progress log so both land in the same place.
+_RUN_LOG_DIR: Path | None = None
+
+
+def get_run_log_dir() -> Path | None:
+    """Return (creating once) the per-run subfolder that log files are written to.
+
+    Log files must never be written to the OUTPUT_ARTIFACTS_DIR *root*: that root
+    holds one output subfolder per run, and loose ``run_agent_*.log`` /
+    ``status_progress_*.log`` files there accumulate across runs — especially when
+    a run fails or is killed before the end-of-run cleanup can fire. Writing them
+    into a dedicated ``_run_logs_<timestamp>/`` folder from the very first line
+    keeps the root clean and lets ``copy_output_artifacts`` relocate them into the
+    final project folder once its name is known.
+
+    The result is cached, so the execution log and status progress log (configured
+    in separate calls) share one folder. Falls back to the root only if the
+    subfolder cannot be created.
+    """
+    global _RUN_LOG_DIR
+    if _RUN_LOG_DIR is not None:
+        return _RUN_LOG_DIR
+
+    output_dir = os.environ.get("OUTPUT_ARTIFACTS_DIR") or "."
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = Path(output_dir) / f"_run_logs_{timestamp}"
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        _RUN_LOG_DIR = run_dir
+    except Exception as e:
+        logger.warning(
+            "Failed to create per-run log folder %s (falling back to root): %s",
+            run_dir, e,
+        )
+        _RUN_LOG_DIR = Path(output_dir)
+    return _RUN_LOG_DIR
 
 
 def setup_file_logging():
@@ -20,15 +58,10 @@ def setup_file_logging():
     if not ARGS.log_file:
         return
 
-    output_dir = os.environ.get("OUTPUT_ARTIFACTS_DIR")
-    if not output_dir:
-        # Fallback for self-test or local runs without environment variables set
-        output_dir = "."
-
     try:
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        
+        # Logs go into a per-run subfolder, never the shared artifacts root.
+        output_path = get_run_log_dir()
+
         # Format: run_agent_YYYYMMDD_HHMMSS.log
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_filepath = output_path / f"run_agent_{timestamp}.log"

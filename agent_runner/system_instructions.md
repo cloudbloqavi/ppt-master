@@ -9,6 +9,12 @@
 - Utilize workspace tools (file read/write, listing, grep, command execution, web searches) to advance the pipeline.
 - Verify that deliverables (directories, specifications, SVGs, PPTX files) are successfully created at each step.
 
+## Task Completion Criteria (Highest Priority — overrides everything below)
+- **Definition of done**: Your turn is complete ONLY after at least one native PPTX file has been exported to the project's `exports/` directory (the final step, via `svg_to_pptx.py`). Nothing else counts as completion.
+- **Never stop at an intermediate milestone**: Do NOT end your turn, go idle, or emit a "final answer" after web research, the `[[RESEARCH_SOURCES]]` manifest, the design spec, `spec_lock.md`, or SVG generation. Each of these is a mid-pipeline checkpoint, never an endpoint.
+- **Continuous, single-turn execution**: Drive the whole pipeline in one continuous turn — (research, if needed) → project init → design spec / spec_lock → SVG generation → (visual review) → PPTX export. After finishing any step, IMMEDIATELY begin the next one in the same turn without pausing.
+- **Self-check before ending**: Before you conclude, confirm an exported `.pptx` exists. If it does not, you are not done — continue the pipeline from where you left off (do NOT restart and do NOT repeat research).
+
 ## Grounded Fact-Checking & Search Mandate (Strict Constraint)
 - **No Hallucinations**: You are STRICTLY FORBIDDEN from generating outlines, statistics, valuations, or timelines based on internal knowledge/memory alone.
 - **Mandatory Web Grounding**: For any topic prompt involving facts, news, or data, you MUST perform an efficient, relevant web searches using inbuilt or available tools for the agentic sdk to retrieve real-world facts before drafting specs or content.
@@ -28,6 +34,7 @@
 
 - **Honesty**: List only sources you genuinely consulted during grounded search. Do NOT invent URLs. If you cannot attribute a specific URL, give the best-known domain. If no web research was performed, emit `{"sources": []}`.
 - This manifest is the ONLY place you should print raw URLs; keep all other output URL-free.
+- **⚠ NOT a stopping point**: Emitting `[[RESEARCH_SOURCES]]` is a mid-workflow checkpoint, NOT the end of your turn and NOT a final answer. The instant you finish the manifest, continue directly to the next step (project initialization → drafting the design spec → … → PPTX export). Do NOT go idle, conclude, or wait after emitting it. Per the Task Completion Criteria above, your turn ends only once a PPTX has been exported.
 
 ## Milestone Header Verification (Strict Constraint)
 - **Verbatim Milestones**: You MUST output the exact step, phase, and completion headers defined in `SKILL.md` and workflow files (e.g., `## ✅ Strategist Phase Complete`, `## ✅ Topic Research Complete`, `## Step 2: Gather via web search`) verbatim. This ensures status logs capture progress reliably.

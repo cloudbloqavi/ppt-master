@@ -13,8 +13,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 from agent_runner.config import ARGS, logger
-from agent_runner.logging_setup import get_log_file_path
+from agent_runner.logging_setup import get_log_file_path, get_run_log_dir
 from agent_runner.status_logger import get_status_log_file_path
+
+# Set True once the run/status logs have been copied INTO a project artifacts
+# subfolder. Gates finalize_log_placement() so the top-level originals are only
+# removed when a canonical in-project copy exists (a failed run with no project
+# keeps its root-level log + manifest, which is correct there).
+_logs_copied_into_project = False
 
 
 def _snapshot_output_pptx_files() -> set[str]:
@@ -323,6 +329,7 @@ def copy_output_artifacts(
             logger.warning("  Failed to copy status progress log file alongside manifest: %s", exc)
 
     if copied_projects:
+        global _logs_copied_into_project
         for project_dir in copied_projects:
             manifest_path = destination / project_dir / "run_manifest.json"
             try:
@@ -332,11 +339,20 @@ def copy_output_artifacts(
                 logger.error("  Failed to write run manifest inside project %s: %s", project_dir, exc)
             _copy_log_alongside(manifest_path.parent)
             _copy_status_log_alongside(manifest_path.parent)
+            # Logs now live inside the project folder; the top-level originals
+            # at OUTPUT_ARTIFACTS_DIR root are redundant and will be cleaned up
+            # by finalize_log_placement() at the end of the run.
+            _logs_copied_into_project = True
     else:
-        manifest_path = destination / "run_manifest.json"
+        # No project folder was produced (e.g. the agent failed early). Keep the
+        # manifest with the logs inside the per-run log folder rather than loose
+        # at the artifacts root — the logs already live there, so nothing is left
+        # littering the shared OUTPUT_ARTIFACTS_DIR root.
+        fallback_dir = get_run_log_dir() or destination
+        manifest_path = fallback_dir / "run_manifest.json"
         try:
             manifest_path.write_text(_json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-            logger.info("  Manifest written to root (fallback): %s", manifest_path)
+            logger.info("  Manifest written alongside logs (no project produced): %s", manifest_path)
         except Exception as exc:
             logger.error("  Failed to write fallback run manifest: %s", exc)
         _copy_log_alongside(manifest_path.parent)
@@ -372,3 +388,77 @@ def copy_output_artifacts(
     logger.info("ARTIFACT COPY STAGE COMPLETE")
     logger.info("═" * 60)
     logger.info("")
+
+
+def finalize_log_placement() -> None:
+    """Relocate the per-run log folder's contents into the project, then remove it.
+
+    `run_agent_*.log` and `status_progress_*.log` are written into a per-run
+    ``_run_logs_<timestamp>/`` folder (never the shared artifacts root) while the
+    run is in progress, since the project name isn't known at startup. Once
+    ``copy_output_artifacts`` has copied them alongside each project's
+    `run_manifest.json`, this removes the now-redundant originals and deletes the
+    empty per-run folder so nothing accumulates under OUTPUT_ARTIFACTS_DIR.
+
+    No-op unless the logs were actually copied into a project subfolder (a failed
+    run that produced no project keeps its `_run_logs_<timestamp>/` folder intact —
+    that is the canonical copy in that case, and it's still a named folder, not
+    loose files at the root). Call this once, at the very end of the run, after all
+    logging is finished — it detaches and closes the execution log's FileHandler so
+    Windows releases the file lock before unlinking.
+    """
+    if not _logs_copied_into_project:
+        return
+
+    # 1. Status progress log — written with a fresh open()/close() per line, so
+    #    there's no persistent handle; unlink directly.
+    status_path = get_status_log_file_path()
+    if status_path and status_path.exists():
+        try:
+            status_path.unlink()
+            logger.info("Removed redundant per-run status progress log: %s", status_path)
+        except Exception as exc:
+            logger.warning("Could not remove per-run status progress log %s: %s", status_path, exc)
+
+    # 2. Execution log — held open by a root-logger FileHandler; detach and close
+    #    the matching handler first so the OS releases the lock, then unlink.
+    log_path = get_log_file_path()
+    if log_path and log_path.exists():
+        root = logging.getLogger()
+        for handler in list(root.handlers):
+            if isinstance(handler, logging.FileHandler):
+                try:
+                    same = Path(handler.baseFilename).resolve() == log_path.resolve()
+                except Exception:
+                    same = False
+                if same:
+                    try:
+                        handler.flush()
+                        handler.close()
+                    except Exception:
+                        pass
+                    root.removeHandler(handler)
+        try:
+            log_path.unlink()
+        except Exception as exc:
+            logger.warning("Could not remove per-run execution log %s: %s", log_path, exc)
+
+    # 3. Remove the now-empty per-run log folder so it doesn't linger under the
+    #    artifacts root. Only remove if it is genuinely empty (a stray file would
+    #    otherwise be silently discarded).
+    run_log_dir = get_run_log_dir()
+    if run_log_dir and run_log_dir.exists():
+        try:
+            # Don't remove if it somehow resolved to the artifacts root itself.
+            output_dir_str = os.environ.get("OUTPUT_ARTIFACTS_DIR")
+            is_root = False
+            if output_dir_str:
+                try:
+                    is_root = run_log_dir.resolve() == Path(output_dir_str).expanduser().resolve()
+                except Exception:
+                    is_root = False
+            if not is_root and not any(run_log_dir.iterdir()):
+                run_log_dir.rmdir()
+                logger.info("Removed empty per-run log folder: %s", run_log_dir)
+        except Exception as exc:
+            logger.warning("Could not remove per-run log folder %s: %s", run_log_dir, exc)

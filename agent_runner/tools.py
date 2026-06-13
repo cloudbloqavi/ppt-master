@@ -184,8 +184,31 @@ def run_self_test() -> bool:
         print("FAIL: run_command failed or did not return expected stdout")
         return False
 
+    # 6. Chart catalog lint (reported; does not gate the tools self-test yet).
+    print("\n6. Linting company chart catalog (powerslides_infographics)...")
+    try:
+        import sys as _sys
+        skill_scripts = (
+            Path(__file__).resolve().parent.parent
+            / "core-ppt-master-engine" / "skills" / "ppt-master" / "scripts"
+        )
+        if str(skill_scripts) not in _sys.path:
+            _sys.path.insert(0, str(skill_scripts))
+        from lint_chart_catalog import lint_catalog
+        errs, warns = lint_catalog()
+        offenders = sorted({e.split(":")[0] for e in errs})
+        if errs:
+            print(f"   ⚠ Catalog lint: {len(errs)} error(s) across {len(offenders)} template(s) "
+                  f"(raw PowerPoint exports — must be re-authored as clean vectors):")
+            for o in offenders:
+                print(f"      - {o}")
+        else:
+            print(f"   ✓ Catalog lint passed ({len(warns)} warning(s)).")
+    except Exception as e:
+        print(f"   (catalog lint skipped: {e})")
+
     # Clean up
-    print("\n6. Cleaning up test file...")
+    print("\n7. Cleaning up test file...")
     if os.path.exists(test_file):
         os.remove(test_file)
     print("Cleanup completed.")

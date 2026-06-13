@@ -17,6 +17,9 @@ from agent_runner.config import ARGS, logger
 _STATUS_LOG_FILE_PATH: Path | None = None
 _STATUS_LOGGER: Any = None
 _last_status: str | None = None
+# Stable per-run id stamped onto every streamed event so the production consumer
+# (Pub/Sub → Firestore → frontend) can scope events to the right presentation job.
+_RUN_ID: str | None = None
 
 # Active tool call tracking to match ToolCall to ToolResult
 _active_tool_calls: dict[str, dict[str, Any]] = {}
@@ -31,12 +34,22 @@ _thought_accum: str = ""                    # accumulated thought text (deltas)
 _text_accum: str = ""                       # accumulated agent text (deltas)
 _seen_research_headers: set[str] = set()     # dedup of reasoning section headers
 _research_headers_emitted: int = 0           # count surfaced (capped)
-_sources_emitted: bool = False              # have we surfaced research citations yet?
+_emitted_source_keys: set[str] = set()       # domains already streamed as citation events (idempotent)
 _MAX_RESEARCH_HEADERS = 8
 
 # Marker the agent prints before its machine-readable citation manifest (see
 # system_instructions.md "Research Source Citations").
 _RESEARCH_SOURCES_MARKER = "[[RESEARCH_SOURCES]]"
+
+# Domains that are never real research citations (schema/spec/loopback noise).
+_NON_CITATION_DOMAINS = frozenset({
+    "w3.org", "www.w3.org", "localhost", "127.0.0.1", "schema.org",
+    "example.com", "example.org",
+})
+
+# Full-URL matcher used to harvest citations that appear only in the model's
+# reasoning (native Google Search grounding surfaces some domains nowhere else).
+_URL_RE = re.compile(r'https?://[^\s\'"<>)\]]+')
 
 # Technical/internal query patterns that should NOT appear in user-facing status
 # progress logs. These are SVG/XML/CSS terms the model searches for during
@@ -143,7 +156,6 @@ def _is_internal_query(query: str) -> bool:
         return True
 
     # Use word boundary matching for internal query patterns
-    import re
     words = re.findall(r'\b\w+\b', q_lower)
     if any(word in _INTERNAL_QUERY_PATTERNS for word in words):
         return True
@@ -204,11 +216,21 @@ class StatusProgressLogger:
             except Exception as e:
                 logger.warning("Failed to initialize Pub/Sub publisher client: %s", e)
 
-    def log_status(self, status_message: str):
+    def log_status(self, status_message: str, event_type: str = "progress",
+                   payload: dict | None = None):
         """Logs a status update.
 
         If a file path is configured, writes to the local log file.
         In production, publishes the status to the configured GCP Pub/Sub topic.
+
+        Args:
+            status_message: Human-readable status line (file feed + frontend display).
+            event_type: Discriminator for the consumer — "progress" or "citation".
+                Citation events are additive deltas (one per source, deduped by
+                domain upstream), so a domain-keyed Firestore upsert is idempotent
+                under Pub/Sub at-least-once redelivery and out-of-order arrival.
+            payload: Optional structured fields (e.g. {name, url, domain}) published
+                under "data" so the frontend need not parse the human string.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         formatted_message = f"[{timestamp}] {status_message}\n"
@@ -224,10 +246,16 @@ class StatusProgressLogger:
         # 2. Production GCP Pub/Sub publishing
         if self.pubsub_client and self.pubsub_topic:
             try:
-                data = json.dumps({
+                event = {
                     "timestamp": timestamp,
-                    "status": status_message
-                }).encode("utf-8")
+                    "status": status_message,
+                    "event_type": event_type,
+                }
+                if _RUN_ID:
+                    event["run_id"] = _RUN_ID
+                if payload:
+                    event["data"] = payload
+                data = json.dumps(event).encode("utf-8")
                 self.pubsub_client.publish(self.pubsub_topic, data)
             except Exception as e:
                 logger.warning("Failed to publish status progress to Pub/Sub: %s", e)
@@ -235,7 +263,16 @@ class StatusProgressLogger:
 
 def setup_status_logging():
     """Configure status progress logging based on CLI args and environment."""
-    global _STATUS_LOG_FILE_PATH, _STATUS_LOGGER
+    global _STATUS_LOG_FILE_PATH, _STATUS_LOGGER, _RUN_ID
+
+    # Stable per-run id for streamed events: prefer an explicit env id, then the
+    # Cloud Run execution name, else a timestamp. Lets the frontend group all
+    # events (incl. citations) under the correct presentation job.
+    _RUN_ID = (
+        os.environ.get("RUN_ID")
+        or os.environ.get("CLOUD_RUN_EXECUTION")
+        or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    )
 
     # Status progress updates run automatically in production (Cloud Run),
     # or locally when the CLI flag is passed or Pub/Sub is configured.
@@ -248,10 +285,11 @@ def setup_status_logging():
 
     file_path = None
     if opt_in:
-        output_dir = os.environ.get("OUTPUT_ARTIFACTS_DIR") or "."
         try:
-            output_path = Path(output_dir)
-            output_path.mkdir(parents=True, exist_ok=True)
+            # Share the same per-run subfolder as the execution log so neither
+            # file is ever written to the shared OUTPUT_ARTIFACTS_DIR root.
+            from agent_runner.logging_setup import get_run_log_dir
+            output_path = get_run_log_dir()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = output_path / f"status_progress_{timestamp}.log"
             _STATUS_LOG_FILE_PATH = file_path
@@ -262,14 +300,19 @@ def setup_status_logging():
     _STATUS_LOGGER = StatusProgressLogger(file_path=file_path)
 
 
-def log_status(message: str):
-    """Log a unique status message to the status progress channels."""
+def log_status(message: str, event_type: str = "progress", payload: dict | None = None):
+    """Log a status message to the status progress channels.
+
+    Consecutive-duplicate suppression applies ONLY to ordinary progress lines.
+    Citation events are already deduped by domain upstream and must never be
+    dropped here, so they bypass the guard.
+    """
     global _last_status
-    if message == _last_status:
+    if event_type == "progress" and message == _last_status:
         return
     _last_status = message
     if _STATUS_LOGGER:
-        _STATUS_LOGGER.log_status(message)
+        _STATUS_LOGGER.log_status(message, event_type=event_type, payload=payload)
     # Always print to stdout/stderr so logs reflect the progress
     logger.info("[Status Progress] %s", message)
 
@@ -425,7 +468,7 @@ def set_research_topic(prompt: str):
 def reset_run_state():
     """Reset per-run status state so a fresh attempt logs cleanly."""
     global _last_status, _research_started, _thought_accum, _text_accum
-    global _seen_research_headers, _research_headers_emitted, _sources_emitted
+    global _seen_research_headers, _research_headers_emitted, _emitted_source_keys
     _active_tool_calls.clear()
     _last_status = None
     _research_started = False
@@ -433,7 +476,7 @@ def reset_run_state():
     _text_accum = ""
     _seen_research_headers = set()
     _research_headers_emitted = 0
-    _sources_emitted = False
+    _emitted_source_keys = set()
 
 
 def _check_thought_for_status(text: str):
@@ -478,20 +521,28 @@ def _check_thought_for_status(text: str):
     # 3) Surface the research citation manifest if the model emitted it in thoughts.
     _scan_research_sources(_thought_accum)
 
+    # 4) Harvest bare URLs that surface only in reasoning (grounding leaves no
+    #    manifest/`## Sources` trace for some domains). Idempotent by domain;
+    #    scans the full buffer so URLs split across thought deltas aren't missed.
+    _harvest_urls_from_text(_thought_accum)
+
 
 def _emit_research_sources(sources: Any):
-    """Emit one clean, user-facing status line naming the research sources/domains.
+    """Stream each newly-seen research source as its own additive citation event.
 
-    Accepts a list of dicts ({name,url}) or URL strings. De-duplicates by domain,
-    caps the count, and fires at most once per run.
+    Accepts a list of dicts ({name,url}) or URL strings. Idempotent by domain:
+    every source fires at most once per run no matter how many times this is
+    called (manifest, research .md, and thought-harvest all feed here). This is
+    the streaming-safe shape — independent per-source deltas, never a growing
+    cumulative line — so on Pub/Sub a domain-keyed Firestore upsert converges to
+    the same set under at-least-once redelivery and out-of-order arrival, with no
+    superseded snapshots and no missing data.
     """
-    global _sources_emitted
-    if _sources_emitted or not isinstance(sources, list):
+    global _emitted_source_keys
+    if not isinstance(sources, list):
         return
 
     from urllib.parse import urlparse
-    parts = []
-    seen = set()
     for s in sources:
         if isinstance(s, dict):
             name = str(s.get("name") or s.get("title") or "").strip()
@@ -506,32 +557,51 @@ def _emit_research_sources(sources: Any):
             domain = urlparse(url).netloc or url
         domain = domain.replace("www.", "").strip("/")
         key = (domain or name).lower()
-        if not key or key in seen:
+        if not key or key in _emitted_source_keys:
             continue
-        seen.add(key)
+        if domain and domain.lower() in _NON_CITATION_DOMAINS:
+            continue
+        _emitted_source_keys.add(key)
 
         if name and domain:
-            short = name if len(name) <= 40 else name[:37] + "..."
-            parts.append(f"'{short}' ({domain})")
+            short = name if len(name) <= 60 else name[:57] + "..."
+            human = f"Research source captured: '{short}' ({domain})."
         elif domain:
-            parts.append(domain)
-        elif name:
-            short = name if len(name) <= 40 else name[:37] + "..."
-            parts.append(f"'{short}'")
-        if len(parts) >= 6:
-            break
+            human = f"Research source captured: {domain}."
+        else:
+            short = name if len(name) <= 60 else name[:57] + "..."
+            human = f"Research source captured: '{short}'."
 
-    if not parts:
+        log_status(
+            human,
+            event_type="citation",
+            payload={
+                "name": name,
+                "url": url,
+                "domain": domain,
+                "index": len(_emitted_source_keys),
+            },
+        )
+
+
+def _harvest_urls_from_text(text: str):
+    """Capture citations that appear only as inline URLs in model reasoning.
+
+    Native Google Search grounding surfaces some domains nowhere but the thought
+    stream (no manifest entry, no `## Sources` line). Harvesting full URLs here
+    feeds them through the same idempotent, per-source citation path, so no
+    grounded domain is lost from the stream.
+    """
+    if not text:
         return
-    _sources_emitted = True
-    remaining = len(seen) - len(parts)
-    suffix = f", +{remaining} more" if remaining > 0 else ""
-    log_status(f"Research sources gathered: {', '.join(parts)}{suffix}.")
+    found = _URL_RE.findall(text)
+    if found:
+        _emit_research_sources([{"name": "", "url": u.rstrip('.,);]')} for u in found])
 
 
 def _scan_research_sources(buffer: str):
     """Detect and parse the agent's `[[RESEARCH_SOURCES]]` JSON manifest."""
-    if _sources_emitted or not buffer or _RESEARCH_SOURCES_MARKER not in buffer:
+    if not buffer or _RESEARCH_SOURCES_MARKER not in buffer:
         return
     # Marker followed by a fenced JSON block (object or array).
     m = re.search(
@@ -687,8 +757,7 @@ def _check_tool_call_for_status(chunk: Any):
                 project_dir = _get_project_dir_from_path(file_path)
                 slide_num = None
                 total_pages = None
-                
-                import re
+
                 match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
                 if match:
                     slide_num = int(match.group(1))
@@ -714,8 +783,7 @@ def _check_tool_call_for_status(chunk: Any):
                 project_dir = _get_project_dir_from_path(file_path)
                 slide_num = None
                 total_pages = None
-                
-                import re
+
                 match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
                 if match:
                     slide_num = int(match.group(1))
@@ -902,7 +970,6 @@ def _check_tool_result_for_status(chunk: Any):
             if original_query and _is_internal_query(original_query):
                 return  # Suppress results from internal technical queries
 
-            import re
             from urllib.parse import urlparse
             res_str = _get_result_text(chunk)
             results_info = []
@@ -991,7 +1058,6 @@ def _check_tool_result_for_status(chunk: Any):
             res_str = _get_result_text(chunk)
 
             # Try to extract the page title (markdown header # or Title: key)
-            import re
             title = ""
             title_match = re.search(r'^#\s+(.+)$', res_str, re.MULTILINE)
             if title_match:
@@ -1020,8 +1086,9 @@ def _check_tool_result_for_status(chunk: Any):
     elif tool_name in ("write_file", "edit_file", "write_to_file", "create_file",
                         "replace_file_content", "multi_replace_file_content"):
         # When the research document is written, surface its cited sources (the
-        # `## Sources` URLs) as a fallback if the model didn't emit the manifest.
-        if is_error or _sources_emitted:
+        # `## Sources` URLs). Idempotent by domain, so this safely augments the
+        # manifest/thought-harvest with any sources only the .md recorded.
+        if is_error:
             return
         fp = ""
         if isinstance(tool_args, dict):

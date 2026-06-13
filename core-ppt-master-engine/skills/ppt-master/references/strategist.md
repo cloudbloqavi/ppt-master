@@ -572,12 +572,20 @@ The catalog covers **both data charts and structural information designs**. A "m
 
 The most common Strategist failure mode is missing the structural half — treating "chart" as "numeric chart only" and leaving team / agenda / principles / journey pages as text-only when a template would fit. Read the catalog with both lenses.
 
+#### Company catalog first (match BEFORE the stock catalog)
+
+Before matching the stock `charts_index.json`, the Strategist MUST consult the in-house catalog [`templates/charts/powerslides_infographics/company_index.json`](../templates/charts/powerslides_infographics/company_index.json). It uses the same `Pick for … Skip for …` selection grammar. Precedence is applied **per page**:
+
+1.  Match each visualization page's content shape against the **company** summaries first.
+2.  If a company entry fits (Pick clause matches, no Skip clause) → **select it** and record its path (`templates/charts/powerslides_infographics/<key>.svg`) in section VII. Do **not** also match that page against the stock catalog — the company variant wins on ties.
+3.  Only pages with **no** company match fall through to the stock `charts_index.json` pass below, and then to the existing fallback chain.
+
 > **Reading is mandatory; the catalog is a starting point, not a copy target.**
-> -   Fully read `templates/charts/charts_index.json` **before drafting the Eight Confirmations** — the read happens up front, not when you sit down to write Section VII. The file contains `meta` + `charts.<key>.summary` only; each `summary` is a selection rule (`"Pick for … Skip if …"`), not a description. There is **no category, quickLookup, or keyword index** — selection is done by semantically matching each page's content shape against all 81 summaries in one pass.
+> -   Fully read `templates/charts/charts_index.json` **before drafting the Eight Confirmations** — the read happens up front, not when you sit down to write Section VII. The file contains `meta` + `charts.<key>.summary` only; each `summary` is a selection rule (`"Pick for … Skip if …"`), not a description. There is **no category, quickLookup, or keyword index** — selection is done by semantically matching each page's content shape against all 71 summaries in one pass.
 > -   Not every page needs a chart. When a page's information structure matches a catalog entry, **use that template as a structural starting point** — keep the visualization type and core layout logic, then adapt composition, density, color, decoration, and accompanying elements to fit this deck's content and visual tone. Free adjustment is encouraged; what is forbidden is (a) generating without reading the catalog, and (b) blind verbatim mimicry that ignores the page's actual content weight.
 >
 > **Workflow**:
-> 1.  Read all 81 summaries; for each page, identify the Pick clause that matches the page's content shape AND does not match any Skip clause.
+> 1.  Read the company catalog (`powerslides_infographics/company_index.json`, 30 entries) first, then all 71 stock summaries; for each page, identify the Pick clause that matches the page's content shape AND does not match any Skip clause — giving company entries precedence on ties (see "Company catalog first" above).
 > 2.  Prefer specificity (`vertical_list` over generic `numbered_steps`).
 > 3.  One primary visualization per page; a supporting layout may accompany it.
 > 4.  List selections in Design Spec section VII; section IX only notes the visualization type name per page.
@@ -586,7 +594,7 @@ The most common Strategist failure mode is missing the structural half — treat
 >
 > **Read-audit (mandatory, section VII format)** — single combined table; `summary-quote` column is the anti-fabrication audit, `path` + `usage` serve Executor lookup. Format defined in [`templates/design_spec_reference.md`](../templates/design_spec_reference.md) §VII:
 > ```
-> Catalog read: 81 templates
+> Catalog read: 30 company + 71 stock templates
 >
 > | Page | Template      | Path                              | Summary-quote (verbatim) | Usage |
 > | ---- | ------------- | --------------------------------- | ------------------------ | ----- |
