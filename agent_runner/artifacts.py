@@ -87,6 +87,41 @@ def _snapshot_project_files() -> dict[str, tuple[float, int]]:
     return snapshot
 
 
+# Structural markers that distinguish a genuine generated project folder from a
+# stray folder the agent may create by writing intermediate files (e.g. failed
+# image downloads) to an invented path that never went through `project_manager
+# init`. A real project always has at least one of these — a bare junk folder of
+# loose images/logs has none. Used to keep stray folders out of the mirrored
+# output (see _looks_like_project).
+_PROJECT_STRUCTURE_MARKERS = ("svg_output", "exports", "svg_final")
+_PROJECT_STRUCTURE_FILES = ("design_spec.md", "spec_lock.md")
+
+
+def _looks_like_project(source_candidates: list[Path], project_name: str) -> bool:
+    """Return whether *project_name* under any source dir is a real project folder.
+
+    A genuine project (created via ``project_manager init``) contains structural
+    subfolders (``svg_output/``, ``exports/``, …) or a design spec. Stray folders
+    — created when the agent writes intermediate files to an invented bare-slug
+    path instead of the canonical path ``init`` returned — have only loose files
+    and must not be mirrored to OUTPUT_ARTIFACTS_DIR as if they were deliverables.
+    """
+    for source in source_candidates:
+        proj_dir = source / project_name
+        try:
+            if not proj_dir.is_dir():
+                continue
+        except Exception:
+            continue
+        for marker in _PROJECT_STRUCTURE_MARKERS:
+            if (proj_dir / marker).is_dir():
+                return True
+        for marker_file in _PROJECT_STRUCTURE_FILES:
+            if (proj_dir / marker_file).is_file():
+                return True
+    return False
+
+
 def copy_output_artifacts(
     run_status: str = "unknown",
     prompt: str = "",
@@ -195,6 +230,26 @@ def copy_output_artifacts(
 
     t_scan_dur = time.time() - t_scan_start
     logger.info("  File scan completed in %.2fs (%d files examined).", t_scan_dur, len(files_to_copy))
+
+    # Drop stray folders that picked up new files during the run but are not real
+    # projects (e.g. failed image downloads written to an invented bare-slug path
+    # that bypassed `project_manager init`). Mirroring those would litter
+    # OUTPUT_ARTIFACTS_DIR with junk folders alongside the genuine deliverable.
+    # A resumed project is trusted explicitly and never filtered.
+    if active_projects:
+        stray_projects = {
+            name
+            for name in active_projects
+            if name != resumed_project and not _looks_like_project(source_candidates, name)
+        }
+        if stray_projects:
+            active_projects -= stray_projects
+            logger.warning(
+                "  Skipping %d stray folder(s) with no project structure "
+                "(svg_output/exports/design_spec): %s. These are likely "
+                "intermediate files written to a non-canonical path.",
+                len(stray_projects), ", ".join(sorted(stray_projects)),
+            )
 
     if active_projects:
         logger.info("  Active project(s) identified for copying: %s", ", ".join(active_projects))

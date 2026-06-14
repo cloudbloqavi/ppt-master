@@ -114,8 +114,13 @@ Output a checkpoint, then continue with the main pipeline. The artifacts feed di
 - [x] Document: `projects/<topic_slug>.md` (N sections)
 - [x] Images: `projects/<topic_slug>/` (N files)
 - [ ] **Next**: SKILL.md Step 2 →
-  `project_manager.py init <project_name> --format <format>`
-  `project_manager.py import-sources projects/<project_name> projects/<topic_slug>.md projects/<topic_slug>/*.* --move`
+  `project_manager.py init <topic_slug> --format <format>`   # creates projects/<topic_slug>_<format>_<YYYYMMDD>/
+  `project_manager.py import-sources <project_dir> projects/<topic_slug>.md projects/<topic_slug>/*.* --move`
+  `rmdir projects/<topic_slug>`   # remove the now-empty staging folder
 ```
 
-`<project_name>` is the user's chosen project identifier (typically `<format>_<topic_slug>`, e.g. `ppt169_joe_hisaishi`); `--move` removes the research artifacts from `projects/<topic_slug>` after they are imported.
+**Naming (HARD rule).** Pass a **clean** `<topic_slug>` to `init` — lowercase snake_case, **no format token and no date** (e.g. `joe_hisaishi`, never `ppt169_joe_hisaishi`). `init` appends `_<format>_<YYYYMMDD>` itself, so embedding the format yourself produces a doubled name like `ppt169_joe_hisaishi_ppt169_20260613`.
+
+**Use the canonical path for every write.** `<project_dir>` is the exact path `init` prints (`Project created: …/projects/<topic_slug>_<format>_<YYYYMMDD>`). Capture it and use it verbatim for `import-sources`, the design spec, SVGs, and all later writes. NEVER write deliverables into the bare staging folder `projects/<topic_slug>/` — that folder is research scratch only.
+
+**Clean up staging.** `--move` relocates the research artifacts into `<project_dir>`; the trailing `rmdir projects/<topic_slug>` removes the leftover staging folder so it is never mirrored to the output as a phantom second project.

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_runner.config import ARGS, logger
-from agent_runner.logging_setup import setup_file_logging
+from agent_runner.logging_setup import setup_file_logging, sweep_orphan_root_logs
 from agent_runner.status_logger import (
     setup_status_logging, log_status, set_research_topic, reset_run_state,
     _check_text_for_status, _check_thought_for_status,
@@ -28,6 +28,7 @@ from agent_runner.artifacts import (
     copy_output_artifacts, _snapshot_project_files, _snapshot_output_pptx_files,
     finalize_log_placement
 )
+from agent_runner.visual_enforcement import enforce_visual_review, status_line
 
 # ─────────────────────────────────────────────────────────────
 # Subagent Tool Detection
@@ -299,7 +300,7 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
             "\n2. Specific delegation scenarios:"
             "\n   - Step 1 (Source Content Ingestion): If the user provides multiple source files or links, spawn one subagent per source to run the conversion scripts (e.g. `pdf_to_md.py`, `web_to_md.py`) concurrently and summarize their outputs."
             "\n   - Step 5 (Image Acquisition): If the design specification requires both AI image generation (`ai` acquisition) and web search (`web` acquisition), you MUST parallelize the work. Spawn a subagent via the `invoke_subagent` tool to perform the web searches concurrently while the main agent executes the AI image generation manifest script (`image_gen.py`)."
-            "\n   - Step 6 (Visual Review): If the number of generated slides N is greater than two (> 2), partition the pages into batches of <= 5 pages and spawn parallel subagents concurrently using the `invoke_subagent` tool to execute visual self-checks. Make sure to launch the local preview server (`python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_editor/server.py <project_path> --no-browser`) beforehand."
+            "\n   - Step 6 (Visual Review): After all SVGs are generated, run the deterministic layout auditor `python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_layout_auditor.py <project_path>`. It mathematically detects and auto-fixes the unambiguous layout defects (text-overlap, y=0 baseline origin, out-of-bounds) and writes per-page findings to `<project_path>/.review/`. For any remaining AMBIGUOUS visual issues when N > 2 slides, you MAY additionally partition the pages into batches of <= 5 and spawn parallel `invoke_subagent` review subagents (launch the preview server `svg_editor/server.py <project_path> --no-browser` first). IMPORTANT: the runner independently re-runs this auditor and rebuilds the deck after your turn, so it cannot be skipped — and you MUST NOT claim visual review is complete unless you actually ran the auditor."
             "\n   - Web Research / Fact-Gathering: If the user prompt requires searching for latest information or reports, Recency-based information for MULTIPLE persona, companies, products, or distinct topics (e.g. comparing Nike and Microsoft sales in current year), you MUST parallelize this web research phase in a very efficient and optimized way. Spawn parallel subagents using the `invoke_subagent` tool to execute web searches and URL reads concurrently, then aggregate their research findings in the workspace."
             "\n3. IMPORTANT: When you spawn any subagent, you MUST explicitly wait for the tool to finish and return its result. You MUST NOT finish your response, conclude the conversation, or output your final answer while any subagents are still running in the background. Doing so terminates the agent session and orphans the subagents. Always consume the subagent's result (ToolResult) and verify its outcomes before declaring the task complete."
             "\n4. Explicit Decision Logging: Every time you evaluate a phase where a subagent could be spawned, you MUST output a clear statement of your decision in your text or thought output using the format: `[Subagent Decision] Phase: <PhaseName> | Decision: <Bypass/Spawn> | Reason: <DetailReason>`."
@@ -326,9 +327,9 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
 
     # Dynamic overrides append
     if no_visual_review:
-        system_instructions += "\n\nUser has opted out of the visual review phase. DO NOT execute the visual self-check / visual-review workflow at Step 6."
+        system_instructions += "\n\nUser has opted out of the visual review phase (--no-visual-review). DO NOT execute the visual self-check / visual-review workflow or the layout auditor at Step 6. The runner will also skip its enforced post-turn audit."
     else:
-        system_instructions += "\n\nVisual review phase is enabled by default (opt-out mode). You MUST run the visual self-check / visual-review workflow at Step 6 after all SVGs are generated, unless opted out."
+        system_instructions += "\n\nVisual review is enabled by default (opt-out mode). At Step 6, after all SVGs are generated, you MUST run the deterministic layout auditor (`svg_layout_auditor.py <project_path>`) and address its findings. The runner ALSO enforces this audit after your turn and rebuilds the deck if it changed any SVG — so never report visual review as done without having actually run the auditor."
 
     mcp_servers = load_mcp_servers() if use_mcp else []
     if use_mcp:
@@ -547,9 +548,15 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                     planned_not_executed,
                 )
 
-            # Check if Step 6 was bypassed dynamically (was enabled in config/cli but no subagents spawned)
+            # Report only OBSERVED facts about the agent's in-turn review activity.
+            # Whether the agent spawned its own review subagents is no longer how
+            # visual review is guaranteed — the runner enforces a deterministic
+            # layout audit after this turn (see enforce_visual_review). Do NOT
+            # fabricate a "static checks passed / slide count <= 2" justification:
+            # earlier that line claimed checks had passed even when none had run.
             if not no_visual_review and subagent_stats["total_spawned"] == 0:
-                logger.info("[Subagent Decision] Phase: Step 6 (Visual Review) | Decision: Bypass | Reason: Static quality check passed with zero errors, or slide count <= 2, rendering parallel visual-review subagents unnecessary.")
+                logger.info("Agent spawned no in-turn visual-review subagents; the runner's "
+                            "enforced deterministic layout audit will run post-turn.")
 
             print("\n" + "═" * 60)
             print("SUBAGENT EXECUTION SUMMARY")
@@ -619,6 +626,10 @@ def main_run() -> int:
     if ARGS.self_test:
         success = run_self_test()
         return 0 if success else 1
+
+    # Clean up any loose logs left at the artifacts root by older runner versions
+    # or runs killed before cleanup, BEFORE this run creates its own logs.
+    sweep_orphan_root_logs()
 
     setup_file_logging()
     check_and_install_dependencies()
@@ -694,6 +705,19 @@ def main_run() -> int:
                     "thoughts_tokens": usage.thoughts_token_count,
                     "total_tokens": usage.total_token_count,
                 }
+
+            # Enforced visual review (Part C): runs runner-side, so it cannot be
+            # skipped or narrated-but-not-done by the agent. The deterministic
+            # auditor auto-fixes unambiguous layout defects (text overlap, y=0
+            # origin, out-of-bounds) in svg_output/ and, if anything changed,
+            # rebuilds the deck — because the agent had already exported from the
+            # un-fixed SVGs. Honors --no-visual-review. Never fails the run.
+            try:
+                vr_result = enforce_visual_review(ARGS.no_visual_review, start_time)
+                log_status(status_line(vr_result))
+            except Exception as vr_exc:
+                logger.error("Enforced visual-review stage errored (non-fatal): %s",
+                             vr_exc, exc_info=True)
         except KeyboardInterrupt:
             run_status = "interrupted"
             log_status("Agent execution interrupted by user.")

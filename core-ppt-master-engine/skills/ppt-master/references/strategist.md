@@ -12,6 +12,43 @@ As a top-tier AI presentation strategist, receive source documents, perform cont
 
 ---
 
+## 0. Intent Fidelity Gate — Directive vs Brief (READ FIRST, before any planning)
+
+🚧 **GATE — classify the prompt before you analyze or re-narrativize anything.** This gate exists because the most damaging Strategist failure is treating an explicit slide-by-slide instruction as loose "source material" and re-authoring a "more well-rounded" deck — silently dropping the visualizations the user actually asked for.
+
+### Two prompt modes
+
+| Mode | Signal | Planning latitude |
+|------|--------|-------------------|
+| **Directive** | The prompt enumerates slides with explicit visualization or content per slide — e.g. `"Slide 1: a fishbone of …"`, `"Slide 2: a waterfall bridging …"`, a numbered page list, an `Expect:` line, or any per-page chart/structure assignment. | **Low.** The enumeration is a **binding contract** (see below). |
+| **Brief** | The prompt gives a topic, goal, or document with **no** per-slide breakdown — e.g. `"Create a deck about our Q3 results"`. | **Full.** Plan page count, order, and visualizations autonomously, as this role otherwise describes. |
+
+A prompt may be **mixed** (some slides specified, some left open). Treat each *specified* slide as Directive and each *unspecified* slide as Brief.
+
+### Directive-mode contract (HARD rules)
+
+When a slide is specified, the following are **locked** and MUST appear in `design_spec.md §IX` and `spec_lock.md` exactly as requested:
+
+1. **Page count & order** — produce at least the enumerated slides, in the stated order. You MAY add slides (cover, divider, summary) but MUST NOT drop, merge, or reorder a specified slide.
+2. **Visualization type per slide** — the requested chart/structure *intent* is the contract. `"a gauge of 78%"` → a single-KPI-vs-target dial; `"a waterfall bridging $4.2M→$3.6M"` → an additive/subtractive bridge; `"a risk heat map"` → a row×column intensity grid. You MUST NOT swap a requested visualization for a different one you judge more "comprehensive."
+3. **Stated content** — the data/categories the user gave (the 6M categories, the budget figures, the 5 risks) belong on that slide; do not relocate them elsewhere or replace them with invented substitutes.
+
+**Allowed autonomy inside the contract**: enrich a specified slide with realistic supporting data, choose styling/layout/density, write the takeaway, fill *unspecified* slides freely, and append slides that genuinely add value (clearly additive, never replacing a requested one).
+
+**Forbidden — re-narrativizing a Directive prompt** (this is the exact failure this gate prevents): converting `"Slide 2: waterfall"` into a KPI dashboard, `"Slide 3: gauge"` into a corrective-action table, or `"Slide 4: heat map"` into a timeline because a "well-rounded operational review" felt better. If you believe a different chart tells the story better, **add** a slide for it — never substitute the requested one. Record the reasoning in §VII `Usage`, not by silently changing the deck.
+
+### How the contract composes with template matching (next: the company-first pass)
+
+The contract binds the requested visualization *meaning*, not a specific file. Realize it through the normal matching + fallback chain, with the company catalog weighted first:
+
+1. Map each requested visualization to the **company catalog** (`powerslides_infographics/company_index.json`) first — see "Company catalog first" below. A user-named chart that has a clear company equivalent (gauge→`20_gauge`, waterfall→`17_waterfall`, heat map→`21_heat_map`, fishbone→`19_fishbone`) **MUST** use that company entry.
+2. If no company entry fits the requested visualization (its `Pick` clause doesn't match, a `Skip` clause applies, or the company SVG is a raw export that cannot be cleanly reproduced — see [`executor-base.md`](executor-base.md) §"never silently abandon a matched chart template"), fall through to the stock `charts_index.json`.
+3. If the requested visualization still has no catalog fit, use the standard fallback chain (table layout / AI-generated image / custom layout) and mark the page `no-template-match` in §VII — **but keep the slide's requested visualization intent**. Falling back to a different *rendering* of the same intent is compliant; changing the slide's *purpose* is the contract breach the gate forbids.
+
+> The fallback chain is preserved on purpose: highly dynamic or novel content that matches no company or stock template legitimately lands on custom/AI/table. Directive fidelity governs *what the slide is about and which visualization the user asked for*, not a mandate to force an unsuitable SVG.
+
+---
+
 ## Canvas Format Quick Reference
 
 > See [`canvas-formats.md`](canvas-formats.md) for the full format table (presentations / social / marketing) and the format-selection decision tree.
@@ -580,6 +617,10 @@ Before matching the stock `charts_index.json`, the Strategist MUST consult the i
 2.  If a company entry fits (Pick clause matches, no Skip clause) → **select it** and record its path (`templates/charts/powerslides_infographics/<key>.svg`) in section VII. Do **not** also match that page against the stock catalog — the company variant wins on ties.
 3.  Only pages with **no** company match fall through to the stock `charts_index.json` pass below, and then to the existing fallback chain.
 
+> **Strong company weighting.** Company entries carry the highest selection weight in the catalog. On any close call between a company entry and a stock chart of similar shape, the company entry wins. When the prompt is **Directive** (§0) and names a visualization with a clear company equivalent (gauge→`20_gauge`, waterfall→`17_waterfall`, heat map→`21_heat_map`, fishbone→`19_fishbone`, SWOT→`18_swot`, funnel→`10_funnel`, etc.), selecting that company entry is **mandatory**, not preferential — it is the realization of the §0 contract.
+>
+> **Weighting is not blind forcing.** Respect each entry's `Skip` clause and content-shape fit: if a company entry's `Skip` condition applies, or its SVG is a raw export the Executor cannot cleanly reproduce ([`executor-base.md`](executor-base.md) §"never silently abandon a matched chart template"), fall through to the stock catalog and then the standard fallback chain (table / AI image / custom), marking the page `no-template-match`. The §0 contract still binds the slide's *requested visualization intent and content* through whichever layer carries it — high weighting biases selection toward the company SVG, it does not override genuine unsuitability.
+
 > **Reading is mandatory; the catalog is a starting point, not a copy target.**
 > -   Fully read `templates/charts/charts_index.json` **before drafting the Eight Confirmations** — the read happens up front, not when you sit down to write Section VII. The file contains `meta` + `charts.<key>.summary` only; each `summary` is a selection rule (`"Pick for … Skip if …"`), not a description. There is **no category, quickLookup, or keyword index** — selection is done by semantically matching each page's content shape against all 71 summaries in one pass.
 > -   Not every page needs a chart. When a page's information structure matches a catalog entry, **use that template as a structural starting point** — keep the visualization type and core layout logic, then adapt composition, density, color, decoration, and accompanying elements to fit this deck's content and visual tone. Free adjustment is encouraged; what is forbidden is (a) generating without reading the catalog, and (b) blind verbatim mimicry that ignores the page's actual content weight.
@@ -763,7 +804,7 @@ Project folder must exist before Strategist runs. If not, execute:
 python3 scripts/project_manager.py init <project_name> --format <canvas_format>
 ```
 
-Save outputs to `projects/<project_name>_<format>_<YYYYMMDD>/design_spec.md`.
+`<project_name>` must be a clean topic slug with **no format token and no date** — `init` appends `_<format>_<YYYYMMDD>` itself (e.g. `init acme_q3 --format ppt169` → `acme_q3_ppt169_20260613`; passing `ppt169_acme_q3` would double it). Save outputs to the exact path `init` prints, `projects/<project_name>_<format>_<YYYYMMDD>/design_spec.md` — never a bare-slug path.
 
 ---
 

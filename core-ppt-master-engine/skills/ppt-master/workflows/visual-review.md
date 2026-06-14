@@ -12,6 +12,8 @@ description: Per-page rubric-based visual self-review via parallel subagents. Ru
 
 ## Positioning
 
+> **This workflow is the *ambiguous-case* layer, not the primary gate.** Deterministic, geometric layout defects — text-overlap, out-of-bounds, text overflow, and the y=0 orphan-baseline origin bug — are caught and auto-fixed by [`svg_layout_auditor.py`](../scripts/svg_layout_auditor.py), which the **runner enforces** after every turn (re-running it and rebuilding the deck if it changed any SVG). That auditor is the authoritative gate and cannot be skipped. This rubric-based subagent loop exists for what geometry *cannot* adjudicate: visual rhythm, emphasis/centroid, image-text relationships, and other judgement calls. Run it for those; do not rely on it to catch hard collisions — the auditor already did.
+
 This is an **opt-out review loop**. The main pipeline (SKILL.md Step 1–7) invokes it by default before Step 7 post-processing, unless the user explicitly opts out (e.g. via `--no-visual-review` CLI argument or prompt instruction).
 
 **Token cost**: each batch subagent re-reads the rubric + `design_spec.md` + `spec_lock.md` and processes K SVG+PNG pairs. For a 20-page deck with K=5, expect on the order of 100–150K additional input tokens on top of the main generation run.
