@@ -804,7 +804,7 @@ Project folder must exist before Strategist runs. If not, execute:
 python3 scripts/project_manager.py init <project_name> --format <canvas_format>
 ```
 
-`<project_name>` must be a clean topic slug with **no format token and no date** — `init` appends `_<format>_<YYYYMMDD>` itself (e.g. `init acme_q3 --format ppt169` → `acme_q3_ppt169_20260613`; passing `ppt169_acme_q3` would double it). Save outputs to the exact path `init` prints, `projects/<project_name>_<format>_<YYYYMMDD>/design_spec.md` — never a bare-slug path.
+`<project_name>` must be a clean topic slug with **no format token and no date** — `init` appends `_<format>_<YYYYMMDD_HHMM>` itself (e.g. `init acme_q3 --format ppt169` → `acme_q3_ppt169_20260613_1530`; passing `ppt169_acme_q3` would double it). Save outputs to the exact path `init` prints, `projects/<project_name>_<format>_<YYYYMMDD_HHMM>/design_spec.md` — never a bare-slug path.
 
 ---
 

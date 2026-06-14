@@ -175,7 +175,7 @@ def generate_examples_index(examples_dir: str = 'examples') -> str:
     content.append("1. Follow the standard project structure")
     content.append("2. Include a complete README.md and design specification")
     content.append("3. SVG files must comply with technical specifications")
-    content.append("4. Directory naming format: `{project_name}_{format}_{YYYYMMDD}`\n")
+    content.append("4. Directory naming format: `{project_name}_{format}_{YYYYMMDD_HHMM}`\n")
 
     content.append("### Submission Process\n")
     content.append("1. Create a project under the `examples/` directory")

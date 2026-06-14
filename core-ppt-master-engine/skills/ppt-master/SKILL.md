@@ -139,7 +139,7 @@ When the user provides non-Markdown content, convert immediately:
 python3 ${SKILL_DIR}/scripts/project_manager.py init <project_name> --format <format>
 ```
 
-⚠️ **`<project_name>` must be a clean topic slug** — lowercase snake_case, **no format token, no date** (e.g. `acme_q3_review`, never `ppt169_acme_q3_review`). `init` appends `_<format>_<YYYYMMDD>` automatically; embedding the format yourself yields a doubled name like `ppt169_acme_q3_review_ppt169_20260613`. Then use the exact path `init` prints (`Project created: …`) for **every** subsequent write — never invent a bare-slug path, or you create a phantom second folder.
+⚠️ **`<project_name>` must be a clean topic slug** — lowercase snake_case, **no format token, no date** (e.g. `acme_q3_review`, never `ppt169_acme_q3_review`). `init` appends `_<format>_<YYYYMMDD_HHMM>` automatically; embedding the format yourself yields a doubled name like `ppt169_acme_q3_review_ppt169_20260613_1530`. Then use the exact path `init` prints (`Project created: …`) for **every** subsequent write — never invent a bare-slug path, or you create a phantom second folder.
 
 Format options: `ppt169` (default), `ppt43`, `xhs`, `story`, etc. For the full format list, see `references/canvas-formats.md`.
 
