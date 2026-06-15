@@ -20,15 +20,22 @@ from agent_runner.logging_setup import setup_file_logging, sweep_orphan_root_log
 from agent_runner.status_logger import (
     setup_status_logging, log_status, set_research_topic, reset_run_state,
     _check_text_for_status, _check_thought_for_status,
-    _check_tool_call_for_status, _check_tool_result_for_status
+    _check_tool_call_for_status, _check_tool_result_for_status,
+    _mark_all_slides_ready,
 )
 from agent_runner.tools import run_self_test
 from agent_runner.resumption import find_and_restore_incomplete_project
+from agent_runner.checkpoints import build_resume_directive, default_project_roots
 from agent_runner.artifacts import (
     copy_output_artifacts, _snapshot_project_files, _snapshot_output_pptx_files,
     finalize_log_placement
 )
 from agent_runner.visual_enforcement import enforce_visual_review, status_line
+
+# Process start time. Used to scope warm-retry research reuse to briefs written
+# during THIS invocation, so a retry never imports a stale brief left in the
+# shared projects/ dir by an unrelated earlier run.
+_RUN_PROCESS_START = time.time()
 
 # ─────────────────────────────────────────────────────────────
 # Subagent Tool Detection
@@ -206,13 +213,30 @@ def _get_max_attempt_count() -> int:
 
 
 def _build_retry_prompt(base_prompt: str, attempt_index: int) -> str:
-    """Add a deterministic non-interactive continuation directive for retries."""
+    """Add a deterministic non-interactive continuation directive for retries.
+
+    Resume is artifact-driven (see agent_runner/checkpoints.py): the runner reads
+    what the previous attempt left on disk — research brief, project folder,
+    design_spec/spec_lock, partial or complete SVG pages, notes, finalized SVGs —
+    and tells the agent to continue from the furthest-completed stage instead of
+    cold-restarting and redoing work. Falls back to a plain continuation directive
+    when no reusable state is found.
+    """
     retry_directive = (
         "Previous run ended before producing a PPTX. "
         "Continue fully autonomously in non-interactive mode and complete the pipeline through Step 7 export in this same run. "
         "Do not ask for confirmations, and do not stop after Eight Confirmations or split-mode hints. "
         "If anything is ambiguous, choose the best default and proceed."
     )
+
+    try:
+        resume = build_resume_directive(default_project_roots(), _RUN_PROCESS_START)
+    except Exception as exc:
+        logger.warning("Resume-state detection failed (%s); using plain retry directive.", exc)
+        resume = None
+    if resume:
+        retry_directive += "\n\n" + resume
+
     return f"{base_prompt}\n\n[RETRY ATTEMPT {attempt_index}] {retry_directive}"
 
 
@@ -695,6 +719,14 @@ def main_run() -> int:
             )
             usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
             run_status = "success"
+            # Safety-net flush: emit a closing "Slide N is ready" for any slide
+            # that was designed but never got its ready event. The per-slide flush
+            # is normally driven off the finalize/export tool call, but when the
+            # agent chains the whole tail (total_md_split && finalize_svg &&
+            # svg_to_pptx) into a single run_command, that detection can be missed
+            # and the final slide's ready line is dropped. Flushing here guarantees
+            # the last slide is reported regardless of how export was invoked.
+            _mark_all_slides_ready()
             log_status("Agent execution completed successfully.")
             logger.info("Agent run completed successfully.")
             if usage:

@@ -109,6 +109,8 @@ curl -L -o "projects/<topic_slug>/<descriptive_name>.<ext>" "<image_url>"
 
 Output a checkpoint, then continue with the main pipeline. The artifacts feed directly into Step 2's `import-sources`:
 
+**⚠ Emit the research-source manifest NOW, before the checkpoint.** The instant research is done — and BEFORE `project_manager.py init`, the design spec, or any slide SVG — print the `[[RESEARCH_SOURCES]]` manifest (format in `system_instructions.md` → "Research Source Citations"). It must appear *here*, up front, so the status log shows consulted sources before slide design begins. Do NOT defer it to your final summary.
+
 ```markdown
 ## ✅ Topic Research Complete
 - [x] Document: `projects/<topic_slug>.md` (N sections)

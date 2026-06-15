@@ -24,6 +24,19 @@ _RUN_ID: str | None = None
 # Active tool call tracking to match ToolCall to ToolResult
 _active_tool_calls: dict[str, dict[str, Any]] = {}
 
+# ── Per-slide progress tracking (call-driven) ────────────────────────────────
+# This SDK does NOT emit ToolResult chunks, so slide "ready" events cannot be
+# driven off tool results. Instead we infer them from the tool-CALL stream: a
+# slide is "ready" once the agent moves on to the next slide (or once finalize/
+# export begins). This state lets us pair each "Designing slide N" with a later
+# "Slide N is ready", de-duplicate repeat edits, and surface polish passes as
+# "Refining slide N".
+_designed_slides: set[int] = set()      # slide numbers announced as "Designing"
+_ready_slides: set[int] = set()         # slide numbers already announced "ready"
+_current_slide: int | None = None       # slide whose SVG was most recently written
+_total_pages_seen: int | None = None     # last known total page count (from spec_lock)
+_slide_names: dict[int, str] = {}        # slide_num -> display name (ready w/o total)
+
 # ── Native web-research (Google Search grounding) tracking ───────────────────
 # This harness performs web research via native Google Search grounding rather
 # than an explicit search tool, so the only trace of it is in the model's
@@ -35,7 +48,41 @@ _text_accum: str = ""                       # accumulated agent text (deltas)
 _seen_research_headers: set[str] = set()     # dedup of reasoning section headers
 _research_headers_emitted: int = 0           # count surfaced (capped)
 _emitted_source_keys: set[str] = set()       # domains already streamed as citation events (idempotent)
-_MAX_RESEARCH_HEADERS = 8
+_sources_parsed: bool = False                # manifest already parsed (stop re-scanning)
+_thought_scan_pos: int = 0                   # high-water mark scanned in _thought_accum
+_text_scan_pos: int = 0                       # high-water mark scanned in _text_accum
+_seen_text_markers: set[str] = set()          # phase/step/role checkpoints already emitted
+_emitted_once: set[str] = set()               # run_command lines capped to one emit per run
+
+# ── Tunable knobs (env-overridable so they can be readjusted without code) ────
+def _env_int(name: str, default: int, minimum: int = 0) -> int:
+    """Read a non-negative integer tuning knob from the environment.
+
+    Falls back to ``default`` when unset, non-numeric, or below ``minimum`` —
+    a bad value must never crash status logging.
+    """
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        val = int(str(raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("Invalid %s=%r; using default %d.", name, raw, default)
+        return default
+    if val < minimum:
+        logger.warning("%s=%d below minimum %d; using %d.", name, val, minimum, minimum)
+        return minimum
+    return val
+
+
+# Max number of research sub-topic headers surfaced from reasoning per run.
+_MAX_RESEARCH_HEADERS = _env_int("STATUS_MAX_RESEARCH_HEADERS", 8)
+# Overlap (chars) re-scanned at the tail of the thought buffer on each delta so a
+# pattern split across a streaming boundary is still matched. Must exceed the
+# longest pattern we incrementally scan for (a `**Header**` is capped at ~64
+# chars; URLs are longer, hence the generous default). Dedup makes re-matches
+# inside the overlap harmless, so larger only costs a little CPU.
+_SCAN_OVERLAP = _env_int("STATUS_SCAN_OVERLAP_CHARS", 1024, minimum=64)
 
 # Marker the agent prints before its machine-readable citation manifest (see
 # system_instructions.md "Research Source Citations").
@@ -386,57 +433,96 @@ def _get_page_rhythm_from_spec_lock(project_dir: Path) -> list[str]:
     return pages
 
 
+# One-shot text checkpoints: (trigger substrings, status message). Each fires
+# once per run the first time ANY of its triggers appears in the text stream.
+# Matching against an accumulator window (not a single delta) means a header
+# split across streaming chunks is still detected; _seen_text_markers stops it
+# re-firing while the marker lingers inside the overlap.
+_TEXT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("## ✅ Strategist Phase Complete",),
+     "Strategist Phase completed: Slide outline and visual guidelines finalized."),
+    (("## ✅ Image Acquisition Phase Complete",),
+     "Image Acquisition Phase completed: Generated visual illustrations and assets."),
+    (("## ✅ Executor Phase Complete",),
+     "Executor Phase completed: Constructed presentation slide layouts."),
+    (("## ✅ Topic Research Complete",),
+     "Topic research completed: Gathered information and assets successfully."),
+    (("## ✅ Template Fill Complete",),
+     "Template fill completed successfully."),
+    (("## ✅ Customize Animations Complete",),
+     "Custom animation overrides successfully applied."),
+    (("## ✅ Brand Saved",),
+     "Brand guidelines and identity templates saved successfully."),
+    (("## Template Creation Complete",),
+     "Presentation template package successfully created and registered."),
+    (("## Step 1: Confirm topic", "Confirm topic scope autonomously"),
+     "Defining research scope and topic focus..."),
+    (("## Step 2: Gather via web search",),
+     "Initiating multi-phase web research to gather facts and details..."),
+    (("Deep fetch", "Deep-dives"),
+     "Extracting comprehensive content and images from high-signal sites..."),
+    (("Targeted fill",),
+     "Conducting targeted search to gather specific missing details..."),
+    (("## Step 3: Save materials",),
+     "Saving research documents and downloading relevant media assets..."),
+)
+
+
 def _check_text_for_status(text: str):
-    """Parses agent text outputs to detect role switches or phase checkpoints."""
+    """Parses agent text outputs to detect role switches or phase checkpoints.
+
+    Checkpoints are matched against a windowed view of the accumulated text (with
+    a fixed overlap) rather than a single delta, so a marker that streams across a
+    chunk boundary (e.g. ``## ✅ Strate`` + ``gist Phase Complete``) is still
+    detected. _seen_text_markers guarantees each fires exactly once.
+    """
+    global _text_accum, _text_scan_pos
     if not text:
         return
 
-    # Accumulate text and surface the research citation manifest if present.
-    global _text_accum
     _text_accum += text
-    _scan_research_sources(_text_accum)
 
-    # Check for role switches (supports multiple switches if chunk is large)
-    if "## [Role Switch:" in text:
+    window_start = max(0, _text_scan_pos - _SCAN_OVERLAP)
+    window = _text_accum[window_start:]
+    _text_scan_pos = len(_text_accum)
+
+    # Surface the research citation manifest if present. Extraction uses the full
+    # contiguous buffer; `window` is the cheap trigger gate (stays O(window)).
+    _scan_research_sources(_text_accum, window)
+
+    # Role switches (dedup by role name). Require the closing ']' so a partial
+    # header still mid-stream is not emitted with a truncated role.
+    if "## [Role Switch:" in window:
         try:
-            parts = text.split("## [Role Switch:")
-            for part in parts[1:]:
+            for part in window.split("## [Role Switch:")[1:]:
+                if "]" not in part:
+                    continue
                 role = part.split("]")[0].strip()
+                if not role:
+                    continue
+                rkey = "role:" + role.lower()
+                if rkey in _seen_text_markers:
+                    continue
+                _seen_text_markers.add(rkey)
                 log_status(f"Switched agent role to: {role}.")
         except Exception:
             pass
 
-    # Check for step and workflow checkpoints
-    if "## ✅ Strategist Phase Complete" in text:
-        log_status("Strategist Phase completed: Slide outline and visual guidelines finalized.")
-    if "## ✅ Image Acquisition Phase Complete" in text:
-        log_status("Image Acquisition Phase completed: Generated visual illustrations and assets.")
-    if "## ✅ Executor Phase Complete" in text:
-        log_status("Executor Phase completed: Constructed presentation slide layouts.")
-    if "## ✅ Topic Research Complete" in text:
-        log_status("Topic research completed: Gathered information and assets successfully.")
-    if "## ✅ Template Fill Complete" in text:
-        log_status("Template fill completed successfully.")
-    if "## ✅ Customize Animations Complete" in text:
-        log_status("Custom animation overrides successfully applied.")
-    if "## ✅ Brand Saved" in text:
-        log_status("Brand guidelines and identity templates saved successfully.")
-    if "## Template Creation Complete" in text:
-        log_status("Presentation template package successfully created and registered.")
-        
-    # Topic Research Workflow detailed steps
-    if "## Step 1: Confirm topic" in text or "Confirm topic scope autonomously" in text:
-        log_status("Defining research scope and topic focus...")
-    if "## Step 2: Gather via web search" in text:
-        log_status("Initiating multi-phase web research to gather facts and details...")
-    if "Landscape phase" in text or ("Landscape" in text and "search" in text.lower() and "Step 2" in text):
-        log_status("Performing broad web landscape scan for authoritative sources...")
-    if "Deep fetch" in text or "Deep-dives" in text:
-        log_status("Extracting comprehensive content and images from high-signal sites...")
-    if "Targeted fill" in text:
-        log_status("Conducting targeted search to gather specific missing details...")
-    if "## Step 3: Save materials" in text:
-        log_status("Saving research documents and downloading relevant media assets...")
+    # One-shot phase / step / workflow checkpoints.
+    for triggers, message in _TEXT_MARKERS:
+        if message in _seen_text_markers:
+            continue
+        if any(t in window for t in triggers):
+            _seen_text_markers.add(message)
+            log_status(message)
+
+    # Landscape phase — compound condition kept verbatim, evaluated on the window.
+    if "landscape" not in _seen_text_markers:
+        if "Landscape phase" in window or (
+            "Landscape" in window and "search" in window.lower() and "Step 2" in window
+        ):
+            _seen_text_markers.add("landscape")
+            log_status("Performing broad web landscape scan for authoritative sources...")
 
 
 def _clean_topic(prompt: str) -> str:
@@ -469,6 +555,8 @@ def reset_run_state():
     """Reset per-run status state so a fresh attempt logs cleanly."""
     global _last_status, _research_started, _thought_accum, _text_accum
     global _seen_research_headers, _research_headers_emitted, _emitted_source_keys
+    global _current_slide, _total_pages_seen, _sources_parsed, _thought_scan_pos
+    global _text_scan_pos, _seen_text_markers, _emitted_once
     _active_tool_calls.clear()
     _last_status = None
     _research_started = False
@@ -477,6 +565,16 @@ def reset_run_state():
     _seen_research_headers = set()
     _research_headers_emitted = 0
     _emitted_source_keys = set()
+    _sources_parsed = False
+    _thought_scan_pos = 0
+    _text_scan_pos = 0
+    _seen_text_markers = set()
+    _emitted_once = set()
+    _designed_slides.clear()
+    _ready_slides.clear()
+    _slide_names.clear()
+    _current_slide = None
+    _total_pages_seen = None
 
 
 def _check_thought_for_status(text: str):
@@ -488,24 +586,36 @@ def _check_thought_for_status(text: str):
     one announcement naming the topic, then the model's own research sub-topics
     (its reasoning section headers), de-duplicated and capped.
     """
-    global _thought_accum, _research_started, _research_headers_emitted
+    global _thought_accum, _research_started, _research_headers_emitted, _thought_scan_pos
     if not text:
         return
     _thought_accum += text
-    low = _thought_accum.lower()
 
-    # 1) Announce the start of web research once, naming the user's topic.
-    if not _research_started and any(k in low for k in _RESEARCH_SIGNAL_KEYWORDS):
-        _research_started = True
-        if _research_topic:
-            log_status(f"Searching the web for the latest information on: '{_research_topic}'...")
-        else:
-            log_status("Searching the web for the latest facts and figures on your topic...")
+    # The incremental scans (headers, URLs) only need to look at what arrived since
+    # last time, plus a fixed overlap so a pattern split across a streaming
+    # boundary is still caught. This keeps per-delta work ~O(1) instead of
+    # re-scanning the whole (ever-growing) buffer — total cost O(n) not O(n²).
+    # Dedup (_seen_research_headers / _emitted_source_keys) makes re-matches inside
+    # the overlap harmless.
+    window_start = max(0, _thought_scan_pos - _SCAN_OVERLAP)
+    window = _thought_accum[window_start:]
+
+    # 1) Announce the start of web research once, naming the user's topic. Only
+    #    scanned until it fires — after that the (expensive) full-buffer .lower()
+    #    is skipped entirely for the rest of the run.
+    if not _research_started:
+        low = window.lower()
+        if any(k in low for k in _RESEARCH_SIGNAL_KEYWORDS):
+            _research_started = True
+            if _research_topic:
+                log_status(f"Searching the web for the latest information on: '{_research_topic}'...")
+            else:
+                log_status("Searching the web for the latest facts and figures on your topic...")
 
     # 2) Surface clean research sub-topics from reasoning section headers, e.g.
     #    **Verifying IPO Details** -> "Researching: Verifying IPO Details".
     if _research_started and _research_headers_emitted < _MAX_RESEARCH_HEADERS:
-        for raw in re.findall(r"\*\*([A-Z][^*\n]{3,60}?)\*\*", _thought_accum):
+        for raw in re.findall(r"\*\*([A-Z][^*\n]{3,60}?)\*\*", window):
             header = raw.strip().rstrip(":.").strip()
             key = header.lower()
             if not header or key in _seen_research_headers:
@@ -519,12 +629,16 @@ def _check_thought_for_status(text: str):
                 break
 
     # 3) Surface the research citation manifest if the model emitted it in thoughts.
-    _scan_research_sources(_thought_accum)
+    #    Extraction uses the full buffer (the marker + JSON block must be
+    #    contiguous); `window` is the cheap trigger gate so this stays O(window).
+    _scan_research_sources(_thought_accum, window)
 
     # 4) Harvest bare URLs that surface only in reasoning (grounding leaves no
     #    manifest/`## Sources` trace for some domains). Idempotent by domain;
-    #    scans the full buffer so URLs split across thought deltas aren't missed.
-    _harvest_urls_from_text(_thought_accum)
+    #    windowed scan with overlap so URLs split across deltas are still caught.
+    _harvest_urls_from_text(window)
+
+    _thought_scan_pos = len(_thought_accum)
 
 
 def _emit_research_sources(sources: Any):
@@ -599,25 +713,51 @@ def _harvest_urls_from_text(text: str):
         _emit_research_sources([{"name": "", "url": u.rstrip('.,);]')} for u in found])
 
 
-def _scan_research_sources(buffer: str):
-    """Detect and parse the agent's `[[RESEARCH_SOURCES]]` JSON manifest."""
-    if not buffer or _RESEARCH_SOURCES_MARKER not in buffer:
+_SOURCES_BLOCK_RE = re.compile(
+    re.escape(_RESEARCH_SOURCES_MARKER) + r"\s*```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```",
+    re.DOTALL,
+)
+
+
+def _scan_research_sources(buffer: str, recent: str | None = None):
+    """Detect and parse the agent's `[[RESEARCH_SOURCES]]` JSON manifest.
+
+    Parses ALL marker blocks in the buffer (not just the first), so an early
+    empty `{"sources": []}` does not lock out a later populated manifest — the
+    regex would otherwise always match the first block. Source emission is
+    idempotent (deduped by domain), so re-parsing earlier blocks is harmless.
+
+    Cost control: the heavy DOTALL scan only runs when the marker is present in
+    `recent` (the small streaming window the callers pass) AND a new marker has
+    arrived since the last parse — so per-delta work stays O(window), not O(n).
+    Short-circuits permanently only once a NON-empty manifest has been emitted.
+    """
+    global _sources_parsed
+    if _sources_parsed or not buffer:
         return
-    # Marker followed by a fenced JSON block (object or array).
-    m = re.search(
-        re.escape(_RESEARCH_SOURCES_MARKER) + r"\s*```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```",
-        buffer,
-        re.DOTALL,
-    )
-    if not m:
+    # Cheap trigger gate: only run the heavy DOTALL scan when the marker is in the
+    # recent streaming window (full buffer if `recent` not supplied, e.g. the .md
+    # result path). Once the marker scrolls past the window without a populated
+    # manifest (a lone empty `{"sources": []}`), re-scans stop automatically — so
+    # per-delta cost stays O(window), not O(n). The block may still be streaming
+    # in, so we re-scan on each delta the marker is present until it parses.
+    probe = recent if recent is not None else buffer
+    if _RESEARCH_SOURCES_MARKER not in probe:
         return
-    try:
-        data = json.loads(m.group(1))
-    except Exception:
-        return
-    sources = data.get("sources") if isinstance(data, dict) else data
-    if isinstance(sources, list):
-        _emit_research_sources(sources)
+
+    emitted_real = False
+    for m in _SOURCES_BLOCK_RE.finditer(buffer):
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        sources = data.get("sources") if isinstance(data, dict) else data
+        if isinstance(sources, list):
+            _emit_research_sources(sources)
+            if sources:
+                emitted_real = True
+    if emitted_real:
+        _sources_parsed = True
 
 
 def _parse_sources_from_md(file_path: str) -> list:
@@ -652,6 +792,123 @@ def _parse_sources_from_md(file_path: str) -> list:
     return sources
 
 
+def _extract_command(args: Any) -> str:
+    """Pull the shell command out of a run_command tool's args.
+
+    The SDK passes the command under the camelCase key ``commandLine`` (as seen in
+    the raw harness protocol). Older/other shapes use ``command`` / ``CommandLine``
+    or nest it under ``runCommand``. Dict ``.get`` is case-sensitive, so we check
+    each known spelling explicitly and fall back to a case-insensitive scan — a
+    miss here silently drops every run_command-derived status line.
+    """
+    if isinstance(args, str):
+        return args
+    if not isinstance(args, dict):
+        return ""
+    for k in ("commandLine", "command", "CommandLine", "cmd"):
+        v = args.get(k)
+        if isinstance(v, str) and v:
+            return v
+    rc = args.get("runCommand")
+    if isinstance(rc, dict):
+        for k in ("commandLine", "command", "CommandLine"):
+            v = rc.get(k)
+            if isinstance(v, str) and v:
+                return v
+    for k, v in args.items():
+        if isinstance(k, str) and k.lower() in ("commandline", "command", "cmd") and isinstance(v, str) and v:
+            return v
+    return ""
+
+
+def _mark_slide_ready(slide_num: int | None):
+    """Announce that a given slide's SVG is complete (idempotent per run).
+
+    Called when the agent moves on from a slide (next slide begins, or finalize/
+    export starts). Uses the page total from spec_lock when known so the wording
+    matches the paired "Designing slide N of M..." emitter.
+    """
+    global _ready_slides
+    if slide_num is None or slide_num in _ready_slides:
+        return
+    _ready_slides.add(slide_num)
+    if _total_pages_seen is not None:
+        log_status(f"Slide {slide_num} of {_total_pages_seen} is ready.")
+    else:
+        name = _slide_names.get(slide_num, "")
+        if name:
+            log_status(f"Slide ready: {name.replace('_', ' ').title()}.")
+        else:
+            log_status(f"Slide {slide_num} is ready.")
+
+
+def _mark_all_slides_ready():
+    """Flush a ready event for every designed-but-not-yet-ready slide, in order.
+
+    Invoked when finalize/export begins so the last slide (and any slide reopened
+    by a late polish edit) gets its closing "ready" event.
+    """
+    for n in sorted(_designed_slides):
+        _mark_slide_ready(n)
+
+
+def _log_status_once(message: str):
+    """Emit a status line at most once per run.
+
+    The agent re-runs some pipeline scripts (e.g. finalize/export after fixing a
+    slide), so their tool-call status lines would otherwise repeat. This caps the
+    noisy ones to a single emission without suppressing genuinely recurring steps
+    like the quality checker.
+    """
+    if message in _emitted_once:
+        return
+    _emitted_once.add(message)
+    log_status(message)
+
+
+def _extract_target_path(args: Any) -> str:
+    """Pull the target file path out of a write/edit tool's args, cleaning file:///."""
+    if isinstance(args, dict):
+        fp = (
+            args.get("filePath") or args.get("file_path") or
+            args.get("TargetFile") or args.get("target_file") or ""
+        )
+    elif isinstance(args, str):
+        fp = args
+    else:
+        fp = ""
+    if not fp:
+        return ""
+    if fp.startswith("file:///"):
+        fp = fp[8:]
+        if len(fp) > 2 and fp[1] == ":" and fp[0] == "/":
+            fp = fp[1:]
+    return fp
+
+
+def _svg_slide_info(file_path: str) -> tuple[int | None, int | None, str]:
+    """Return (slide_num, total_pages, slide_name) for an svg_output/svg_final path.
+
+    slide_num is parsed from the filename (e.g. 02_manifesto -> 2); total_pages is
+    read from the project's spec_lock page rhythm. Either may be None when not
+    determinable. Shared by the "designing"/"polishing" (tool-call) and "ready"
+    (tool-result) status emitters so the two can never disagree on numbering.
+    """
+    filename = Path(file_path).name
+    slide_name = Path(file_path).stem
+    slide_num = None
+    total_pages = None
+    match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
+    if match:
+        slide_num = int(match.group(1))
+    project_dir = _get_project_dir_from_path(file_path)
+    if project_dir:
+        pages = _get_page_rhythm_from_spec_lock(project_dir)
+        if pages:
+            total_pages = len(pages)
+    return slide_num, total_pages, slide_name
+
+
 def _check_tool_call_for_status(chunk: Any):
     """Parses tool calls to detect and log key pipeline actions."""
     if not chunk or not hasattr(chunk, "name") or not hasattr(chunk, "id"):
@@ -679,16 +936,16 @@ def _check_tool_call_for_status(chunk: Any):
         return
 
     if chunk.name == "run_command":
-        cmd = ""
-        # Inspect arguments depending on shape/type
-        if isinstance(chunk.args, dict):
-            cmd = chunk.args.get("command") or chunk.args.get("CommandLine") or ""
-        elif isinstance(chunk.args, str):
-            cmd = chunk.args
-            
+        cmd = _extract_command(chunk.args)
+
         if not cmd:
             return
-            
+
+        # Finalize / export begins → every designed slide is now complete. Emit
+        # the closing "Slide N is ready" events before the finalize/export line.
+        if "finalize_svg.py" in cmd or "svg_to_pptx.py" in cmd:
+            _mark_all_slides_ready()
+
         # Match commands against key scripts in the pipeline
         if "pdf_to_md.py" in cmd:
             log_status("Extracting content from source PDF...")
@@ -717,9 +974,10 @@ def _check_tool_call_for_status(chunk: Any):
         elif "total_md_split.py" in cmd:
             log_status("Structuring slide content and speaker notes...")
         elif "finalize_svg.py" in cmd:
-            log_status("Finalizing slide graphics and optimizing assets...")
+            # Re-run after slide fixes; cap to one emission per run (see #1).
+            _log_status_once("Finalizing slide graphics and optimizing assets...")
         elif "svg_to_pptx.py" in cmd:
-            log_status("Exporting presentation to editable PowerPoint (.pptx)...")
+            _log_status_once("Exporting presentation to editable PowerPoint (.pptx)...")
         elif "svg_position_calculator.py" in cmd or "verify_charts" in cmd:
             log_status("Calibrating and verifying slide chart geometry...")
         elif "register_template.py" in cmd:
@@ -749,50 +1007,47 @@ def _check_tool_call_for_status(chunk: Any):
 
         file_path_norm = file_path.replace("\\", "/")
         
-        # Detect slide SVG writing
+        # Detect slide SVG writing. The first write of a slide announces
+        # "Designing slide N" and marks the PREVIOUS slide ready; a later write to
+        # the same slide is a polish pass, surfaced as "Refining slide N" (never a
+        # duplicate "Designing"). This is the only completion signal available
+        # because the SDK emits no ToolResult chunks.
         if "svg_output/" in file_path_norm and file_path_norm.endswith(".svg"):
+            global _current_slide, _total_pages_seen
             try:
-                filename = Path(file_path).name
-                slide_name = Path(file_path).stem
-                project_dir = _get_project_dir_from_path(file_path)
-                slide_num = None
-                total_pages = None
+                slide_num, total_pages, slide_name = _svg_slide_info(file_path)
+                if total_pages is not None:
+                    _total_pages_seen = total_pages
+                if slide_num is not None:
+                    _slide_names[slide_num] = slide_name
 
-                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
-                if match:
-                    slide_num = int(match.group(1))
-                
-                if project_dir:
-                    pages = _get_page_rhythm_from_spec_lock(project_dir)
-                    if pages:
-                        total_pages = len(pages)
-                        
-                if slide_num is not None and total_pages is not None:
-                    log_status(f"Designing slide {slide_num} of {total_pages}...")
+                if slide_num is not None and slide_num in _designed_slides:
+                    # Revisit / polish pass on an already-created slide.
+                    if total_pages is not None:
+                        log_status(f"Refining slide {slide_num} of {total_pages}...")
+                    else:
+                        log_status(f"Refining slide for {slide_name.replace('_', ' ').title()}...")
+                    # Reopened: it is no longer "ready" until we move on again
+                    # (a closing ready event fires at the next slide or finalize).
+                    _ready_slides.discard(slide_num)
+                    _current_slide = slide_num
                 else:
-                    formatted_slide_name = slide_name.replace("_", " ").title()
-                    log_status(f"Designing slide for {formatted_slide_name}...")
+                    # First time on this slide → the previous slide is now ready.
+                    _mark_slide_ready(_current_slide)
+                    if slide_num is not None:
+                        _designed_slides.add(slide_num)
+                    if slide_num is not None and total_pages is not None:
+                        log_status(f"Designing slide {slide_num} of {total_pages}...")
+                    else:
+                        log_status(f"Designing slide for {slide_name.replace('_', ' ').title()}...")
+                    _current_slide = slide_num
             except Exception as e:
                 logger.warning("Failed to parse slide number or total pages: %s", e)
                 log_status("Designing layout for next slide...")
-                
+
         elif "svg_final/" in file_path_norm and file_path_norm.endswith(".svg"):
             try:
-                filename = Path(file_path).name
-                slide_name = Path(file_path).stem
-                project_dir = _get_project_dir_from_path(file_path)
-                slide_num = None
-                total_pages = None
-
-                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
-                if match:
-                    slide_num = int(match.group(1))
-                
-                if project_dir:
-                    pages = _get_page_rhythm_from_spec_lock(project_dir)
-                    if pages:
-                        total_pages = len(pages)
-                        
+                slide_num, total_pages, slide_name = _svg_slide_info(file_path)
                 if slide_num is not None and total_pages is not None:
                     log_status(f"Polishing slide {slide_num} of {total_pages}...")
                 else:
@@ -896,11 +1151,7 @@ def _check_tool_result_for_status(chunk: Any):
     is_error = bool(getattr(chunk, "error", None) or getattr(chunk, "exception", None))
 
     if tool_name == "run_command":
-        cmd = ""
-        if isinstance(tool_args, dict):
-            cmd = tool_args.get("command") or tool_args.get("CommandLine") or ""
-        elif isinstance(tool_args, str):
-            cmd = tool_args
+        cmd = _extract_command(tool_args)
 
         if not cmd:
             return
@@ -958,6 +1209,10 @@ def _check_tool_result_for_status(chunk: Any):
                 log_status("PowerPoint presentation assembly and export failed.")
             else:
                 log_status("PowerPoint presentation (.pptx) successfully assembled and exported!")
+
+    # NOTE: per-slide "Slide N is ready" events are emitted from the tool-CALL
+    # stream (see _check_tool_call_for_status / _mark_slide_ready), NOT here. This
+    # SDK does not emit ToolResult chunks, so a result-driven approach never fires.
 
     elif _is_web_search_tool(tool_name):
         if is_error:
