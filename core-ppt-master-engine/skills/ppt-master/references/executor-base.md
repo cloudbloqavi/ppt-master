@@ -14,8 +14,10 @@
 |---|---|
 | Chosen template's `design_spec.md` (read frontmatter to detect `replication_mode`) | `templates/<chosen_template>/design_spec.md` |
 | Every distinct `<basename>` in `spec_lock.md page_layouts` | `templates/<chosen_template>/<basename>.svg` |
-| Every distinct chart name in `spec_lock.md page_charts` | `templates/charts/<chart_name>.svg` |
-| Chart types in `design_spec.md §VII` not covered above | `templates/charts/<chart_name>.svg` |
+| Every distinct chart name in `spec_lock.md page_charts` (**company-tier first**) | company key → `templates/charts/powerslides_infographics/<chart_name>.svg`; otherwise → `templates/charts/<chart_name>.svg` |
+| Chart types in `design_spec.md §VII` not covered above | per the §VII `Tier`/`Path` columns (company → `powerslides_infographics/`, stock → `templates/charts/`) |
+
+> **Chart path resolution (Hard rule — fixes silent fallback).** A `page_charts` value resolves to a **company** chart when it is a numeric-prefixed key (`NN_name`, e.g. `18_swot`, `19_fishbone`, `31_maturity_transformation_roadmap`) that exists at `templates/charts/powerslides_infographics/<value>.svg` — that path is authoritative; do NOT look for it under `templates/charts/<value>.svg` (it is not there, and guessing/grepping by name is unreliable). All other values resolve under `templates/charts/<value>.svg`. The authoritative tier + path for every viz page is in `chart_provenance.json` and `design_spec.md §VII`; consult them when in doubt.
 
 **Forbidden — re-reading during generation**:
 - Layout SVG already loaded in this batch
@@ -293,6 +295,16 @@ Chart SVGs referenced in **VII. Visualization Reference List** are loaded once v
 > 1. Reproduce the template's **layout logic and distinctive elements** (phase columns, stacked objective slots, the matrix grid, etc.) in clean SVG using the deck's locked palette/typography — i.e. treat the heavy template as a *visual reference* (mirror-style, §1.1), redrawing its geometry without copying its banned filter constructs.
 > 2. If the page genuinely cannot carry that structure, emit `warning: P<NN> page_charts template <name> abandoned — output uses <fallback> instead; structure differs from catalog` so the divergence is visible, never silent.
 > 3. As a sanity check, a chart page whose final SVG is drastically smaller/simpler than its source template (e.g. <30% of the template's element count) is a signal you downgraded it — re-examine before finalizing.
+
+### 5.0 Confirm chart provenance (Required when `chart_provenance.json` exists)
+
+The Strategist wrote `chart_provenance.json` with `confirmed_by: "strategist"` (intent). The Executor is the source of truth for **what actually shipped**, so after generating each viz page, reconcile its entry:
+
+- If you reproduced the assigned reference's structure (company/stock) → set that page's `confirmed_by: "executor"` (leave `tier`/`key`/`reference` as-is).
+- If you **abandoned** the assigned template (emitted the §5 `warning: P<NN> page_charts template <name> abandoned …`) → rewrite that page to `tier: "custom"`, `key: null`, `reference: null`, and put the abandonment reason in `decision`. Do not leave a `company`/`stock` entry pointing at a reference the slide does not actually carry — that is the exact intent-vs-actual drift this file exists to kill.
+- If a page has no chart, it has no entry.
+
+Keep `chart_provenance.json`, `spec_lock.md page_charts`, and §VII consistent. The runner validates this file after the turn (reference files must exist on disk for company/stock; custom needs a non-empty `decision`) and runs the structural-mimic review against it.
 
 ### 5.1 Chart Coordinate Calibration
 

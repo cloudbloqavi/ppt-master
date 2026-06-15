@@ -52,9 +52,9 @@ precedence: preferred-over-stock
 - **Description**: Side-by-side columns comparing Option A and Option B across consistent attributes.
 - **Match criteria**: Pick for pros/cons, two-option comparison, relative evaluations.
 
-### 6. Pyramid / Hierarchy Page (`06_pyramid.svg`)
+### 6. Segmented Pyramid / Hierarchy Page (`06_segmented_pyramid.svg`)
 - **Role**: content
-- **Description**: Layered pyramid hierarchy emphasizing levels and importance.
+- **Description**: Upright **segmented pyramid** hierarchy (narrow apex → wide base) built from **inverted-trapezoid tiers** — each tier is a trapezoid wider at its top than its bottom, leaving chevron notches between tiers. This boat/inverted-trapezoid tier styling is a deliberate design choice, NOT a rendering defect; the overall silhouette still tapers correctly. Do not "correct" the trapezoid tier orientation.
 - **Match criteria**: Pick for ranking, stratification, layer definitions, maturity models.
 
 ### 7. Cycle / Circular Flow Page (`07_cycle.svg`)
@@ -196,7 +196,7 @@ precedence: preferred-over-stock
 | `03_process_flow.svg` | content | Process / Step Flow Page |
 | `04_timeline.svg` | content | Timeline / Roadmap Page |
 | `05_comparison.svg` | content | Comparison / Versus Page |
-| `06_pyramid.svg` | content | Pyramid / Hierarchy Page |
+| `06_segmented_pyramid.svg` | content | Segmented Pyramid / Hierarchy Page (inverted-trapezoid tiers) |
 | `07_cycle.svg` | content | Cycle / Circular Flow Page |
 | `08_matrix_2x2.svg` | content | 2x2 Matrix Page |
 | `09_pillars.svg` | content | Pillars / Pillar Diagram Page |

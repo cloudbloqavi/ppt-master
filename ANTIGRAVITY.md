@@ -27,7 +27,10 @@ ai-builder-engine/               # Root: SDK infrastructure & deployment config
 │   ├── status_logger.py         # User-facing status progress logging
 │   ├── tools.py                 # Workspace and self-test execution tools
 │   ├── resumption.py            # Watchdog/resumption logic
-│   ├── artifacts.py             # Replicating workspace to output directory
+│   ├── checkpoints.py           # Artifact-driven checkpoint / stage detection for resume
+│   ├── artifacts.py             # Replicating workspace to output directory (+ chart_provenance copy)
+│   ├── visual_enforcement.py    # Runner-enforced layout audit + auto-fix (post-turn)
+│   ├── provenance_enforcement.py# Chart provenance validation + structural-mimic review (post-turn)
 │   └── core.py                  # Core agent loop and runner entry points
 └── core-ppt-master-engine/      # Core application
     ├── skills/ppt-master/
@@ -226,6 +229,60 @@ When spawning the background harness subprocess via `subprocess.Popen`, the wrap
 
 #### 4. Cloud Logging Stream
 The harness stderr stream is wrapped and printed as `[Harness] <line>` to Python's stderr. In Google Cloud Run Jobs, this ensures all harness logs are captured, structured, and indexed by Cloud Logging.
+
+---
+
+## 🩺 SVG Quality, Chart Provenance & Structural-Mimic Review
+
+The engine matches every visualization slide to a template — **company catalog first** (`templates/charts/powerslides_infographics/`), then the **stock** catalog (`templates/charts/`), then a bespoke **custom** design — and reproduces that template's structure with the runtime theme. The following artifact + tools make that pipeline auditable and fixable. (Background: company templates were historically never selected, and matched templates were silently redrawn as new shapes; these close both gaps.)
+
+### `chart_provenance.json` — per-slide selection decision record
+
+Written by the Strategist and **confirmed by the Executor** (the Executor is the source of truth for what actually shipped), one entry per chart slide. It is the single reconciled record — `design_spec.md §VII` (intent), `spec_lock.md page_charts` (lock), and the drawn SVG could otherwise disagree. Schema: [`templates/chart_provenance_reference.md`](core-ppt-master-engine/skills/ppt-master/templates/chart_provenance_reference.md).
+
+| `tier` | `reference` resolves to | Reviewed against a reference? |
+|:---|:---|:---|
+| `company` | `templates/charts/powerslides_infographics/<key>.svg` | yes |
+| `stock` | `templates/charts/<key>.svg` | yes |
+| `custom` | `null` (bespoke; `decision` MUST say why neither catalog fit) | no — skipped |
+
+It is copied **next to the run logs** in `OUTPUT_ARTIFACTS_DIR/<project>/` (see `artifacts.py` → `_copy_provenance_alongside`) so the decision flow can be inspected alongside `run_manifest.json` and the logs.
+
+### Runner-enforced structural-mimic review
+
+After the agent's turn (right after the visual-review enforcement, in `core.py`), `agent_runner/provenance_enforcement.py`:
+1. **Validates** `chart_provenance.json` — references exist on disk for `company`/`stock`, company refs sit under `powerslides_infographics/`, every `custom` page carries a non-empty reason.
+2. **Reviews structure** via `core-ppt-master-engine/skills/ppt-master/scripts/chart_structural_review.py` — tier-aware: for `company`/`stock` slides it compares the **generated SVG's topology** against the reference (element-type histogram + repeated-unit count + element mass), and **skips** `custom`. Runtime theme (color/font/exact text) is deliberately ignored — only structure. Report-only/advisory; per-page findings land in `<project>/.review/structural/summary.json`. The affinity formula + thresholds are documented in the script.
+
+> Limitation: this is **topology** comparison — it cannot see geometry-orientation or aesthetic bugs (e.g. an inverted-but-same-shapes pyramid scores ~identical). Those need a rendered look (the visual-review pass), which is why `svg_doctor` flags them rather than auto-fixing.
+
+### `svg_doctor.py` — standalone single-SVG lint & auto-fix
+
+Vets **any one SVG** with no project context — a hand-authored slide, or sweeping the chart catalog to find fragile templates:
+
+```bash
+SD=core-ppt-master-engine/skills/ppt-master/scripts/svg_doctor.py
+python3 $SD file.svg            # REVIEW (default): list issues, change nothing
+python3 $SD file.svg --fix      # FIX: apply AUTO-FIXABLE items only (REVIEW items never touched)
+python3 $SD file.svg --fix -o out.svg   # write the fixed copy elsewhere
+python3 $SD file.svg --json     # machine-readable findings (for CI / catalog sweeps)
+```
+
+Findings split into two classes. **Hard invariant: `--fix` must never change how the SVG renders** — it only repairs internal issues while leaving the visible asset pixel-identical. Anything whose safe fix is *not* visually neutral is flag-only. (Core principle: **not every fix needs AI**.)
+
+| Class | Examples | Fix path |
+|:---|:---|:---|
+| **AUTO-FIX** (provably visual no-op) | add `xmlns`/`viewBox`, HTML entity → identical glyph, unescaped `&` → `&amp;`, `rgba()` → hex **+ matching `-opacity` (alpha preserved)**, strip non-rendering `<script>`/`<iframe>` | deterministic `--fix` — no AI |
+| **NEEDS REVIEW** (intent/aesthetics, OR a fix that would alter appearance) | mirrored/flipped transforms (the pyramid-inversion class), raw-export bloat, out-of-bounds, orphan baseline, heavy SVG; **plus** `<style>`/`<foreignObject>`/`<animate>`, `class=`, `<g opacity>`, `rgba` inside `style="…"` | **flag only** — fix by human/AI while preserving the look |
+
+`--fix` never edits a REVIEW-class item, so it can neither break a slide nor silently change its appearance. Exit code is `1` when REVIEW findings remain (CI-gateable). Sweep the company catalog with:
+
+```bash
+for f in core-ppt-master-engine/skills/ppt-master/templates/charts/powerslides_infographics/*.svg; do
+  python3 $SD "$f" --json; done
+```
+
+> **Catalog note (raw exports):** several company templates are raw PowerPoint exports whose geometry uses `matrix(1 0 0 -1 …)` vertical flips. Faithful mimicry reproduces them as-is, which can render inverted/jagged (the original "broken pyramid"). `svg_doctor` flags these as `mirrored_transform`; the fix is to **re-orient** the paths (flip → `translate`), not to remove them blindly — see the corrected `06_pyramid.svg` for the pattern.
 
 ---
 

@@ -383,6 +383,28 @@ def copy_output_artifacts(
         except Exception as exc:
             logger.warning("  Failed to copy status progress log file alongside manifest: %s", exc)
 
+    def _copy_provenance_alongside(manifest_dir: Path, project_name: str) -> None:
+        """Copy the project's chart_provenance.json next to the run logs/manifest.
+
+        The full project tree (incl. chart_provenance.json) is normally mirrored
+        already, but that relies on modified-file detection. Copying it explicitly
+        — the same way the logs are — guarantees the chart-selection decision
+        record always lands beside the logs for inspecting the decision flow,
+        including resume/edge cases where the mirror might skip an unchanged file.
+        """
+        for source in source_candidates:
+            src = source / project_name / "chart_provenance.json"
+            if not src.is_file():
+                continue
+            dest = manifest_dir / "chart_provenance.json"
+            try:
+                if dest.resolve() != src.resolve():
+                    shutil.copy2(src, dest)
+                    logger.info("  Chart provenance copied to: %s", dest)
+            except Exception as exc:
+                logger.warning("  Failed to copy chart_provenance.json alongside manifest: %s", exc)
+            return
+
     if copied_projects:
         global _logs_copied_into_project
         for project_dir in copied_projects:
@@ -394,6 +416,7 @@ def copy_output_artifacts(
                 logger.error("  Failed to write run manifest inside project %s: %s", project_dir, exc)
             _copy_log_alongside(manifest_path.parent)
             _copy_status_log_alongside(manifest_path.parent)
+            _copy_provenance_alongside(manifest_path.parent, project_dir)
             # Logs now live inside the project folder; the top-level originals
             # at OUTPUT_ARTIFACTS_DIR root are redundant and will be cleaned up
             # by finalize_log_placement() at the end of the run.

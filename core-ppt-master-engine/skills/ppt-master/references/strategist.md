@@ -622,7 +622,7 @@ Before matching the stock `charts_index.json`, the Strategist MUST consult the i
 > **Weighting is not blind forcing.** Respect each entry's `Skip` clause and content-shape fit: if a company entry's `Skip` condition applies, or its SVG is a raw export the Executor cannot cleanly reproduce ([`executor-base.md`](executor-base.md) §"never silently abandon a matched chart template"), fall through to the stock catalog and then the standard fallback chain (table / AI image / custom), marking the page `no-template-match`. The §0 contract still binds the slide's *requested visualization intent and content* through whichever layer carries it — high weighting biases selection toward the company SVG, it does not override genuine unsuitability.
 
 > **Reading is mandatory; the catalog is a starting point, not a copy target.**
-> -   Fully read `templates/charts/charts_index.json` **before drafting the Eight Confirmations** — the read happens up front, not when you sit down to write Section VII. The file contains `meta` + `charts.<key>.summary` only; each `summary` is a selection rule (`"Pick for … Skip if …"`), not a description. There is **no category, quickLookup, or keyword index** — selection is done by semantically matching each page's content shape against all 71 summaries in one pass.
+> -   **Read BOTH catalogs, company first, before drafting the Eight Confirmations** — the reads happen up front, not when you sit down to write Section VII. Read `templates/charts/powerslides_infographics/company_index.json` (30 entries) **first**, then `templates/charts/charts_index.json` (71 entries). Each file contains `meta` + `<key>.summary` only; each `summary` is a selection rule (`"Pick for … Skip if …"`), not a description. There is **no category, quickLookup, or keyword index** — selection is done by semantically matching each page's content shape against all 30 + 71 summaries in one pass, giving company entries precedence (see "Company catalog first" above). **Skipping the company read is a hard failure** — the runner validates `chart_provenance.json` after the turn and a deck whose viz pages all fell to stock/custom without the company catalog having been read will be flagged.
 > -   Not every page needs a chart. When a page's information structure matches a catalog entry, **use that template as a structural starting point** — keep the visualization type and core layout logic, then adapt composition, density, color, decoration, and accompanying elements to fit this deck's content and visual tone. Free adjustment is encouraged; what is forbidden is (a) generating without reading the catalog, and (b) blind verbatim mimicry that ignores the page's actual content weight.
 >
 > **Workflow**:
@@ -637,11 +637,11 @@ Before matching the stock `charts_index.json`, the Strategist MUST consult the i
 > ```
 > Catalog read: 30 company + 71 stock templates
 >
-> | Page | Template      | Path                              | Summary-quote (verbatim) | Usage |
-> | ---- | ------------- | --------------------------------- | ------------------------ | ----- |
-> | P03  | bar_chart     | templates/charts/bar_chart.svg    | "<verbatim first sentence>" | <intent> |
-> | P07  | line_chart    | templates/charts/line_chart.svg   | "<verbatim first sentence>" | <intent> |
-> | P11  | pie_chart     | templates/charts/pie_chart.svg    | "<verbatim first sentence>" | <intent> |
+> | Page | Tier    | Template      | Path                                                       | Summary-quote (verbatim) | Usage |
+> | ---- | ------- | ------------- | ---------------------------------------------------------- | ------------------------ | ----- |
+> | P03  | company | 19_fishbone   | templates/charts/powerslides_infographics/19_fishbone.svg  | "<verbatim first sentence>" | <intent> |
+> | P07  | stock   | line_chart    | templates/charts/line_chart.svg                            | "<verbatim first sentence>" | <intent> |
+> | P11  | custom  | —             | no-template-match                                          | "<reason neither catalog fit>" | <intent> |
 >
 > Runners-up considered (3 entries minimum, drawn from real second-best matches):
 > - <key_A> | rejected for P03: <reason citing this deck's specifics>
@@ -650,10 +650,12 @@ Before matching the stock `charts_index.json`, the Strategist MUST consult the i
 > ```
 > The `summary-quote` must be copy-pasted from `charts_index.json` — paraphrasing or summarizing breaks the audit. Every template name listed (selected or rejected) must `grep` cleanly inside `charts_index.json` (so misspelled or invented keys fail). If fewer than 3 visualization pages exist, list what exists and note "fewer than 3 viz pages"; runners-up still required for each page that does exist.
 >
-> **Fallback when no template fits**:
-> 1.  Re-read the full summary list with the page's intent re-stated in plain language — "non-obvious" matches often surface on the second pass (e.g. "causal chain" → `process_flow` or `sankey_chart`).
-> 2.  If still no fit: data-driven content → table layout; conceptual/illustrative → "AI-generated image" (Image_Generator handles); structural → "custom layout".
-> 3.  Mark the page `no-template-match` in section VII with the fallback chosen and why. Do NOT silently substitute a close-but-wrong chart.
+> **Three-tier fallback cascade (company → stock → custom)** — apply per page, in order:
+> 1.  **Company tier**: a `company_index.json` entry whose `Pick` clause fits and whose SVG is cleanly reproducible (see [`executor-base.md`](executor-base.md) §"never silently abandon"). Record `tier: company`.
+> 2.  **Stock tier**: only if no company entry fit — re-read the full summary list with the page's intent re-stated in plain language ("non-obvious" matches often surface on the second pass, e.g. "causal chain" → `process_flow` or `sankey_chart`); a `charts_index.json` entry that fits → `tier: stock`.
+> 3.  **Custom tier**: only if **neither** catalog fits the page's content / style / theme coherence — data-driven → table layout; conceptual/illustrative → "AI-generated image" (Image_Generator handles); structural → "custom layout". Record `tier: custom` and mark the page `no-template-match` in section VII **with a one-sentence reason why neither catalog fit**. Do NOT silently substitute a close-but-wrong chart, and do NOT skip straight to custom without having attempted both catalogs.
+
+> **Emit `chart_provenance.json` (mandatory when any viz page exists)** — immediately after writing §VII and `spec_lock.md`, write `<project_path>/chart_provenance.json` per [`templates/chart_provenance_reference.md`](../templates/chart_provenance_reference.md). One entry per viz page with `tier` / `key` / `reference` / `viz_type` / `decision` / `confirmed_by: "strategist"`. This is the reconciled single-truth record the Executor confirms and the runner validates; `custom` pages MUST carry a non-empty `decision` reason. Keep it consistent with §VII and `page_charts` (same tier, same key, same path).
 
 ### Speaker Notes Requirements (Default — no discussion needed)
 

@@ -222,13 +222,21 @@ Two views on the same font decisions — fill both, keep them consistent:
 
 ## VII. Visualization Reference List (if needed)
 
-> When pages map to a chart-library template (data charts OR structural patterns — team rosters, agendas, frameworks, etc.), Strategist lists them here for Executor reference. Single combined table — `summary-quote` column is the anti-fabrication audit, `path` + `usage` columns serve Executor lookup.
+> When pages map to a chart-library template (data charts OR structural patterns — team rosters, agendas, frameworks, etc.), Strategist lists them here for Executor reference. Single combined table — `summary-quote` column is the anti-fabrication audit, `tier` + `path` + `usage` columns serve Executor lookup and provenance.
 
-Catalog read: 71 templates
+**Catalog read: 30 company + 71 stock templates.** You MUST read the company catalog (`templates/charts/powerslides_infographics/company_index.json`, 30 entries) **before** the stock catalog (`charts_index.json`, 71 entries) and prefer it — see `strategist.md` §VII "Company catalog first" for the per-page precedence. Quote from whichever catalog the entry came from.
 
-| Page | Template | Path | Summary-quote (verbatim from `charts_index.json`) | Usage |
-| ---- | -------- | ---- | ------------------------------------------------- | ----- |
-| P05 | grouped_bar_chart | `templates/charts/grouped_bar_chart.svg` | "Pick for 2-4 series side-by-side across the same categories (e.g. YoY/QoQ). Skip if showing composition within each category (use stacked_bar_chart)." | YoY revenue comparison by product line |
+The `Tier` column records which catalog won, and is the source for `chart_provenance.json` (see [`chart_provenance_reference.md`](chart_provenance_reference.md)):
+
+- `company` → path is `templates/charts/powerslides_infographics/<key>.svg`
+- `stock` → path is `templates/charts/<key>.svg`
+- `custom` → no template fit; path is `no-template-match`, and the `Usage` cell MUST state why neither catalog fit (the mandatory custom reason).
+
+| Page | Tier | Template | Path | Summary-quote (verbatim from the source `*_index.json`) | Usage |
+| ---- | ---- | -------- | ---- | ------------------------------------------------------- | ----- |
+| P01 | company | 18_swot | `templates/charts/powerslides_infographics/18_swot.svg` | "Pick for SWOT (Strengths/Weaknesses/Opportunities/Threats) and internal-vs-external, positive-vs-negative assessment. Skip for generic 2x2 prioritization (use 08_matrix_2x2)." | SWOT assessment for SEA market entry |
+| P05 | stock | grouped_bar_chart | `templates/charts/grouped_bar_chart.svg` | "Pick for 2-4 series side-by-side across the same categories (e.g. YoY/QoQ). Skip if showing composition within each category (use stacked_bar_chart)." | YoY revenue comparison by product line (no company entry fit) |
+| P08 | custom | — | `no-template-match` | "fewer than 3 viz pages" | Bespoke layout: neither catalog carried a 5-year stacked-objective roadmap |
 
 **Runners-up considered** (3 entries minimum, drawn from real second-best matches in this deck):
 
@@ -236,7 +244,7 @@ Catalog read: 71 templates
 - `<key_B>` | rejected for P##: `<reason>`
 - `<key_C>` | rejected for P##: `<reason>`
 
-> **Audit rule**: `Summary-quote` must be copy-pasted verbatim — paraphrasing breaks the audit. Every template name listed must `grep` cleanly inside `charts_index.json` (so misspellings/inventions fail). If fewer than 3 viz pages exist, list what exists and note "fewer than 3 viz pages"; runners-up still required for each page that does exist.
+> **Audit rule**: `Summary-quote` must be copy-pasted verbatim from the catalog the entry came from — paraphrasing breaks the audit. Every `company`-tier template name must `grep` cleanly inside `company_index.json`; every `stock`-tier name inside `charts_index.json` (so misspellings/inventions fail). If fewer than 3 viz pages exist, list what exists and note "fewer than 3 viz pages"; runners-up still required for each page that does exist.
 
 ---
 

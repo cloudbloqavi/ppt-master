@@ -332,6 +332,7 @@ python3 ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 **Output**:
 - `<project_path>/design_spec.md` — human-readable design narrative
 - `<project_path>/spec_lock.md` — machine-readable execution contract (skeleton: `templates/spec_lock_reference.md`); Executor re-reads before every page
+- `<project_path>/chart_provenance.json` — per-page record of which visualization template each slide used (company → stock → custom tier), when the deck has any viz pages (schema: `templates/chart_provenance_reference.md`). The runner validates it and runs the structural-mimic review against it after the turn.
 
 **✅ Checkpoint — Phase deliverables complete, auto-proceed to next step**:
 ```markdown

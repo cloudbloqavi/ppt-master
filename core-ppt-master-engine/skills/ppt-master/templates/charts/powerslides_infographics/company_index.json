@@ -19,10 +19,10 @@
       "summary": "Pick for milestones, roadmaps, and time-ordered events on a single horizontal axis. Skip for multi-stream quarterly plans (use 23_quarterly_product_roadmap) or calendar grids (use 28_monthly_marketing_calendar)."
     },
     "05_comparison": {
-      "summary": "Pick for two-option comparison, pros/cons, side-by-side evaluation across consistent attributes. Skip for 3+ options or single-axis ranking (use 06_pyramid)."
+      "summary": "Pick for two-option comparison, pros/cons, side-by-side evaluation across consistent attributes. Skip for 3+ options or single-axis ranking (use 06_segmented_pyramid)."
     },
-    "06_pyramid": {
-      "summary": "Pick for ranking, stratification, layered hierarchy, and maturity levels. Skip for reporting-line org structures (use 11_org_tree)."
+    "06_segmented_pyramid": {
+      "summary": "Pick for ranking, stratification, layered hierarchy, and maturity levels — a segmented pyramid with inverted-trapezoid tiers (boat-style tiers are intentional, not a defect). Skip for reporting-line org structures (use 11_org_tree)."
     },
     "07_cycle": {
       "summary": "Pick for iterative loops, flywheels, PDCA, and continuous feedback cycles. Skip for one-directional linear steps (use 03_process_flow)."

@@ -31,6 +31,10 @@ from agent_runner.artifacts import (
     finalize_log_placement
 )
 from agent_runner.visual_enforcement import enforce_visual_review, status_line
+from agent_runner.provenance_enforcement import (
+    enforce_chart_provenance,
+    status_line as provenance_status_line,
+)
 
 # Process start time. Used to scope warm-retry research reuse to briefs written
 # during THIS invocation, so a retry never imports a stale brief left in the
@@ -750,6 +754,17 @@ def main_run() -> int:
             except Exception as vr_exc:
                 logger.error("Enforced visual-review stage errored (non-fatal): %s",
                              vr_exc, exc_info=True)
+
+            # Chart provenance validation + structural-mimic review (advisory):
+            # verifies viz slides recorded which template they used (company
+            # catalog first) and that company/stock slides carry the matched
+            # template's structure. Report-only — never fails the run.
+            try:
+                cp_result = enforce_chart_provenance(start_time)
+                log_status(provenance_status_line(cp_result))
+            except Exception as cp_exc:
+                logger.error("Chart provenance/structural review errored (non-fatal): %s",
+                             cp_exc, exc_info=True)
         except KeyboardInterrupt:
             run_status = "interrupted"
             log_status("Agent execution interrupted by user.")
