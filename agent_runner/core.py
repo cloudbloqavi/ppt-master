@@ -749,6 +749,8 @@ def main_run() -> int:
             # rebuilds the deck — because the agent had already exported from the
             # un-fixed SVGs. Honors --no-visual-review. Never fails the run.
             try:
+                if not ARGS.no_visual_review:
+                    log_status("Reviewing slide layouts for visual issues...")
                 vr_result = enforce_visual_review(ARGS.no_visual_review, start_time)
                 log_status(status_line(vr_result))
             except Exception as vr_exc:

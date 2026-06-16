@@ -48,7 +48,8 @@ _text_accum: str = ""                       # accumulated agent text (deltas)
 _seen_research_headers: set[str] = set()     # dedup of reasoning section headers
 _research_headers_emitted: int = 0           # count surfaced (capped)
 _emitted_source_keys: set[str] = set()       # domains already streamed as citation events (idempotent)
-_sources_parsed: bool = False                # manifest already parsed (stop re-scanning)
+_sources_parsed: bool = False                # populated manifest parsed (stop re-scanning)
+_sources_marker_open: bool = False            # marker seen, block not yet closed/parsed
 _thought_scan_pos: int = 0                   # high-water mark scanned in _thought_accum
 _text_scan_pos: int = 0                       # high-water mark scanned in _text_accum
 _seen_text_markers: set[str] = set()          # phase/step/role checkpoints already emitted
@@ -83,6 +84,13 @@ _MAX_RESEARCH_HEADERS = _env_int("STATUS_MAX_RESEARCH_HEADERS", 8)
 # chars; URLs are longer, hence the generous default). Dedup makes re-matches
 # inside the overlap harmless, so larger only costs a little CPU.
 _SCAN_OVERLAP = _env_int("STATUS_SCAN_OVERLAP_CHARS", 1024, minimum=64)
+# A populated [[RESEARCH_SOURCES]] block can be larger than _SCAN_OVERLAP (≈1.1KB
+# observed vs the 1KB window) — so the marker scrolls out of the streaming window
+# before its closing ``` fence arrives. Once a marker appears we therefore re-scan
+# from it until the block closes, capping the re-scanned region at this size so a
+# malformed, never-closed marker can't turn per-delta scanning into an unbounded
+# sweep of an ever-growing buffer.
+_SOURCES_MAX_BLOCK = _env_int("STATUS_SOURCES_MAX_BLOCK", 16384, minimum=2048)
 
 # Marker the agent prints before its machine-readable citation manifest (see
 # system_instructions.md "Research Source Citations").
@@ -556,7 +564,7 @@ def reset_run_state():
     global _last_status, _research_started, _thought_accum, _text_accum
     global _seen_research_headers, _research_headers_emitted, _emitted_source_keys
     global _current_slide, _total_pages_seen, _sources_parsed, _thought_scan_pos
-    global _text_scan_pos, _seen_text_markers, _emitted_once
+    global _text_scan_pos, _seen_text_markers, _emitted_once, _sources_marker_open
     _active_tool_calls.clear()
     _last_status = None
     _research_started = False
@@ -566,6 +574,7 @@ def reset_run_state():
     _research_headers_emitted = 0
     _emitted_source_keys = set()
     _sources_parsed = False
+    _sources_marker_open = False
     _thought_scan_pos = 0
     _text_scan_pos = 0
     _seen_text_markers = set()
@@ -727,26 +736,42 @@ def _scan_research_sources(buffer: str, recent: str | None = None):
     regex would otherwise always match the first block. Source emission is
     idempotent (deduped by domain), so re-parsing earlier blocks is harmless.
 
-    Cost control: the heavy DOTALL scan only runs when the marker is present in
-    `recent` (the small streaming window the callers pass) AND a new marker has
-    arrived since the last parse — so per-delta work stays O(window), not O(n).
-    Short-circuits permanently only once a NON-empty manifest has been emitted.
+    Cost control: a marker arms the scan (cheap substring check on the small
+    streaming `recent` window); once armed we re-scan a bounded region from the
+    first marker on each delta until a block actually closes. We deliberately do
+    NOT keep gating on the marker still being inside `recent` — a populated block
+    is often larger than the window, so by the time its closing ``` fence streams
+    in the marker has already scrolled out. The old window-only gate skipped the
+    completed block at that moment and the sources surfaced only when a *later*
+    marker happened to re-enter the window (or never), making citations appear at
+    the very end of the run instead of right after research. Staying armed until a
+    block closes fixes that ordering. Short-circuits permanently once a NON-empty
+    manifest is emitted; disarms (until the next marker) on a closed-but-empty
+    block or a never-closing marker past the size cap.
     """
-    global _sources_parsed
+    global _sources_parsed, _sources_marker_open
     if _sources_parsed or not buffer:
         return
-    # Cheap trigger gate: only run the heavy DOTALL scan when the marker is in the
-    # recent streaming window (full buffer if `recent` not supplied, e.g. the .md
-    # result path). Once the marker scrolls past the window without a populated
-    # manifest (a lone empty `{"sources": []}`), re-scans stop automatically — so
-    # per-delta cost stays O(window), not O(n). The block may still be streaming
-    # in, so we re-scan on each delta the marker is present until it parses.
+
+    # Arm on first sight of the marker in the streaming window (full buffer if
+    # `recent` is not supplied, e.g. the .md result path).
     probe = recent if recent is not None else buffer
-    if _RESEARCH_SOURCES_MARKER not in probe:
+    if _RESEARCH_SOURCES_MARKER in probe:
+        _sources_marker_open = True
+    if not _sources_marker_open:
         return
 
+    # Bounded re-scan from the first marker — not the whole (ever-growing) buffer.
+    first = buffer.find(_RESEARCH_SOURCES_MARKER)
+    if first == -1:
+        return  # marker is in the other accumulator; this buffer has nothing yet
+    region = buffer[first:first + _SOURCES_MAX_BLOCK]
+
+    marker_count = region.count(_RESEARCH_SOURCES_MARKER)
     emitted_real = False
-    for m in _SOURCES_BLOCK_RE.finditer(buffer):
+    closed_count = 0
+    for m in _SOURCES_BLOCK_RE.finditer(region):
+        closed_count += 1
         try:
             data = json.loads(m.group(1))
         except Exception:
@@ -756,8 +781,21 @@ def _scan_research_sources(buffer: str, recent: str | None = None):
             _emit_research_sources(sources)
             if sources:
                 emitted_real = True
+
     if emitted_real:
-        _sources_parsed = True
+        _sources_parsed = True       # permanent short-circuit (see top guard)
+        _sources_marker_open = False
+    elif closed_count >= marker_count:
+        # Every marker seen so far has a CLOSED block and all were empty
+        # (`{"sources": []}`) — nothing pending. Disarm until a fresh marker
+        # re-arms us; a later populated manifest then re-triggers and is matched.
+        # (We must not disarm while closed_count < marker_count: a more recent
+        # marker's block is still streaming and would otherwise be abandoned.)
+        _sources_marker_open = False
+    elif (len(buffer) - first) > _SOURCES_MAX_BLOCK:
+        # A marker has no closing ``` fence within the cap — treat as malformed and
+        # disarm so a never-closed marker can't cause O(region) work per delta.
+        _sources_marker_open = False
 
 
 def _parse_sources_from_md(file_path: str) -> list:

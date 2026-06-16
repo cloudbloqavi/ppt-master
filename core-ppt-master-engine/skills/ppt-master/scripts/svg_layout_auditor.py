@@ -681,55 +681,191 @@ def fix_orphan_baseline(tree: ET.ElementTree, canvas: tuple[int, int]) -> int:
     return fixed
 
 
+def _shift_text_node(node: ET.Element, dx: float, dy: float) -> None:
+    """Translate a <text> element (and any absolutely-positioned tspans) by
+    (dx, dy). Only attributes already present are rewritten — dx/dy on tspans
+    are relative and keep working unchanged since the pen position they offset
+    from moves with the absolute x/y they're chained from."""
+    if dx:
+        cur = _to_float(node.get("x"), 0.0) or 0.0
+        node.set("x", f"{cur + dx:.2f}")
+    if dy:
+        cur = _to_float(node.get("y"), 0.0) or 0.0
+        node.set("y", f"{cur + dy:.2f}")
+    for c in list(node):
+        if _localname(c.tag) != "tspan":
+            continue
+        if dx and c.get("x") is not None:
+            cur = _to_float(c.get("x"), 0.0) or 0.0
+            c.set("x", f"{cur + dx:.2f}")
+        if dy and c.get("y") is not None:
+            cur = _to_float(c.get("y"), 0.0) or 0.0
+            c.set("y", f"{cur + dy:.2f}")
+
+
+def fix_out_of_bounds(tree: ET.ElementTree, canvas: tuple[int, int]) -> int:
+    """Translate every off-canvas <text> block back inside the canvas.
+
+    Shifts the whole block (its x/y and any absolute tspan x/y) by the exact
+    overage plus a small margin, on whichever axis(es) it overflows. This is a
+    rigid translation — internal line spacing and anchoring are untouched — so
+    it cannot itself introduce a new D1/D4-style defect, only move the block.
+    """
+    root = tree.getroot()
+    elems = measure_elements(root, canvas)
+    cw, ch = canvas
+    margin = 4.0
+    fixed = 0
+
+    for e in elems:
+        if e.kind != "text" or e.box is None:
+            continue
+        b = e.box
+        over_left = max(0.0, -b.x)
+        over_right = max(0.0, b.x2 - cw)
+        over_top = max(0.0, -b.y)
+        over_bottom = max(0.0, b.y2 - ch)
+        if max(over_left, over_right, over_top, over_bottom) <= 2:
+            continue
+
+        shift_x = 0.0
+        if over_left > 2 and over_left >= over_right:
+            shift_x = over_left + margin
+        elif over_right > 2:
+            shift_x = -(over_right + margin)
+        shift_y = 0.0
+        if over_top > 2 and over_top >= over_bottom:
+            shift_y = over_top + margin
+        elif over_bottom > 2:
+            shift_y = -(over_bottom + margin)
+        if not shift_x and not shift_y:
+            continue
+
+        _shift_text_node(e.node, shift_x, shift_y)
+        fixed += 1
+    return fixed
+
+
+def fix_text_overlap(tree: ET.ElementTree, canvas: tuple[int, int]) -> int:
+    """Separate overlapping <text> pairs by the minimum translation needed.
+
+    For each overlapping pair, moves apart along whichever axis has the
+    *smaller* penetration depth (the shorter, lower-risk separation) — pushing
+    the element with the larger coordinate on that axis further away. Each
+    text node is moved at most once per pass so independent rows (the common
+    case: a label crowding its adjacent badge/value) never fight each other;
+    any pair still touching afterward simply remains a reported finding rather
+    than being forced apart riskily.
+    """
+    root = tree.getroot()
+    elems = measure_elements(root, canvas)
+    margin = 6.0
+    fixed = 0
+    moved: set[int] = set()
+
+    texts = [e for e in elems if e.kind == "text" and e.box and e.has_fill]
+    for i in range(len(texts)):
+        for j in range(i + 1, len(texts)):
+            a, b = texts[i], texts[j]
+            if id(a.node) in moved or id(b.node) in moved:
+                continue
+            if not a.box.overlaps(b.box, _OVERLAP_MIN_PX):
+                continue
+            ox, oy = a.box.intersection(b.box)
+            if ox <= oy:
+                mover, shift = (b, ox + margin) if b.box.x >= a.box.x else (a, ox + margin)
+                _shift_text_node(mover.node, shift, 0.0)
+            else:
+                mover, shift = (b, oy + margin) if b.box.y >= a.box.y else (a, oy + margin)
+                _shift_text_node(mover.node, 0.0, shift)
+            moved.add(id(mover.node))
+            fixed += 1
+    return fixed
+
+
 # ─────────────────────────── driver ───────────────────────────
 
 def _hard(findings: list[Finding]) -> list[Finding]:
     return [f for f in findings if f.severity == "hard"]
 
 
+# Rules attempted in this order: D1 untangles the y=0 header-band float first
+# (it can dwarf every other measurement on the page), D3 then pulls anything
+# off-canvas back in, and D2 resolves remaining text/text crowding last, once
+# positions are otherwise sane.
+_FIXERS: list[tuple[str, "callable"]] = [
+    ("D1_orphan_baseline", fix_orphan_baseline),
+    ("D3_out_of_bounds", fix_out_of_bounds),
+    ("D2_text_overlap", fix_text_overlap),
+]
+
+
+def _run_one_fixer(rule: str, fix_fn, svg_path: Path, review_dir: Path,
+                   canvas: tuple[int, int], findings: list[Finding],
+                   measurer: "ChromiumMeasurer | None") -> tuple[list[Finding], Path | None, str | None]:
+    """Backup -> apply -> re-audit -> commit/rollback for one rule.
+
+    Commits whenever the fix reduced or held steady the HARD finding count —
+    partial progress (e.g. 8 of 9 overlaps resolved) is kept rather than
+    discarded, since the all-or-nothing bar would throw away real fixes over
+    one stubborn remaining instance. Only a regression (more hard findings
+    than before) triggers a full rollback to the pre-fix SVG.
+    """
+    if not any(f.rule == rule for f in findings):
+        return findings, None, None
+    before_hard = len(_hard(findings))
+    backup_dir = review_dir / "backup"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_dir / f"{svg_path.stem}.{rule}.preaudit.svg"
+    shutil.copy2(svg_path, backup_path)
+
+    tree = ET.parse(svg_path, parser=_svg_parser())
+    n = fix_fn(tree, canvas)
+    if not n:
+        return findings, None, None
+
+    with open(svg_path, "w", encoding="utf-8", newline="\n") as fh:
+        tree.write(fh, encoding="unicode", xml_declaration=False)
+        fh.write("\n")
+    post_findings, _ = audit_page(svg_path, canvas, measurer)
+    after_hard = len(_hard(post_findings))
+
+    if after_hard > before_hard:
+        shutil.copy2(backup_path, svg_path)
+        for f in findings:
+            if f.rule == rule:
+                f.autofix = "reverted"
+        return findings, None, None
+
+    for f in post_findings:
+        if f.rule == rule:
+            f.autofix = "applied"
+    return post_findings, backup_path, f"{rule} x{n}"
+
+
 def process_page(svg_path: Path, review_dir: Path, canvas: tuple[int, int],
                  autofix: bool, measurer: "ChromiumMeasurer | None" = None) -> dict:
-    findings, tree = audit_page(svg_path, canvas, measurer)
+    findings, _tree = audit_page(svg_path, canvas, measurer)
     page = svg_path.name
     backup_path = None
     fixes_applied: list[str] = []
 
-    if autofix and any(f.rule == "D1_orphan_baseline" for f in findings):
-        before_hard = len(_hard(findings))
-        backup_dir = review_dir / "backup"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = backup_dir / f"{svg_path.stem}.preaudit.svg"
-        shutil.copy2(svg_path, backup_path)
-
-        n = fix_orphan_baseline(tree, canvas)
-        if n:
-            # Force LF newlines (text-mode write would emit CRLF on Windows),
-            # keeping output byte-consistent with the agent's Linux-authored SVGs.
-            with open(svg_path, "w", encoding="utf-8", newline="\n") as fh:
-                tree.write(fh, encoding="unicode", xml_declaration=False)
-                fh.write("\n")
-            # Re-audit deterministically; roll back if it didn't help or regressed.
-            post_findings, _ = audit_page(svg_path, canvas, measurer)
-            after_hard = len(_hard(post_findings))
-            still_orphan = any(f.rule == "D1_orphan_baseline" for f in post_findings)
-            if still_orphan or after_hard > before_hard:
-                shutil.copy2(backup_path, svg_path)
-                for f in findings:
-                    if f.rule == "D1_orphan_baseline":
-                        f.autofix = "reverted"
-            else:
-                for f in findings:
-                    if f.rule == "D1_orphan_baseline":
-                        f.autofix = "applied"
-                fixes_applied.append(f"D1_orphan_baseline x{n}")
-                findings = post_findings  # report the post-fix state
+    if autofix:
+        for rule, fix_fn in _FIXERS:
+            findings, bp, label = _run_one_fixer(
+                rule, fix_fn, svg_path, review_dir, canvas, findings, measurer)
+            if bp:
+                backup_path = bp
+            if label:
+                fixes_applied.append(label)
 
     hard = _hard(findings)
+    soft = [f for f in findings if f.severity == "soft"]
     result = {
         "page": page,
         "status": "ok" if not hard else "issues",
         "hard": len(hard),
-        "soft": len(findings) - len(hard),
+        "soft": len(soft),
         "fixes_applied": fixes_applied,
         "backup": str(backup_path) if backup_path else None,
         "findings": [asdict(f) for f in findings],
@@ -810,12 +946,14 @@ def main() -> int:
             measurer.close()
 
     total_hard = sum(r["hard"] for r in results)
+    total_soft = sum(r["soft"] for r in results)
     total_fixed = sum(len(r["fixes_applied"]) for r in results)
     summary = {
         "project": str(project),
         "pages_audited": len(results),
         "pages_with_hard_issues": sum(1 for r in results if r["hard"] > 0),
         "total_hard_findings": total_hard,
+        "total_soft_findings": total_soft,
         "total_fixes_applied": total_fixed,
         "backend": backend,
         "pages": results,

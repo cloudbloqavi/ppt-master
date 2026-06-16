@@ -22,11 +22,56 @@ fact is logged truthfully (never dressed up as "passed").
 from __future__ import annotations
 
 import json
+import re
 import sys
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 from agent_runner.config import logger
+
+# Plain-language names for the auditor's internal rule codes. The status feed
+# is the non-technical end-user log — rule codes like "D2_text_overlap" must
+# never leak into it, but a category like "overlapping text" tells the user
+# what was actually wrong without exposing internals.
+_FRIENDLY_RULE_NAMES = {
+    "D1_orphan_baseline": "text floating into the header",
+    "D2_text_overlap": "overlapping text",
+    "D3_out_of_bounds": "text running off the slide edge",
+    "D4_text_overflow": "text crowding its card edge",
+}
+_FIX_LABEL_RE = re.compile(r"^(\w+)\s+x(\d+)$")
+
+
+def _friendly(rule: str) -> str:
+    return _FRIENDLY_RULE_NAMES.get(rule, rule)
+
+
+def _breakdown_from_pages(pages: list[dict]) -> tuple[Counter, Counter]:
+    """Tally (fixed_rule_counts, remaining_hard_rule_counts) from one auditor
+    summary's per-page results, for a plain-language breakdown."""
+    fixed: Counter = Counter()
+    remaining: Counter = Counter()
+    for page in pages:
+        for label in page.get("fixes_applied", []):
+            m = _FIX_LABEL_RE.match(label)
+            if m:
+                fixed[m.group(1)] += int(m.group(2))
+        for finding in page.get("findings", []):
+            if finding.get("severity") == "hard" and finding.get("autofix") not in ("applied",):
+                remaining[finding.get("rule", "?")] += 1
+    return fixed, remaining
+
+
+def _format_categories(counter: Counter) -> str:
+    """e.g. 'overlapping text and text running off the slide edge' — no counts,
+    no rule codes, just the distinct categories involved, for a readable line."""
+    names = [_friendly(rule) for rule in counter]
+    if not names:
+        return ""
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " and " + names[-1]
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SKILL_SCRIPTS = _REPO_ROOT / "core-ppt-master-engine" / "skills" / "ppt-master" / "scripts"
@@ -126,14 +171,20 @@ def _audit_project(project_dir: Path) -> dict:
         logger.error("  Auditor produced no parseable summary for %s (rc=%d): %s",
                      project_dir.name, rc, (err or out)[:500])
         return {"project": project_dir.name, "error": "auditor_unparseable",
-                "pages": 0, "fixes": 0, "hard_remaining": 0, "reexported": False}
+                "pages": 0, "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter(),
+                "reexported": False}
 
+    fixed_breakdown, remaining_breakdown = _breakdown_from_pages(summary.get("pages", []))
     fixes = int(summary.get("total_fixes_applied", 0))
     result = {
         "project": project_dir.name,
         "pages": int(summary.get("pages_audited", 0)),
         "fixes": fixes,
         "hard_remaining": int(summary.get("total_hard_findings", 0)),
+        "soft_remaining": int(summary.get("total_soft_findings", 0)),
+        "fixed_breakdown": fixed_breakdown,
+        "remaining_breakdown": remaining_breakdown,
         "reexported": False,
     }
     if fixes > 0:
@@ -152,18 +203,21 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
     if no_visual_review:
         logger.info("Visual review: SKIPPED (user opted out via --no-visual-review).")
         return {"ran": False, "status": "opted_out", "projects": [],
-                "fixes": 0, "hard_remaining": 0}
+                "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
 
     if not _AUDITOR.is_file():
         logger.error("Visual review: auditor script not found at %s — cannot enforce.", _AUDITOR)
         return {"ran": False, "status": "error", "projects": [],
-                "fixes": 0, "hard_remaining": 0}
+                "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
 
     project_dirs = _find_active_project_dirs(start_time)
     if not project_dirs:
         logger.info("Visual review: no project with svg_output/ found to audit.")
         return {"ran": False, "status": "no_project", "projects": [],
-                "fixes": 0, "hard_remaining": 0}
+                "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
 
     logger.info("")
     logger.info("═" * 60)
@@ -174,8 +228,14 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
     per_project = [_audit_project(d) for d in project_dirs]
     total_fixes = sum(p["fixes"] for p in per_project)
     total_hard = sum(p["hard_remaining"] for p in per_project)
+    total_soft = sum(p.get("soft_remaining", 0) for p in per_project)
     total_pages = sum(p["pages"] for p in per_project)
     any_error = any(p.get("error") for p in per_project)
+    total_fixed_breakdown: Counter = Counter()
+    total_remaining_breakdown: Counter = Counter()
+    for p in per_project:
+        total_fixed_breakdown.update(p.get("fixed_breakdown", Counter()))
+        total_remaining_breakdown.update(p.get("remaining_breakdown", Counter()))
     # A project that was auto-fixed but whose deck could not be rebuilt: the
     # exported PPTX still shows the defect. This must NOT be reported as "fixed
     # and rebuilt" — it would be a misleading log.
@@ -193,16 +253,31 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
         status = "clean"
 
     logger.info("  Visual review result: %s | pages=%d auto_fixed=%d "
-                "unresolved_hard=%d deck_rebuilt=%s",
-                status, total_pages, total_fixes, total_hard, not reexport_failed)
+                "unresolved_hard=%d unresolved_soft=%d deck_rebuilt=%s",
+                status, total_pages, total_fixes, total_hard, total_soft, not reexport_failed)
+    if total_fixed_breakdown:
+        logger.info("  Fixed by category: %s", dict(total_fixed_breakdown))
+    if total_remaining_breakdown:
+        logger.info("  Still unresolved by category: %s", dict(total_remaining_breakdown))
     logger.info("═" * 60)
     logger.info("")
 
     return {
         "ran": True, "status": status, "projects": per_project,
         "pages": total_pages, "fixes": total_fixes, "hard_remaining": total_hard,
-        "reexport_failed": reexport_failed,
+        "soft_remaining": total_soft, "reexport_failed": reexport_failed,
+        "fixed_breakdown": total_fixed_breakdown,
+        "remaining_breakdown": total_remaining_breakdown,
     }
+
+
+def _soft_suffix(result: dict) -> str:
+    """Never drop soft findings from the user-facing line — they used to vanish
+    silently since only hard_remaining was ever reported."""
+    n = result.get("soft_remaining", 0)
+    if not n:
+        return ""
+    return f" {n} minor formatting note(s) were left as-is (not auto-fixed)."
 
 
 def status_line(result: dict) -> str:
@@ -215,17 +290,23 @@ def status_line(result: dict) -> str:
     if status == "error":
         return "Visual review could not complete; slides were left as generated."
     if status == "clean":
-        return "Visual review passed: no layout issues found on any slide."
+        return f"Visual review passed: no hard layout issues found on any slide.{_soft_suffix(result)}"
+    fixed_cats = _format_categories(result.get("fixed_breakdown", Counter()))
+    remaining_cats = _format_categories(result.get("remaining_breakdown", Counter()))
     if status == "fixed_no_export":
         n = result.get("fixes", 0)
-        return (f"Visual review corrected {n} slide layout issue(s), but rebuilding the "
-                "deck failed - the exported file may still show them.")
+        what = f" ({fixed_cats})" if fixed_cats else ""
+        return (f"Visual review corrected {n} slide layout issue(s){what}, but rebuilding the "
+                f"deck failed - the exported file may still show them.{_soft_suffix(result)}")
     if status == "fixed":
         n = result.get("fixes", 0)
+        what = f" ({fixed_cats})" if fixed_cats else ""
         extra = "" if not result.get("hard_remaining") else \
-            f" {result['hard_remaining']} issue(s) still need attention."
-        return f"Visual review fixed {n} slide layout issue(s) and rebuilt the deck.{extra}"
+            f" {result['hard_remaining']} issue(s) ({remaining_cats}) still need attention."
+        return (f"Visual review fixed {n} slide layout issue(s){what} and rebuilt the "
+                f"deck.{extra}{_soft_suffix(result)}")
     if status == "unresolved":
-        return (f"Visual review found {result.get('hard_remaining', 0)} layout issue(s) "
-                "that need a closer look.")
+        what = f" ({remaining_cats})" if remaining_cats else ""
+        return (f"Visual review found {result.get('hard_remaining', 0)} layout issue(s){what} "
+                f"that need a closer look.{_soft_suffix(result)}")
     return "Visual review completed."
