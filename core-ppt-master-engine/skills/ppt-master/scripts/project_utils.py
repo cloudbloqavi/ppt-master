@@ -104,19 +104,25 @@ def parse_project_name(dir_name: str) -> Dict[str, str]:
 
     dir_name_lower = dir_name.lower()
 
-    # Extract date (format: _YYYYMMDD)
-    date_match = re.search(r'_(\d{8})$', dir_name)
+    # Extract date (format: _YYYYMMDD or _YYYYMMDD_HHMM). The optional _HHMM tail
+    # keeps same-day projects distinct; older _YYYYMMDD-only folders still parse.
+    date_match = re.search(r'_(\d{8})(?:_(\d{4}))?$', dir_name)
     if date_match:
         date_str = date_match.group(1)
+        time_str = date_match.group(2)
         result['date'] = date_str
         try:
-            date_obj = datetime.strptime(date_str, '%Y%m%d')
-            result['date_formatted'] = date_obj.strftime('%Y-%m-%d')
+            if time_str:
+                dt = datetime.strptime(date_str + time_str, '%Y%m%d%H%M')
+                result['date_formatted'] = dt.strftime('%Y-%m-%d %H:%M')
+            else:
+                dt = datetime.strptime(date_str, '%Y%m%d')
+                result['date_formatted'] = dt.strftime('%Y-%m-%d')
         except ValueError:
             pass
 
-    # Prefer parsing standard format: name_format_YYYYMMDD
-    full_match = re.match(r'^(?P<name>.+)_(?P<format>[a-z0-9_-]+)_(?P<date>\d{8})$', dir_name_lower)
+    # Prefer parsing standard format: name_format_YYYYMMDD[_HHMM]
+    full_match = re.match(r'^(?P<name>.+)_(?P<format>[a-z0-9_-]+)_(?P<date>\d{8})(?:_\d{4})?$', dir_name_lower)
     if full_match:
         raw_format = full_match.group('format')
         normalized_format = normalize_canvas_format(raw_format)
@@ -129,13 +135,13 @@ def parse_project_name(dir_name: str) -> Dict[str, str]:
     # Fallback: only match trailing `_format` to avoid deleting parts of the project name
     sorted_formats = sorted(CANVAS_FORMATS.keys(), key=len, reverse=True)
     for fmt_key in sorted_formats:
-        if re.search(rf'_{re.escape(fmt_key)}(?:_\d{{8}})?$', dir_name_lower):
+        if re.search(rf'_{re.escape(fmt_key)}(?:_\d{{8}}(?:_\d{{4}})?)?$', dir_name_lower):
             result['format'] = fmt_key
             result['format_name'] = CANVAS_FORMATS[fmt_key]['name']
             break
 
-    # Extract project name (only remove trailing date and format suffix)
-    name = re.sub(r'_\d{8}$', '', dir_name)
+    # Extract project name (only remove trailing date[_time] and format suffix)
+    name = re.sub(r'_\d{8}(?:_\d{4})?$', '', dir_name)
     if result['format'] != 'unknown':
         name = re.sub(rf'_{re.escape(result["format"])}$', '', name, flags=re.IGNORECASE)
     result['name'] = name
@@ -295,8 +301,8 @@ def validate_project_structure(project_path: str, verbose: bool = False) -> Tupl
 
     # Check directory naming format
     dir_name = project_path.name
-    if not re.search(r'_\d{8}$', dir_name):
-        msg = f"Directory name missing date suffix (_YYYYMMDD): {dir_name}"
+    if not re.search(r'_\d{8}(?:_\d{4})?$', dir_name):
+        msg = f"Directory name missing date suffix (_YYYYMMDD or _YYYYMMDD_HHMM): {dir_name}"
         if use_helper and verbose:
             msg += "\n" + \
                 ErrorHelper.format_error_message('missing_date_suffix')

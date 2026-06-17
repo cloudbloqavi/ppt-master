@@ -10,8 +10,8 @@ Usage:
     python3 scripts/total_md_split.py <project_path> -o output_dir
 
 Examples:
-    python3 scripts/total_md_split.py projects/<svg_title>_ppt169_YYYYMMDD
-    python3 scripts/total_md_split.py projects/<svg_title>_ppt169_YYYYMMDD -o notes
+    python3 scripts/total_md_split.py projects/<svg_title>_ppt169_YYYYMMDD_HHMM
+    python3 scripts/total_md_split.py projects/<svg_title>_ppt169_YYYYMMDD_HHMM -o notes
 
 Dependencies:
     None (only uses standard library)
@@ -272,9 +272,9 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD
-    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD -o notes
-    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD -q
+    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD_HHMM
+    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD_HHMM -o notes
+    %(prog)s projects/<svg_title>_ppt169_YYYYMMDD_HHMM -q
 
 Features:
     - Reads the total.md speaker notes file

@@ -608,6 +608,37 @@ def convert_line(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 # path
 # ---------------------------------------------------------------------------
 
+def _bake_affine_into_commands(
+    commands: list[PathCommand],
+    a: float, b: float, c: float, d: float, e: float, f: float,
+) -> list[PathCommand]:
+    """Apply the affine matrix [a b c d e f] to every coordinate of M/L/C/Z commands.
+
+    Commands must already be absolute and normalized to M/L/C/Z (which the
+    pipeline guarantees: svg_path_to_absolute converts H/V→L and normalize_path_commands
+    converts S/Q/T/A→C). Z carries no coordinates. A point (x, y) maps to
+    (a*x + c*y + e, b*x + d*y + f), so flips (negative a/d), scales, rotation and
+    shear are all reproduced exactly.
+    """
+    def tp(x: float, y: float) -> tuple[float, float]:
+        return (a * x + c * y + e, b * x + d * y + f)
+
+    out: list[PathCommand] = []
+    for cmd in commands:
+        ar = cmd.args
+        if cmd.cmd in ('M', 'L') and len(ar) >= 2:
+            nx, ny = tp(ar[0], ar[1])
+            out.append(PathCommand(cmd.cmd, [nx, ny]))
+        elif cmd.cmd == 'C' and len(ar) >= 6:
+            x1, y1 = tp(ar[0], ar[1])
+            x2, y2 = tp(ar[2], ar[3])
+            x3, y3 = tp(ar[4], ar[5])
+            out.append(PathCommand('C', [x1, y1, x2, y2, x3, y3]))
+        else:
+            out.append(cmd)  # Z (no coords) or any unexpected command — pass through
+    return out
+
+
 def convert_path(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <path> to DrawingML custom geometry shape."""
     d = elem.get('d', '')
@@ -622,13 +653,25 @@ def convert_path(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     rot = 0
     transform = elem.get('transform')
     if transform:
-        t_match = re.search(r'translate\(\s*([-\d.]+)[\s,]+([-\d.]+)\s*\)', transform)
-        if t_match:
-            tx = float(t_match.group(1))
-            ty = float(t_match.group(2))
-        r_match = re.search(r'rotate\(\s*([-\d.]+)', transform)
-        if r_match:
-            rot = int(float(r_match.group(1)) * ANGLE_UNIT)
+        # convert_path historically honored only translate()/rotate() and silently
+        # DROPPED matrix()/scale() — which collapsed flipped/scaled geometry (e.g.
+        # the `matrix(1 0 0 -1 e f)` boat-pyramid tiers) to the origin and rendered
+        # broken in PowerPoint. When a matrix/scale is present we bake the full
+        # composed affine into the (absolute, normalized M/L/C/Z) coordinates so the
+        # flip/scale/shear is exact; translate/rotate are subsumed by that matrix.
+        # Pure translate()/rotate() transforms keep the lighter fast path below
+        # (rotate stays an editable shape `rot` attribute).
+        if 'matrix(' in transform or 'scale(' in transform:
+            a, b, c, d, e, f = parse_transform_matrix(transform)
+            commands = _bake_affine_into_commands(commands, a, b, c, d, e, f)
+        else:
+            t_match = re.search(r'translate\(\s*([-\d.]+)[\s,]+([-\d.]+)\s*\)', transform)
+            if t_match:
+                tx = float(t_match.group(1))
+                ty = float(t_match.group(2))
+            r_match = re.search(r'rotate\(\s*([-\d.]+)', transform)
+            if r_match:
+                rot = int(float(r_match.group(1)) * ANGLE_UNIT)
 
     path_xml, min_x, min_y, width, height = path_commands_to_drawingml(
         commands, ctx.translate_x + tx, ctx.translate_y + ty,

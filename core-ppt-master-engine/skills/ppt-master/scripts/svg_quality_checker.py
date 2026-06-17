@@ -538,6 +538,34 @@ class SVGQualityChecker:
                 f"Detected {len(text_matches)} potentially overly long single-line text(s) (consider using tspan for wrapping)"
             )
 
+        # Orphan-baseline check: a multi-line <text> whose first positional <tspan>
+        # advances with `dy` but neither the <text> nor that tspan sets an absolute
+        # `y`. Per the SVG positioning algorithm the baseline then originates at
+        # y=0, floating the whole block into the header band — a deterministic
+        # cause of text overlap. The svg_layout_auditor auto-fixes this; flagging
+        # it here gives an earlier, render-free signal at the static gate.
+        orphan_count = 0
+        for tag_match in re.finditer(r'<text\b([^>]*)>(.*?)</text>', content, re.DOTALL):
+            text_attrs, inner = tag_match.group(1), tag_match.group(2)
+            if re.search(r'\by\s*=', text_attrs):
+                continue  # <text> sets an absolute y — well-anchored
+            tspans = re.findall(r'<tspan\b([^>]*)>', inner)
+            if len(tspans) < 2:
+                continue
+            first_attrs = tspans[0]
+            if re.search(r'\by\s*=', first_attrs):
+                continue  # first tspan sets an absolute y — well-anchored
+            relies_on_dy = any(re.search(r'\bdy\s*=', t) for t in tspans)
+            if relies_on_dy and re.search(r'\bdy\s*=', first_attrs):
+                orphan_count += 1
+        if orphan_count:
+            result['errors'].append(
+                f"Detected {orphan_count} multi-line <text> block(s) whose first <tspan> "
+                "uses 'dy' with no absolute 'y' on the <text> or that tspan - the baseline "
+                "originates at y=0 and the block will collide with the header. Set an absolute "
+                "'y' on the first tspan (or the <text>)."
+            )
+
     def _check_image_references(self, content: str, svg_path: Path, result: Dict):
         """Check image file existence and resolution vs display size."""
         # Find all <image ...> elements (capture the full tag)

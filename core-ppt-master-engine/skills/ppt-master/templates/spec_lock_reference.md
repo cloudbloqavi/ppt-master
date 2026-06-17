@@ -127,13 +127,15 @@
 - P09: timeline_horizontal
 - P12: quadrant_bubble_scatter
 
-> One entry per page **that adapts a `templates/charts/` chart template**. Key: `P<NN>` matching §IX. Value: chart template basename without `.svg` (must match a key in `templates/charts/charts_index.json`).
+> One entry per page **that adapts a chart template**. Key: `P<NN>` matching §IX. Value: chart template basename without `.svg`. The basename must match a key in **either** `templates/charts/powerslides_infographics/company_index.json` (company tier — preferred) **or** `templates/charts/charts_index.json` (stock tier).
 >
-> **No entry for a page** → no chart on that page (or a chart that did not match any catalog template — Strategist's `no-template-match` fallback). Both cases mean Executor designs the visualization from scratch per `design_spec.md §VII`.
+> **Path resolution (Executor)**: a value that matches a company key resolves to `templates/charts/powerslides_infographics/<value>.svg`; otherwise to `templates/charts/<value>.svg`. Company keys are numeric-prefixed (`NN_name`, e.g. `18_swot`, `19_fishbone`); when a numeric-prefixed key resolves under `powerslides_infographics/`, that path is authoritative. See `executor-base.md §1.0`.
+>
+> **No entry for a page** → no chart on that page (or a chart that did not match any catalog template — Strategist's `no-template-match` / `custom` fallback). Both cases mean Executor designs the visualization from scratch per `design_spec.md §VII`.
 >
 > **Whole section omitted** → no data-visualization pages in this deck.
 >
-> **Strategist source**: copy from `design_spec.md §VII Visualization Reference List` — only the rows whose `reference template path` points to a `templates/charts/` file. Pages marked `no-template-match` in §VII MUST NOT appear here.
+> **Strategist source**: copy from `design_spec.md §VII Visualization Reference List` — the `company`- and `stock`-tier rows (their `Path` points to a real `.svg`). Pages marked `custom` / `no-template-match` in §VII MUST NOT appear here. The tier + path for every viz page is also recorded in `chart_provenance.json` (see [`chart_provenance_reference.md`](../templates/chart_provenance_reference.md)) — keep `page_charts` and the provenance file consistent.
 
 ## forbidden
 - Mixing icon libraries

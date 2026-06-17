@@ -131,7 +131,12 @@ class ProjectManager:
                 f"(available: {available}; common alias: xhs -> xiaohongshu)"
             )
 
-        date_str = datetime.now().strftime("%Y%m%d")
+        # Folder stamp is YYYYMMDD_HHMM so multiple decks generated on the same
+        # day get distinct, time-ordered output folders (e.g. ..._ppt169_20260614_1530).
+        # Capture one instant so the folder name and the README date never drift.
+        now = datetime.now()
+        date_str = now.strftime("%Y%m%d_%H%M")
+        created_human = now.strftime("%Y-%m-%d %H:%M")
         project_dir_name = f"{project_name}_{normalized_format}_{date_str}"
         project_path = base_path / project_dir_name
 
@@ -155,7 +160,7 @@ class ProjectManager:
             (
                 f"# {project_name}\n\n"
                 f"- Canvas format: {normalized_format}\n"
-                f"- Created: {date_str}\n\n"
+                f"- Created: {created_human}\n\n"
                 "## Directories\n\n"
                 "- `svg_output/`: raw SVG output\n"
                 "- `svg_final/`: finalized SVG output\n"

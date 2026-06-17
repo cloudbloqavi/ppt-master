@@ -13,8 +13,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 from agent_runner.config import ARGS, logger
-from agent_runner.logging_setup import get_log_file_path
+from agent_runner.logging_setup import get_log_file_path, get_run_log_dir
 from agent_runner.status_logger import get_status_log_file_path
+
+# Set True once the run/status logs have been copied INTO a project artifacts
+# subfolder. Gates finalize_log_placement() so the top-level originals are only
+# removed when a canonical in-project copy exists (a failed run with no project
+# keeps its root-level log + manifest, which is correct there).
+_logs_copied_into_project = False
 
 
 def _snapshot_output_pptx_files() -> set[str]:
@@ -79,6 +85,41 @@ def _snapshot_project_files() -> dict[str, tuple[float, int]]:
     t_dur = time.time() - t_start
     logger.info("Project snapshot: %d files indexed in %.2fs.", file_count, t_dur)
     return snapshot
+
+
+# Structural markers that distinguish a genuine generated project folder from a
+# stray folder the agent may create by writing intermediate files (e.g. failed
+# image downloads) to an invented path that never went through `project_manager
+# init`. A real project always has at least one of these — a bare junk folder of
+# loose images/logs has none. Used to keep stray folders out of the mirrored
+# output (see _looks_like_project).
+_PROJECT_STRUCTURE_MARKERS = ("svg_output", "exports", "svg_final")
+_PROJECT_STRUCTURE_FILES = ("design_spec.md", "spec_lock.md")
+
+
+def _looks_like_project(source_candidates: list[Path], project_name: str) -> bool:
+    """Return whether *project_name* under any source dir is a real project folder.
+
+    A genuine project (created via ``project_manager init``) contains structural
+    subfolders (``svg_output/``, ``exports/``, …) or a design spec. Stray folders
+    — created when the agent writes intermediate files to an invented bare-slug
+    path instead of the canonical path ``init`` returned — have only loose files
+    and must not be mirrored to OUTPUT_ARTIFACTS_DIR as if they were deliverables.
+    """
+    for source in source_candidates:
+        proj_dir = source / project_name
+        try:
+            if not proj_dir.is_dir():
+                continue
+        except Exception:
+            continue
+        for marker in _PROJECT_STRUCTURE_MARKERS:
+            if (proj_dir / marker).is_dir():
+                return True
+        for marker_file in _PROJECT_STRUCTURE_FILES:
+            if (proj_dir / marker_file).is_file():
+                return True
+    return False
 
 
 def copy_output_artifacts(
@@ -189,6 +230,26 @@ def copy_output_artifacts(
 
     t_scan_dur = time.time() - t_scan_start
     logger.info("  File scan completed in %.2fs (%d files examined).", t_scan_dur, len(files_to_copy))
+
+    # Drop stray folders that picked up new files during the run but are not real
+    # projects (e.g. failed image downloads written to an invented bare-slug path
+    # that bypassed `project_manager init`). Mirroring those would litter
+    # OUTPUT_ARTIFACTS_DIR with junk folders alongside the genuine deliverable.
+    # A resumed project is trusted explicitly and never filtered.
+    if active_projects:
+        stray_projects = {
+            name
+            for name in active_projects
+            if name != resumed_project and not _looks_like_project(source_candidates, name)
+        }
+        if stray_projects:
+            active_projects -= stray_projects
+            logger.warning(
+                "  Skipping %d stray folder(s) with no project structure "
+                "(svg_output/exports/design_spec): %s. These are likely "
+                "intermediate files written to a non-canonical path.",
+                len(stray_projects), ", ".join(sorted(stray_projects)),
+            )
 
     if active_projects:
         logger.info("  Active project(s) identified for copying: %s", ", ".join(active_projects))
@@ -322,7 +383,30 @@ def copy_output_artifacts(
         except Exception as exc:
             logger.warning("  Failed to copy status progress log file alongside manifest: %s", exc)
 
+    def _copy_provenance_alongside(manifest_dir: Path, project_name: str) -> None:
+        """Copy the project's chart_provenance.json next to the run logs/manifest.
+
+        The full project tree (incl. chart_provenance.json) is normally mirrored
+        already, but that relies on modified-file detection. Copying it explicitly
+        — the same way the logs are — guarantees the chart-selection decision
+        record always lands beside the logs for inspecting the decision flow,
+        including resume/edge cases where the mirror might skip an unchanged file.
+        """
+        for source in source_candidates:
+            src = source / project_name / "chart_provenance.json"
+            if not src.is_file():
+                continue
+            dest = manifest_dir / "chart_provenance.json"
+            try:
+                if dest.resolve() != src.resolve():
+                    shutil.copy2(src, dest)
+                    logger.info("  Chart provenance copied to: %s", dest)
+            except Exception as exc:
+                logger.warning("  Failed to copy chart_provenance.json alongside manifest: %s", exc)
+            return
+
     if copied_projects:
+        global _logs_copied_into_project
         for project_dir in copied_projects:
             manifest_path = destination / project_dir / "run_manifest.json"
             try:
@@ -332,11 +416,21 @@ def copy_output_artifacts(
                 logger.error("  Failed to write run manifest inside project %s: %s", project_dir, exc)
             _copy_log_alongside(manifest_path.parent)
             _copy_status_log_alongside(manifest_path.parent)
+            _copy_provenance_alongside(manifest_path.parent, project_dir)
+            # Logs now live inside the project folder; the top-level originals
+            # at OUTPUT_ARTIFACTS_DIR root are redundant and will be cleaned up
+            # by finalize_log_placement() at the end of the run.
+            _logs_copied_into_project = True
     else:
-        manifest_path = destination / "run_manifest.json"
+        # No project folder was produced (e.g. the agent failed early). Keep the
+        # manifest with the logs inside the per-run log folder rather than loose
+        # at the artifacts root — the logs already live there, so nothing is left
+        # littering the shared OUTPUT_ARTIFACTS_DIR root.
+        fallback_dir = get_run_log_dir() or destination
+        manifest_path = fallback_dir / "run_manifest.json"
         try:
             manifest_path.write_text(_json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-            logger.info("  Manifest written to root (fallback): %s", manifest_path)
+            logger.info("  Manifest written alongside logs (no project produced): %s", manifest_path)
         except Exception as exc:
             logger.error("  Failed to write fallback run manifest: %s", exc)
         _copy_log_alongside(manifest_path.parent)
@@ -372,3 +466,77 @@ def copy_output_artifacts(
     logger.info("ARTIFACT COPY STAGE COMPLETE")
     logger.info("═" * 60)
     logger.info("")
+
+
+def finalize_log_placement() -> None:
+    """Relocate the per-run log folder's contents into the project, then remove it.
+
+    `run_agent_*.log` and `status_progress_*.log` are written into a per-run
+    ``_run_logs_<timestamp>/`` folder (never the shared artifacts root) while the
+    run is in progress, since the project name isn't known at startup. Once
+    ``copy_output_artifacts`` has copied them alongside each project's
+    `run_manifest.json`, this removes the now-redundant originals and deletes the
+    empty per-run folder so nothing accumulates under OUTPUT_ARTIFACTS_DIR.
+
+    No-op unless the logs were actually copied into a project subfolder (a failed
+    run that produced no project keeps its `_run_logs_<timestamp>/` folder intact —
+    that is the canonical copy in that case, and it's still a named folder, not
+    loose files at the root). Call this once, at the very end of the run, after all
+    logging is finished — it detaches and closes the execution log's FileHandler so
+    Windows releases the file lock before unlinking.
+    """
+    if not _logs_copied_into_project:
+        return
+
+    # 1. Status progress log — written with a fresh open()/close() per line, so
+    #    there's no persistent handle; unlink directly.
+    status_path = get_status_log_file_path()
+    if status_path and status_path.exists():
+        try:
+            status_path.unlink()
+            logger.info("Removed redundant per-run status progress log: %s", status_path)
+        except Exception as exc:
+            logger.warning("Could not remove per-run status progress log %s: %s", status_path, exc)
+
+    # 2. Execution log — held open by a root-logger FileHandler; detach and close
+    #    the matching handler first so the OS releases the lock, then unlink.
+    log_path = get_log_file_path()
+    if log_path and log_path.exists():
+        root = logging.getLogger()
+        for handler in list(root.handlers):
+            if isinstance(handler, logging.FileHandler):
+                try:
+                    same = Path(handler.baseFilename).resolve() == log_path.resolve()
+                except Exception:
+                    same = False
+                if same:
+                    try:
+                        handler.flush()
+                        handler.close()
+                    except Exception:
+                        pass
+                    root.removeHandler(handler)
+        try:
+            log_path.unlink()
+        except Exception as exc:
+            logger.warning("Could not remove per-run execution log %s: %s", log_path, exc)
+
+    # 3. Remove the now-empty per-run log folder so it doesn't linger under the
+    #    artifacts root. Only remove if it is genuinely empty (a stray file would
+    #    otherwise be silently discarded).
+    run_log_dir = get_run_log_dir()
+    if run_log_dir and run_log_dir.exists():
+        try:
+            # Don't remove if it somehow resolved to the artifacts root itself.
+            output_dir_str = os.environ.get("OUTPUT_ARTIFACTS_DIR")
+            is_root = False
+            if output_dir_str:
+                try:
+                    is_root = run_log_dir.resolve() == Path(output_dir_str).expanduser().resolve()
+                except Exception:
+                    is_root = False
+            if not is_root and not any(run_log_dir.iterdir()):
+                run_log_dir.rmdir()
+                logger.info("Removed empty per-run log folder: %s", run_log_dir)
+        except Exception as exc:
+            logger.warning("Could not remove per-run log folder %s: %s", run_log_dir, exc)

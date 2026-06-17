@@ -10,7 +10,9 @@ To browse the library, open `charts_index.json` and scan the `charts` block top-
 
 ## Style rules
 
-See [`CHART_STYLE_GUIDE.md`](./CHART_STYLE_GUIDE.md) for color palette, typography, and SVG authoring conventions all templates must follow.
+See [`CHART_STYLE_GUIDE.md`](./CHART_STYLE_GUIDE.md) for the color palette, typography, and SVG authoring conventions the **stock** templates must follow.
+
+The company catalog in [`powerslides_infographics/`](./powerslides_infographics/) is the exception: it has its own index (`company_index.json`), its own brand identity ([`STYLE_GUIDE.md`](./powerslides_infographics/STYLE_GUIDE.md)), and is matched **before** the stock library (see [`references/strategist.md`](../../references/strategist.md) §VII "Company catalog first"). It does not follow `CHART_STYLE_GUIDE.md`.
 
 ## Usage
 

@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "total": 30,
+    "defaultViewBox": "0 0 1280 720",
+    "formats": [
+      "ppt169"
+    ],
+    "filePattern": "{key}.svg",
+    "basePath": "templates/charts/powerslides_infographics/",
+    "libraryPositioning": "Company-preferred visualization catalog. These are custom in-house infographic, roadmap, and framework templates. They are consulted BEFORE the stock charts_index.json: for each visualization page, match this catalog first; if an entry's Pick clause fits the page's content shape, use it; only pages with no company match fall through to the 81-template stock catalog. See references/strategist.md §VII 'Company catalog first'.",
+    "summaryGrammar": "Each entry's `summary` is a selection rule, not a description. Format: 'Pick for <content shape + scale>. Skip for <reason → alternative>'. Match every visualization page's content shape against these summaries before the stock catalog.",
+    "precedence": "preferred-over-stock"
+  },
+  "charts": {
+    "03_process_flow": {
+      "summary": "Pick for linear processes, sequential steps, workflows, deployment phases (3-7 numbered steps). Skip for cyclical/iterative loops (use 07_cycle) or branching causal flows (use 22_sankey)."
+    },
+    "04_timeline": {
+      "summary": "Pick for milestones, roadmaps, and time-ordered events on a single horizontal axis. Skip for multi-stream quarterly plans (use 23_quarterly_product_roadmap) or calendar grids (use 28_monthly_marketing_calendar)."
+    },
+    "05_comparison": {
+      "summary": "Pick for two-option comparison, pros/cons, side-by-side evaluation across consistent attributes. Skip for 3+ options or single-axis ranking (use 06_segmented_pyramid)."
+    },
+    "06_segmented_pyramid": {
+      "summary": "Pick for ranking, stratification, layered hierarchy, and maturity levels — a segmented pyramid with inverted-trapezoid tiers (boat-style tiers are intentional, not a defect). Skip for reporting-line org structures (use 11_org_tree)."
+    },
+    "07_cycle": {
+      "summary": "Pick for iterative loops, flywheels, PDCA, and continuous feedback cycles. Skip for one-directional linear steps (use 03_process_flow)."
+    },
+    "08_matrix_2x2": {
+      "summary": "Pick for sorting items across two axes (High/Low), BCG-style prioritization. Skip for labelled SWOT quadrants (use 18_swot) or 3x3 grids (use 30_marketing_milestones_matrix)."
+    },
+    "09_pillars": {
+      "summary": "Pick for core strategic pillars, corporate tenets, and organizational foundations. Skip for sequential steps (use 03_process_flow)."
+    },
+    "10_funnel": {
+      "summary": "Pick for conversion funnels, sales pipelines, and monotonic stage drop-off. Skip for non-decreasing or branching flows."
+    },
+    "11_org_tree": {
+      "summary": "Pick for org charts, OKR cascades, work breakdown structures, and parent-child hierarchy. Skip for non-hierarchical concept networks (use 15_mind_map)."
+    },
+    "12_venn": {
+      "summary": "Pick for set overlaps, intersections, and shared/overlapping areas. Skip for non-overlapping categories."
+    },
+    "13_kpi_highlight": {
+      "summary": "Pick for KPI summary cards, key-metric dashboards, and financial highlights with direction. Skip for a single metric vs a target (use 20_gauge)."
+    },
+    "14_gantt": {
+      "summary": "Pick for project plans and task schedules with durations and phases across swimlanes. Skip for high-level milestone-only timelines (use 04_timeline)."
+    },
+    "15_mind_map": {
+      "summary": "Pick for brainstorms, radial concept maps, product modules, and non-linear categories. Skip for strict reporting hierarchy (use 11_org_tree)."
+    },
+    "16_geo_map": {
+      "summary": "Pick for geographic regions, office locations, and spatial or global-scale data. Skip for non-spatial data."
+    },
+    "17_waterfall": {
+      "summary": "Pick for additive/subtractive financial variances, budget bridges, and stepwise totals. Skip for cumulative time-series trends."
+    },
+    "18_swot": {
+      "summary": "Pick for SWOT (Strengths/Weaknesses/Opportunities/Threats) and internal-vs-external, positive-vs-negative assessment. Skip for generic 2x2 prioritization (use 08_matrix_2x2)."
+    },
+    "19_fishbone": {
+      "summary": "Pick for root-cause analysis, Ishikawa cause-and-effect, and quality diagnosis. Skip for sequential processes (use 03_process_flow)."
+    },
+    "20_gauge": {
+      "summary": "Pick for a single KPI vs target, goal-completion dial, or speedometer metric. Skip for multiple KPIs (use 13_kpi_highlight)."
+    },
+    "21_heat_map": {
+      "summary": "Pick for risk matrices, value-intensity grids across row/column headers, and cohort retention. Skip for single-series charts."
+    },
+    "22_sankey": {
+      "summary": "Pick for resource/energy flows and magnitude branching from sources to targets. Skip for simple linear steps (use 03_process_flow)."
+    },
+    "23_quarterly_product_roadmap": {
+      "summary": "Pick for 4-quarter (Q1-Q4) roadmaps grouped by streams or focus areas. Skip for monthly granularity (use 24_monthly_strategic_roadmap)."
+    },
+    "24_monthly_strategic_roadmap": {
+      "summary": "Pick for phased monthly execution roadmaps with activities/outcomes per phase. Skip for quarter-level (use 23_quarterly_product_roadmap) or multi-year (use 25_yearly_strategic_goals_roadmap)."
+    },
+    "25_yearly_strategic_goals_roadmap": {
+      "summary": "Pick for multiple strategic goals mapped to milestone years/targets and multi-year objectives. Skip for sub-annual execution plans."
+    },
+    "26_annual_roles_targets_roadmap": {
+      "summary": "Pick for multi-year roadmaps organized by execution pillars (roles, action plans, targets). Skip for simple single-axis timelines (use 04_timeline)."
+    },
+    "27_three_year_project_lifecycle": {
+      "summary": "Pick for 3-year project lifecycle phases (e.g. Planning/Execution/Monitoring) and multi-year phase tracks. Skip for single-year plans."
+    },
+    "28_monthly_marketing_calendar": {
+      "summary": "Pick for monthly calendar grids of campaign events, editorial schedules, and sprint planners. Skip for non-calendar timelines (use 04_timeline)."
+    },
+    "29_cross_functional_status_board": {
+      "summary": "Pick for Kanban/status boards, 4-column task trackers, and cross-functional status. Skip for scheduled Gantt durations (use 14_gantt)."
+    },
+    "30_marketing_milestones_matrix": {
+      "summary": "Pick for 3x3 matrices, 9-item grids grouped under 3 categories, and grouped milestone cards. Skip for 2x2 prioritization (use 08_matrix_2x2)."
+    },
+    "31_maturity_transformation_roadmap": {
+      "summary": "Pick for maturity curves, capability-growth progression, and 4-stage transformation roadmaps. Skip for calendar or quarter plans."
+    },
+    "32_multi_year_growth_strategy": {
+      "summary": "Pick for 5-year/5-phase growth strategies with stacked key objectives and long-term projections. Skip for short-term plans (use 24_monthly_strategic_roadmap)."
+    }
+  }
+}

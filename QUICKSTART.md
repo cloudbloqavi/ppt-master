@@ -28,6 +28,12 @@ rsync -ahc --delete --info=progress2 /mnt/c/Users/<your-windows-username>/repo/a
 cd ~/development/ai-builder-engine
 ```
 
+# Without checksum
+```bash
+rsync -ah --delete --info=progress2 /mnt/c/Users/<your-windows-username>/repo/ai-builder-engine/ ~/development/ai-builder-engine/
+cd ~/development/ai-builder-engine
+```
+
 **If you are on a native Linux machine** (fresh clone):
 ```bash
 # Clone the repository

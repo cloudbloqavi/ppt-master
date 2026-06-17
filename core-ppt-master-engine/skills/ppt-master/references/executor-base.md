@@ -14,8 +14,10 @@
 |---|---|
 | Chosen template's `design_spec.md` (read frontmatter to detect `replication_mode`) | `templates/<chosen_template>/design_spec.md` |
 | Every distinct `<basename>` in `spec_lock.md page_layouts` | `templates/<chosen_template>/<basename>.svg` |
-| Every distinct chart name in `spec_lock.md page_charts` | `templates/charts/<chart_name>.svg` |
-| Chart types in `design_spec.md §VII` not covered above | `templates/charts/<chart_name>.svg` |
+| Every distinct chart name in `spec_lock.md page_charts` (**company-tier first**) | company key → `templates/charts/powerslides_infographics/<chart_name>.svg`; otherwise → `templates/charts/<chart_name>.svg` |
+| Chart types in `design_spec.md §VII` not covered above | per the §VII `Tier`/`Path` columns (company → `powerslides_infographics/`, stock → `templates/charts/`) |
+
+> **Chart path resolution (Hard rule — fixes silent fallback).** A `page_charts` value resolves to a **company** chart when it is a numeric-prefixed key (`NN_name`, e.g. `18_swot`, `19_fishbone`, `31_maturity_transformation_roadmap`) that exists at `templates/charts/powerslides_infographics/<value>.svg` — that path is authoritative; do NOT look for it under `templates/charts/<value>.svg` (it is not there, and guessing/grepping by name is unreliable). All other values resolve under `templates/charts/<value>.svg`. The authoritative tier + path for every viz page is in `chart_provenance.json` and `design_spec.md §VII`; consult them when in doubt.
 
 **Forbidden — re-reading during generation**:
 - Layout SVG already loaded in this batch
@@ -190,6 +192,7 @@ grep "chart-plot-area" <project_path>/svg_output/<current_page>.svg
 > All chart templates in `templates/charts/` include this marker as a reference. If you are drawing a chart and the marker is absent, you have a bug.
 - **Technical specs**: see [shared-standards.md](shared-standards.md) for SVG/PPT constraints
 - **Card containers — use the documented patterns**: when a content page needs section cards (4 quadrants, parallel aspects, capability blocks, info cards), use the patterns codified in [`templates/charts/CHART_STYLE_GUIDE.md`](../templates/charts/CHART_STYLE_GUIDE.md) §11 — half-rounded section tab (§11.1), nested card border without stroke (§11.2), card-grid skeletons (§11.3), diagonal dashed connector for cross-quadrant relationships (§11.5), ground-anchor ellipse as a non-filter depth marker (§11.6), bidirectional interaction arrows for paired protocols (§11.7). Do not reinvent the "tinted full-rounded rect + white cover-rect to hide the bottom corners" hack; it survives in older templates but breaks SVG→PPTX color editing. Reference templates: [`labeled_card.svg`](../templates/charts/labeled_card.svg), [`quadrant_text_bullets.svg`](../templates/charts/quadrant_text_bullets.svg), [`kpi_cards.svg`](../templates/charts/kpi_cards.svg), [`matrix_2x2.svg`](../templates/charts/matrix_2x2.svg), [`team_roster.svg`](../templates/charts/team_roster.svg), [`client_server_flow.svg`](../templates/charts/client_server_flow.svg).
+- **Company-catalog infographics keep their own identity**: templates under [`templates/charts/powerslides_infographics/`](../templates/charts/powerslides_infographics/) carry a distinct brand palette and typography. When recreating one selected in Design Spec §VII, preserve its source colors/fonts — it is **exempt** from the CHART_STYLE_GUIDE Tailwind palette. See [`powerslides_infographics/STYLE_GUIDE.md`](../templates/charts/powerslides_infographics/STYLE_GUIDE.md).
 - **Semantic shapes over preset stacks**: when a slide needs to express "ascending / converging / breaking through / stacking" — i.e., a relationship that goes beyond a generic arrow — prefer a single custom `<polygon>` or `<path>` that encodes the semantics geometrically, rather than stacking multiple preset arrows. A converging-tip path or a podium polygon reads faster than three arrows pointing at a label. Examples of this technique appear in many imported corporate decks; see `projects/01_template_import/svg_output/slide_01.svg` shape-158 for a reference (gradient-filled inward-pointing arrow). Do not codify these as templates — they are page-specific; the rule is just "consider polygon before stacking presets."
 - **Visual depth — through restraint**: layered depth comes from rhythm (flat vs lifted, dense vs spacious), not from shadows everywhere. Apply shadow to at most 2-3 genuinely floating elements per page (cards on photos, primary CTA, overlays); keep peer-grid cards, dividers, body containers flat. Reach for typography weight, spacing, accent bars, subtle tints **before** shadow. Full rules in shared-standards.md §6.
 
@@ -287,6 +290,21 @@ Chart SVGs referenced in **VII. Visualization Reference List** are loaded once v
 - **Forbidden**: changing visualization type without spec justification; omitting data points or structural elements from the outline
 
 > Templates: `templates/charts/` (81 types). Index: `templates/charts/charts_index.json`
+
+**Hard rule — never silently abandon a matched chart template.** When `spec_lock.md page_charts` (or §VII) assigns a template to a page, the output MUST visibly carry that template's distinctive structure. If a template is too heavy or visually incompatible to reproduce cleanly (e.g. a company-catalog infographic that is a raw PowerPoint export — single-line, `<filter>`/`feGaussianBlur`-laden, tens of KB), do NOT quietly rebuild a generic chart of a different shape (a 5-phase stacked-objective growth strategy must not collapse into a plain timeline). Instead:
+> 1. Reproduce the template's **layout logic and distinctive elements** (phase columns, stacked objective slots, the matrix grid, etc.) in clean SVG using the deck's locked palette/typography — i.e. treat the heavy template as a *visual reference* (mirror-style, §1.1), redrawing its geometry without copying its banned filter constructs.
+> 2. If the page genuinely cannot carry that structure, emit `warning: P<NN> page_charts template <name> abandoned — output uses <fallback> instead; structure differs from catalog` so the divergence is visible, never silent.
+> 3. As a sanity check, a chart page whose final SVG is drastically smaller/simpler than its source template (e.g. <30% of the template's element count) is a signal you downgraded it — re-examine before finalizing.
+
+### 5.0 Confirm chart provenance (Required when `chart_provenance.json` exists)
+
+The Strategist wrote `chart_provenance.json` with `confirmed_by: "strategist"` (intent). The Executor is the source of truth for **what actually shipped**, so after generating each viz page, reconcile its entry:
+
+- If you reproduced the assigned reference's structure (company/stock) → set that page's `confirmed_by: "executor"` (leave `tier`/`key`/`reference` as-is).
+- If you **abandoned** the assigned template (emitted the §5 `warning: P<NN> page_charts template <name> abandoned …`) → rewrite that page to `tier: "custom"`, `key: null`, `reference: null`, and put the abandonment reason in `decision`. Do not leave a `company`/`stock` entry pointing at a reference the slide does not actually carry — that is the exact intent-vs-actual drift this file exists to kill.
+- If a page has no chart, it has no entry.
+
+Keep `chart_provenance.json`, `spec_lock.md page_charts`, and §VII consistent. The runner validates this file after the turn (reference files must exist on disk for company/stock; custom needs a non-empty `decision`) and runs the structural-mimic review against it.
 
 ### 5.1 Chart Coordinate Calibration
 

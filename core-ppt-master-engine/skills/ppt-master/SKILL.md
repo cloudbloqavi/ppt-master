@@ -69,6 +69,7 @@ For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 | Layout templates | `${SKILL_DIR}/templates/layouts/layouts_index.json` | Query available page layout templates |
 | Brand presets | `${SKILL_DIR}/templates/brands/brands_index.json` | Query available brand identity presets (color / typography / logo / voice) |
 | Visualization templates | `${SKILL_DIR}/templates/charts/charts_index.json` | Query available visualization SVG templates (charts, infographics, diagrams, frameworks) |
+| Company-preferred visualizations | `${SKILL_DIR}/templates/charts/powerslides_infographics/company_index.json` | In-house infographic / roadmap / framework variants — matched BEFORE the stock chart catalog, with fallback to it (see [`references/strategist.md`](references/strategist.md) §VII "Company catalog first") |
 | Icon library | `${SKILL_DIR}/templates/icons/` | See `${SKILL_DIR}/templates/icons/README.md`; search icons on demand with `ls templates/icons/<library>/ \| grep <keyword>` |
 
 ## Standalone Workflows
@@ -137,6 +138,8 @@ When the user provides non-Markdown content, convert immediately:
 ```bash
 python3 ${SKILL_DIR}/scripts/project_manager.py init <project_name> --format <format>
 ```
+
+⚠️ **`<project_name>` must be a clean topic slug** — lowercase snake_case, **no format token, no date** (e.g. `acme_q3_review`, never `ppt169_acme_q3_review`). `init` appends `_<format>_<YYYYMMDD_HHMM>` automatically; embedding the format yourself yields a doubled name like `ppt169_acme_q3_review_ppt169_20260613_1530`. Then use the exact path `init` prints (`Project created: …`) for **every** subsequent write — never invent a bare-slug path, or you create a phantom second folder.
 
 Format options: `ppt169` (default), `ppt43`, `xhs`, `story`, etc. For the full format list, see `references/canvas-formats.md`.
 
@@ -329,6 +332,7 @@ python3 ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 **Output**:
 - `<project_path>/design_spec.md` — human-readable design narrative
 - `<project_path>/spec_lock.md` — machine-readable execution contract (skeleton: `templates/spec_lock_reference.md`); Executor re-reads before every page
+- `<project_path>/chart_provenance.json` — per-page record of which visualization template each slide used (company → stock → custom tier), when the deck has any viz pages (schema: `templates/chart_provenance_reference.md`). The runner validates it and runs the structural-mimic review against it after the turn.
 
 **✅ Checkpoint — Phase deliverables complete, auto-proceed to next step**:
 ```markdown
@@ -433,10 +437,11 @@ python3 ${SKILL_DIR}/scripts/svg_editor/server.py <project_path> --live
 **Quality Check Gate (Mandatory)** — after all SVGs, BEFORE annotation handling and speaker notes:
 ```bash
 python3 ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
+python3 ${SKILL_DIR}/scripts/svg_layout_auditor.py <project_path>
 ```
-- Any `error` (banned SVG features, viewBox mismatch, spec_lock drift, etc.) MUST be fixed before proceeding — return to Visual Construction, regenerate that page, re-run check.
-- `warning` entries (low-res image, non-PPT-safe font tail, etc.): fix when straightforward, otherwise acknowledge and release.
-- Run against `svg_output/` (not after `finalize_svg.py` — finalize rewrites SVG and masks violations).
+- `svg_quality_checker.py` — Any `error` (banned SVG features, viewBox mismatch, spec_lock drift, **orphan-baseline text**, etc.) MUST be fixed before proceeding — return to Visual Construction, regenerate that page, re-run check. `warning` entries (low-res image, non-PPT-safe font tail, etc.): fix when straightforward, otherwise acknowledge and release.
+- `svg_layout_auditor.py` — deterministic geometry audit. Detects text-overlap, out-of-bounds, overflow, and orphan-baseline (y=0 origin) defects and **auto-fixes the unambiguous ones in place**, writing per-page findings to `<project_path>/.review/`. Review any `hard_remaining` findings it could not auto-fix. This is the same auditor the runner re-runs after the turn (it cannot be skipped) — running it here lets you catch issues before export.
+- Run both against `svg_output/` (not after `finalize_svg.py` — finalize rewrites SVG and masks violations).
 
 **Logic Construction Phase**: generate speaker notes → `<project_path>/notes/total.md`
 
@@ -451,7 +456,7 @@ python3 ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 
 > **Chart pages?** If this deck contains data charts (bar / line / pie / radar / etc.), run the standalone [`verify-charts`](workflows/verify-charts.md) workflow before Step 7 to calibrate coordinates. AI models routinely introduce 10–50 px errors when mapping data to pixel positions; verify-charts eliminates that class of error. Skip if no chart pages.
 
-> **Visual self-check (opt-out)**: By default, always run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. If the user has explicitly opted out (e.g. via the `--no-visual-review` CLI argument or explicitly requesting it in their prompt), skip this step.
+> **Visual review (opt-out)**: The deterministic `svg_layout_auditor.py` above is the authoritative, enforced layout gate (the runner re-runs it after the turn and rebuilds the deck if it changed any SVG). For *ambiguous* visual-quality issues that geometry cannot adjudicate — visual rhythm, emphasis, image-text relationships — also run the standalone [`visual-review`](workflows/visual-review.md) workflow before Step 7. If the user opted out (`--no-visual-review`), skip both the auditor and the visual-review workflow.
 
 ---
 

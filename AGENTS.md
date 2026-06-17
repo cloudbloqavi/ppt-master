@@ -114,6 +114,23 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx.py <project
 - `core-ppt-master-engine/examples/` — example projects.
 - `core-ppt-master-engine/projects/` — user project workspace.
 
+## Testing
+
+The `agent_runner` engine and the `ppt-master` skill scripts have fast, deterministic,
+offline regression tests under [`agent_runner/tests/`](agent_runner/tests/).
+
+*   **Test guide**: [TEST.md](TEST.md) is the single source of truth — it documents the
+    test strategy, the per-file inventory, the run commands, and the conventions for
+    adding tests.
+*   **Run command**: from the repo root,
+    ```bash
+    python3 -m pytest agent_runner/tests/
+    ```
+*   **Authoring rule**: whenever you write or change a test to validate or verify a
+    specific execution behavior, follow the conventions in `TEST.md` (where the file
+    goes, how it is structured, deterministic/offline requirements) **and** update the
+    `TEST.md` inventory table. Do not place ad-hoc test scripts elsewhere in the repo.
+
 ## Dependency Auditing & EOL Maintenance
 
 To maintain secure, stable, and up-to-date Python dependencies, this project includes an automated dependency audit log.

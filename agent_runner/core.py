@@ -16,17 +16,30 @@ from pathlib import Path
 from typing import Any
 
 from agent_runner.config import ARGS, logger
-from agent_runner.logging_setup import setup_file_logging
+from agent_runner.logging_setup import setup_file_logging, sweep_orphan_root_logs
 from agent_runner.status_logger import (
     setup_status_logging, log_status, set_research_topic, reset_run_state,
     _check_text_for_status, _check_thought_for_status,
-    _check_tool_call_for_status, _check_tool_result_for_status
+    _check_tool_call_for_status, _check_tool_result_for_status,
+    _mark_all_slides_ready,
 )
 from agent_runner.tools import run_self_test
 from agent_runner.resumption import find_and_restore_incomplete_project
+from agent_runner.checkpoints import build_resume_directive, default_project_roots
 from agent_runner.artifacts import (
-    copy_output_artifacts, _snapshot_project_files, _snapshot_output_pptx_files
+    copy_output_artifacts, _snapshot_project_files, _snapshot_output_pptx_files,
+    finalize_log_placement
 )
+from agent_runner.visual_enforcement import enforce_visual_review, status_line
+from agent_runner.provenance_enforcement import (
+    enforce_chart_provenance,
+    status_line as provenance_status_line,
+)
+
+# Process start time. Used to scope warm-retry research reuse to briefs written
+# during THIS invocation, so a retry never imports a stale brief left in the
+# shared projects/ dir by an unrelated earlier run.
+_RUN_PROCESS_START = time.time()
 
 # ─────────────────────────────────────────────────────────────
 # Subagent Tool Detection
@@ -204,13 +217,30 @@ def _get_max_attempt_count() -> int:
 
 
 def _build_retry_prompt(base_prompt: str, attempt_index: int) -> str:
-    """Add a deterministic non-interactive continuation directive for retries."""
+    """Add a deterministic non-interactive continuation directive for retries.
+
+    Resume is artifact-driven (see agent_runner/checkpoints.py): the runner reads
+    what the previous attempt left on disk — research brief, project folder,
+    design_spec/spec_lock, partial or complete SVG pages, notes, finalized SVGs —
+    and tells the agent to continue from the furthest-completed stage instead of
+    cold-restarting and redoing work. Falls back to a plain continuation directive
+    when no reusable state is found.
+    """
     retry_directive = (
         "Previous run ended before producing a PPTX. "
         "Continue fully autonomously in non-interactive mode and complete the pipeline through Step 7 export in this same run. "
         "Do not ask for confirmations, and do not stop after Eight Confirmations or split-mode hints. "
         "If anything is ambiguous, choose the best default and proceed."
     )
+
+    try:
+        resume = build_resume_directive(default_project_roots(), _RUN_PROCESS_START)
+    except Exception as exc:
+        logger.warning("Resume-state detection failed (%s); using plain retry directive.", exc)
+        resume = None
+    if resume:
+        retry_directive += "\n\n" + resume
+
     return f"{base_prompt}\n\n[RETRY ATTEMPT {attempt_index}] {retry_directive}"
 
 
@@ -258,6 +288,11 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
     """Initialize the Antigravity agent and send a single prompt."""
     logger.info("Initializing Agent using Google Antigravity SDK...")
     logger.info("Platform: %s | Python: %s", sys.platform, sys.version.split()[0])
+    logger.info(
+        "Web research runs via native Google Search grounding (in-model): it does NOT "
+        "appear as a tool call, subprocess, or subagent. Cited sources are surfaced as "
+        "discrete citation events from the model's manifest/reasoning, not from a search tool."
+    )
     logger.info("Prompt: %s", prompt_message[:120] + ("..." if len(prompt_message) > 120 else ""))
 
     # Reset per-attempt status state and record the topic so native web-research
@@ -293,7 +328,7 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
             "\n2. Specific delegation scenarios:"
             "\n   - Step 1 (Source Content Ingestion): If the user provides multiple source files or links, spawn one subagent per source to run the conversion scripts (e.g. `pdf_to_md.py`, `web_to_md.py`) concurrently and summarize their outputs."
             "\n   - Step 5 (Image Acquisition): If the design specification requires both AI image generation (`ai` acquisition) and web search (`web` acquisition), you MUST parallelize the work. Spawn a subagent via the `invoke_subagent` tool to perform the web searches concurrently while the main agent executes the AI image generation manifest script (`image_gen.py`)."
-            "\n   - Step 6 (Visual Review): If the number of generated slides N is greater than two (> 2), partition the pages into batches of <= 5 pages and spawn parallel subagents concurrently using the `invoke_subagent` tool to execute visual self-checks. Make sure to launch the local preview server (`python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_editor/server.py <project_path> --no-browser`) beforehand."
+            "\n   - Step 6 (Visual Review): After all SVGs are generated, run the deterministic layout auditor `python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_layout_auditor.py <project_path>`. It mathematically detects and auto-fixes the unambiguous layout defects (text-overlap, y=0 baseline origin, out-of-bounds) and writes per-page findings to `<project_path>/.review/`. For any remaining AMBIGUOUS visual issues when N > 2 slides, you MAY additionally partition the pages into batches of <= 5 and spawn parallel `invoke_subagent` review subagents (launch the preview server `svg_editor/server.py <project_path> --no-browser` first). IMPORTANT: the runner independently re-runs this auditor and rebuilds the deck after your turn, so it cannot be skipped — and you MUST NOT claim visual review is complete unless you actually ran the auditor."
             "\n   - Web Research / Fact-Gathering: If the user prompt requires searching for latest information or reports, Recency-based information for MULTIPLE persona, companies, products, or distinct topics (e.g. comparing Nike and Microsoft sales in current year), you MUST parallelize this web research phase in a very efficient and optimized way. Spawn parallel subagents using the `invoke_subagent` tool to execute web searches and URL reads concurrently, then aggregate their research findings in the workspace."
             "\n3. IMPORTANT: When you spawn any subagent, you MUST explicitly wait for the tool to finish and return its result. You MUST NOT finish your response, conclude the conversation, or output your final answer while any subagents are still running in the background. Doing so terminates the agent session and orphans the subagents. Always consume the subagent's result (ToolResult) and verify its outcomes before declaring the task complete."
             "\n4. Explicit Decision Logging: Every time you evaluate a phase where a subagent could be spawned, you MUST output a clear statement of your decision in your text or thought output using the format: `[Subagent Decision] Phase: <PhaseName> | Decision: <Bypass/Spawn> | Reason: <DetailReason>`."
@@ -320,9 +355,9 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
 
     # Dynamic overrides append
     if no_visual_review:
-        system_instructions += "\n\nUser has opted out of the visual review phase. DO NOT execute the visual self-check / visual-review workflow at Step 6."
+        system_instructions += "\n\nUser has opted out of the visual review phase (--no-visual-review). DO NOT execute the visual self-check / visual-review workflow or the layout auditor at Step 6. The runner will also skip its enforced post-turn audit."
     else:
-        system_instructions += "\n\nVisual review phase is enabled by default (opt-out mode). You MUST run the visual self-check / visual-review workflow at Step 6 after all SVGs are generated, unless opted out."
+        system_instructions += "\n\nVisual review is enabled by default (opt-out mode). At Step 6, after all SVGs are generated, you MUST run the deterministic layout auditor (`svg_layout_auditor.py <project_path>`) and address its findings. The runner ALSO enforces this audit after your turn and rebuilds the deck if it changed any SVG — so never report visual review as done without having actually run the auditor."
 
     mcp_servers = load_mcp_servers() if use_mcp else []
     if use_mcp:
@@ -521,49 +556,58 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
                         logger.info("%s", decision_line)
                         logged_decisions.add(decision_line)
 
-            # ── Subagent spawn-count inference fallback ──────────────
-            # If the ToolCall stream never matched a subagent tool name,
-            # but the agent's own decision log contains Spawn decisions,
-            # infer the count from those entries.
-            if subagent_stats["total_spawned"] == 0:
-                spawn_decisions = [d for d in logged_decisions if "Decision: Spawn" in d]
-                if spawn_decisions:
-                    subagent_stats["total_spawned"] = len(spawn_decisions)
-                    subagent_stats["inferred"] = True
-                    logger.warning(
-                        "Subagent spawns detected via decision log (%d) but not via "
-                        "ToolCall stream. The SDK may be handling subagents internally.",
-                        len(spawn_decisions),
-                    )
+            # ── Subagent delegation reconciliation (no fabrication) ──────────
+            # The model may LOG a planning decision ("[Subagent Decision] … Spawn")
+            # without the harness ever surfacing a START_SUBAGENT ToolCall — it
+            # reconsiders, or the phase is satisfied inline. We report planned
+            # spawns separately and NEVER inflate the real (observed) spawn count.
+            # In particular, web research runs via native Google Search grounding
+            # in-model and legitimately never spawns a subagent or subprocess.
+            spawn_decisions = [d for d in logged_decisions if "Decision: Spawn" in d]
+            planned_not_executed = (
+                len(spawn_decisions) if subagent_stats["total_spawned"] == 0 else 0
+            )
+            if planned_not_executed:
+                logger.info(
+                    "Subagent delegation was planned in %d decision-log entr(ies) but no "
+                    "START_SUBAGENT tool call was observed — the model satisfied those "
+                    "phases inline (e.g. native Google Search grounding does web research "
+                    "in-model and never spawns a subagent).",
+                    planned_not_executed,
+                )
 
-            # Check if Step 6 was bypassed dynamically (was enabled in config/cli but no subagents spawned)
+            # Report only OBSERVED facts about the agent's in-turn review activity.
+            # Whether the agent spawned its own review subagents is no longer how
+            # visual review is guaranteed — the runner enforces a deterministic
+            # layout audit after this turn (see enforce_visual_review). Do NOT
+            # fabricate a "static checks passed / slide count <= 2" justification:
+            # earlier that line claimed checks had passed even when none had run.
             if not no_visual_review and subagent_stats["total_spawned"] == 0:
-                logger.info("[Subagent Decision] Phase: Step 6 (Visual Review) | Decision: Bypass | Reason: Static quality check passed with zero errors, or slide count <= 2, rendering parallel visual-review subagents unnecessary.")
+                logger.info("Agent spawned no in-turn visual-review subagents; the runner's "
+                            "enforced deterministic layout audit will run post-turn.")
 
-            inferred_tag = " (inferred from decision log)" if subagent_stats.get("inferred") else ""
             print("\n" + "═" * 60)
             print("SUBAGENT EXECUTION SUMMARY")
             print(f"  Subagents Enabled in Config: {subagent_stats['enabled']}")
-            print(f"  Total Subagents Spawned:     {subagent_stats['total_spawned']}{inferred_tag}")
+            print(f"  Total Subagents Spawned:     {subagent_stats['total_spawned']} (observed START_SUBAGENT calls)")
             print(f"  Total Subagents Completed:   {subagent_stats['completed']}")
-            if subagent_stats["total_spawned"] > 0:
-                if subagent_stats["details"]:
-                    print("  Spawned Subagents Details:")
-                    for idx, detail in enumerate(subagent_stats["details"], 1):
-                        tool_info = f" via {detail['tool_name']}" if detail.get('tool_name') else ""
-                        print(f"    {idx}. [Type: {detail['type']}{tool_info}] Status: {detail['status']}")
-                        print(f"       Task: {detail['task'][:120]}...")
-                elif subagent_stats.get("inferred"):
-                    print("  Details: Spawns were inferred from agent decision logs (SDK did not")
-                    print("           surface ToolCall chunks for subagent invocations).")
+            if subagent_stats["total_spawned"] > 0 and subagent_stats["details"]:
+                print("  Spawned Subagents Details:")
+                for idx, detail in enumerate(subagent_stats["details"], 1):
+                    tool_info = f" via {detail['tool_name']}" if detail.get('tool_name') else ""
+                    print(f"    {idx}. [Type: {detail['type']}{tool_info}] Status: {detail['status']}")
+                    print(f"       Task: {detail['task'][:120]}...")
+            elif subagent_stats["enabled"]:
+                print("  Note: Subagents were enabled and available, but the model did not delegate.")
+                print("        Expected for small decks and for web research — native Google Search")
+                print("        grounding runs in-model and never spawns a subagent or background process.")
+                if planned_not_executed:
+                    print(f"  Planned-but-not-executed: {planned_not_executed} '[Subagent Decision] … Spawn' "
+                          "log entr(ies) had no matching tool call (satisfied inline):")
                     for idx, decision in enumerate(spawn_decisions, 1):
                         print(f"    {idx}. {decision[:140]}")
             else:
-                if subagent_stats["enabled"]:
-                    print("  Note: Subagents were enabled but the main agent did not delegate any tasks.")
-                    print("        This can happen if the slide count was small (e.g. <= 2 pages) or sequential execution was chosen by the model.")
-                else:
-                    print("  Reason not invoked: Subagents were disabled in CapabilitiesConfig.")
+                print("  Reason not invoked: Subagents were disabled in CapabilitiesConfig.")
             print("═" * 60 + "\n")
             return response.usage_metadata, subagent_stats
 
@@ -610,6 +654,10 @@ def main_run() -> int:
     if ARGS.self_test:
         success = run_self_test()
         return 0 if success else 1
+
+    # Clean up any loose logs left at the artifacts root by older runner versions
+    # or runs killed before cleanup, BEFORE this run creates its own logs.
+    sweep_orphan_root_logs()
 
     setup_file_logging()
     check_and_install_dependencies()
@@ -675,6 +723,14 @@ def main_run() -> int:
             )
             usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
             run_status = "success"
+            # Safety-net flush: emit a closing "Slide N is ready" for any slide
+            # that was designed but never got its ready event. The per-slide flush
+            # is normally driven off the finalize/export tool call, but when the
+            # agent chains the whole tail (total_md_split && finalize_svg &&
+            # svg_to_pptx) into a single run_command, that detection can be missed
+            # and the final slide's ready line is dropped. Flushing here guarantees
+            # the last slide is reported regardless of how export was invoked.
+            _mark_all_slides_ready()
             log_status("Agent execution completed successfully.")
             logger.info("Agent run completed successfully.")
             if usage:
@@ -685,6 +741,32 @@ def main_run() -> int:
                     "thoughts_tokens": usage.thoughts_token_count,
                     "total_tokens": usage.total_token_count,
                 }
+
+            # Enforced visual review (Part C): runs runner-side, so it cannot be
+            # skipped or narrated-but-not-done by the agent. The deterministic
+            # auditor auto-fixes unambiguous layout defects (text overlap, y=0
+            # origin, out-of-bounds) in svg_output/ and, if anything changed,
+            # rebuilds the deck — because the agent had already exported from the
+            # un-fixed SVGs. Honors --no-visual-review. Never fails the run.
+            try:
+                if not ARGS.no_visual_review:
+                    log_status("Reviewing slide layouts for visual issues...")
+                vr_result = enforce_visual_review(ARGS.no_visual_review, start_time)
+                log_status(status_line(vr_result))
+            except Exception as vr_exc:
+                logger.error("Enforced visual-review stage errored (non-fatal): %s",
+                             vr_exc, exc_info=True)
+
+            # Chart provenance validation + structural-mimic review (advisory):
+            # verifies viz slides recorded which template they used (company
+            # catalog first) and that company/stock slides carry the matched
+            # template's structure. Report-only — never fails the run.
+            try:
+                cp_result = enforce_chart_provenance(start_time)
+                log_status(provenance_status_line(cp_result))
+            except Exception as cp_exc:
+                logger.error("Chart provenance/structural review errored (non-fatal): %s",
+                             cp_exc, exc_info=True)
         except KeyboardInterrupt:
             run_status = "interrupted"
             log_status("Agent execution interrupted by user.")
@@ -752,6 +834,11 @@ def main_run() -> int:
 
     log_status(f"Workflow execution finished with status: {final_status}")
     logger.info("Runner finished with status: %s", final_status)
+    # Logs were copied into the project artifacts folder during the artifact-copy
+    # stage; remove the now-redundant top-level originals so they don't pile up at
+    # the OUTPUT_ARTIFACTS_DIR root. Must run last — it closes the execution log
+    # FileHandler. (No-op if logs were not placed inside a project folder.)
+    finalize_log_placement()
     return exit_code
 
 

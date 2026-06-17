@@ -17,9 +17,25 @@ from agent_runner.config import ARGS, logger
 _STATUS_LOG_FILE_PATH: Path | None = None
 _STATUS_LOGGER: Any = None
 _last_status: str | None = None
+# Stable per-run id stamped onto every streamed event so the production consumer
+# (Pub/Sub → Firestore → frontend) can scope events to the right presentation job.
+_RUN_ID: str | None = None
 
 # Active tool call tracking to match ToolCall to ToolResult
 _active_tool_calls: dict[str, dict[str, Any]] = {}
+
+# ── Per-slide progress tracking (call-driven) ────────────────────────────────
+# This SDK does NOT emit ToolResult chunks, so slide "ready" events cannot be
+# driven off tool results. Instead we infer them from the tool-CALL stream: a
+# slide is "ready" once the agent moves on to the next slide (or once finalize/
+# export begins). This state lets us pair each "Designing slide N" with a later
+# "Slide N is ready", de-duplicate repeat edits, and surface polish passes as
+# "Refining slide N".
+_designed_slides: set[int] = set()      # slide numbers announced as "Designing"
+_ready_slides: set[int] = set()         # slide numbers already announced "ready"
+_current_slide: int | None = None       # slide whose SVG was most recently written
+_total_pages_seen: int | None = None     # last known total page count (from spec_lock)
+_slide_names: dict[int, str] = {}        # slide_num -> display name (ready w/o total)
 
 # ── Native web-research (Google Search grounding) tracking ───────────────────
 # This harness performs web research via native Google Search grounding rather
@@ -31,12 +47,64 @@ _thought_accum: str = ""                    # accumulated thought text (deltas)
 _text_accum: str = ""                       # accumulated agent text (deltas)
 _seen_research_headers: set[str] = set()     # dedup of reasoning section headers
 _research_headers_emitted: int = 0           # count surfaced (capped)
-_sources_emitted: bool = False              # have we surfaced research citations yet?
-_MAX_RESEARCH_HEADERS = 8
+_emitted_source_keys: set[str] = set()       # domains already streamed as citation events (idempotent)
+_sources_parsed: bool = False                # populated manifest parsed (stop re-scanning)
+_sources_marker_open: bool = False            # marker seen, block not yet closed/parsed
+_thought_scan_pos: int = 0                   # high-water mark scanned in _thought_accum
+_text_scan_pos: int = 0                       # high-water mark scanned in _text_accum
+_seen_text_markers: set[str] = set()          # phase/step/role checkpoints already emitted
+_emitted_once: set[str] = set()               # run_command lines capped to one emit per run
+
+# ── Tunable knobs (env-overridable so they can be readjusted without code) ────
+def _env_int(name: str, default: int, minimum: int = 0) -> int:
+    """Read a non-negative integer tuning knob from the environment.
+
+    Falls back to ``default`` when unset, non-numeric, or below ``minimum`` —
+    a bad value must never crash status logging.
+    """
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        val = int(str(raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("Invalid %s=%r; using default %d.", name, raw, default)
+        return default
+    if val < minimum:
+        logger.warning("%s=%d below minimum %d; using %d.", name, val, minimum, minimum)
+        return minimum
+    return val
+
+
+# Max number of research sub-topic headers surfaced from reasoning per run.
+_MAX_RESEARCH_HEADERS = _env_int("STATUS_MAX_RESEARCH_HEADERS", 8)
+# Overlap (chars) re-scanned at the tail of the thought buffer on each delta so a
+# pattern split across a streaming boundary is still matched. Must exceed the
+# longest pattern we incrementally scan for (a `**Header**` is capped at ~64
+# chars; URLs are longer, hence the generous default). Dedup makes re-matches
+# inside the overlap harmless, so larger only costs a little CPU.
+_SCAN_OVERLAP = _env_int("STATUS_SCAN_OVERLAP_CHARS", 1024, minimum=64)
+# A populated [[RESEARCH_SOURCES]] block can be larger than _SCAN_OVERLAP (≈1.1KB
+# observed vs the 1KB window) — so the marker scrolls out of the streaming window
+# before its closing ``` fence arrives. Once a marker appears we therefore re-scan
+# from it until the block closes, capping the re-scanned region at this size so a
+# malformed, never-closed marker can't turn per-delta scanning into an unbounded
+# sweep of an ever-growing buffer.
+_SOURCES_MAX_BLOCK = _env_int("STATUS_SOURCES_MAX_BLOCK", 16384, minimum=2048)
 
 # Marker the agent prints before its machine-readable citation manifest (see
 # system_instructions.md "Research Source Citations").
 _RESEARCH_SOURCES_MARKER = "[[RESEARCH_SOURCES]]"
+
+# Domains that are never real research citations (schema/spec/loopback noise).
+_NON_CITATION_DOMAINS = frozenset({
+    "w3.org", "www.w3.org", "localhost", "127.0.0.1", "schema.org",
+    "example.com", "example.org",
+})
+
+# Full-URL matcher used to harvest citations that appear only in the model's
+# reasoning (native Google Search grounding surfaces some domains nowhere else).
+_URL_RE = re.compile(r'https?://[^\s\'"<>)\]]+')
 
 # Technical/internal query patterns that should NOT appear in user-facing status
 # progress logs. These are SVG/XML/CSS terms the model searches for during
@@ -143,7 +211,6 @@ def _is_internal_query(query: str) -> bool:
         return True
 
     # Use word boundary matching for internal query patterns
-    import re
     words = re.findall(r'\b\w+\b', q_lower)
     if any(word in _INTERNAL_QUERY_PATTERNS for word in words):
         return True
@@ -204,11 +271,21 @@ class StatusProgressLogger:
             except Exception as e:
                 logger.warning("Failed to initialize Pub/Sub publisher client: %s", e)
 
-    def log_status(self, status_message: str):
+    def log_status(self, status_message: str, event_type: str = "progress",
+                   payload: dict | None = None):
         """Logs a status update.
 
         If a file path is configured, writes to the local log file.
         In production, publishes the status to the configured GCP Pub/Sub topic.
+
+        Args:
+            status_message: Human-readable status line (file feed + frontend display).
+            event_type: Discriminator for the consumer — "progress" or "citation".
+                Citation events are additive deltas (one per source, deduped by
+                domain upstream), so a domain-keyed Firestore upsert is idempotent
+                under Pub/Sub at-least-once redelivery and out-of-order arrival.
+            payload: Optional structured fields (e.g. {name, url, domain}) published
+                under "data" so the frontend need not parse the human string.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         formatted_message = f"[{timestamp}] {status_message}\n"
@@ -224,10 +301,16 @@ class StatusProgressLogger:
         # 2. Production GCP Pub/Sub publishing
         if self.pubsub_client and self.pubsub_topic:
             try:
-                data = json.dumps({
+                event = {
                     "timestamp": timestamp,
-                    "status": status_message
-                }).encode("utf-8")
+                    "status": status_message,
+                    "event_type": event_type,
+                }
+                if _RUN_ID:
+                    event["run_id"] = _RUN_ID
+                if payload:
+                    event["data"] = payload
+                data = json.dumps(event).encode("utf-8")
                 self.pubsub_client.publish(self.pubsub_topic, data)
             except Exception as e:
                 logger.warning("Failed to publish status progress to Pub/Sub: %s", e)
@@ -235,7 +318,16 @@ class StatusProgressLogger:
 
 def setup_status_logging():
     """Configure status progress logging based on CLI args and environment."""
-    global _STATUS_LOG_FILE_PATH, _STATUS_LOGGER
+    global _STATUS_LOG_FILE_PATH, _STATUS_LOGGER, _RUN_ID
+
+    # Stable per-run id for streamed events: prefer an explicit env id, then the
+    # Cloud Run execution name, else a timestamp. Lets the frontend group all
+    # events (incl. citations) under the correct presentation job.
+    _RUN_ID = (
+        os.environ.get("RUN_ID")
+        or os.environ.get("CLOUD_RUN_EXECUTION")
+        or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    )
 
     # Status progress updates run automatically in production (Cloud Run),
     # or locally when the CLI flag is passed or Pub/Sub is configured.
@@ -248,10 +340,11 @@ def setup_status_logging():
 
     file_path = None
     if opt_in:
-        output_dir = os.environ.get("OUTPUT_ARTIFACTS_DIR") or "."
         try:
-            output_path = Path(output_dir)
-            output_path.mkdir(parents=True, exist_ok=True)
+            # Share the same per-run subfolder as the execution log so neither
+            # file is ever written to the shared OUTPUT_ARTIFACTS_DIR root.
+            from agent_runner.logging_setup import get_run_log_dir
+            output_path = get_run_log_dir()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = output_path / f"status_progress_{timestamp}.log"
             _STATUS_LOG_FILE_PATH = file_path
@@ -262,14 +355,19 @@ def setup_status_logging():
     _STATUS_LOGGER = StatusProgressLogger(file_path=file_path)
 
 
-def log_status(message: str):
-    """Log a unique status message to the status progress channels."""
+def log_status(message: str, event_type: str = "progress", payload: dict | None = None):
+    """Log a status message to the status progress channels.
+
+    Consecutive-duplicate suppression applies ONLY to ordinary progress lines.
+    Citation events are already deduped by domain upstream and must never be
+    dropped here, so they bypass the guard.
+    """
     global _last_status
-    if message == _last_status:
+    if event_type == "progress" and message == _last_status:
         return
     _last_status = message
     if _STATUS_LOGGER:
-        _STATUS_LOGGER.log_status(message)
+        _STATUS_LOGGER.log_status(message, event_type=event_type, payload=payload)
     # Always print to stdout/stderr so logs reflect the progress
     logger.info("[Status Progress] %s", message)
 
@@ -343,57 +441,96 @@ def _get_page_rhythm_from_spec_lock(project_dir: Path) -> list[str]:
     return pages
 
 
+# One-shot text checkpoints: (trigger substrings, status message). Each fires
+# once per run the first time ANY of its triggers appears in the text stream.
+# Matching against an accumulator window (not a single delta) means a header
+# split across streaming chunks is still detected; _seen_text_markers stops it
+# re-firing while the marker lingers inside the overlap.
+_TEXT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("## ✅ Strategist Phase Complete",),
+     "Strategist Phase completed: Slide outline and visual guidelines finalized."),
+    (("## ✅ Image Acquisition Phase Complete",),
+     "Image Acquisition Phase completed: Generated visual illustrations and assets."),
+    (("## ✅ Executor Phase Complete",),
+     "Executor Phase completed: Constructed presentation slide layouts."),
+    (("## ✅ Topic Research Complete",),
+     "Topic research completed: Gathered information and assets successfully."),
+    (("## ✅ Template Fill Complete",),
+     "Template fill completed successfully."),
+    (("## ✅ Customize Animations Complete",),
+     "Custom animation overrides successfully applied."),
+    (("## ✅ Brand Saved",),
+     "Brand guidelines and identity templates saved successfully."),
+    (("## Template Creation Complete",),
+     "Presentation template package successfully created and registered."),
+    (("## Step 1: Confirm topic", "Confirm topic scope autonomously"),
+     "Defining research scope and topic focus..."),
+    (("## Step 2: Gather via web search",),
+     "Initiating multi-phase web research to gather facts and details..."),
+    (("Deep fetch", "Deep-dives"),
+     "Extracting comprehensive content and images from high-signal sites..."),
+    (("Targeted fill",),
+     "Conducting targeted search to gather specific missing details..."),
+    (("## Step 3: Save materials",),
+     "Saving research documents and downloading relevant media assets..."),
+)
+
+
 def _check_text_for_status(text: str):
-    """Parses agent text outputs to detect role switches or phase checkpoints."""
+    """Parses agent text outputs to detect role switches or phase checkpoints.
+
+    Checkpoints are matched against a windowed view of the accumulated text (with
+    a fixed overlap) rather than a single delta, so a marker that streams across a
+    chunk boundary (e.g. ``## ✅ Strate`` + ``gist Phase Complete``) is still
+    detected. _seen_text_markers guarantees each fires exactly once.
+    """
+    global _text_accum, _text_scan_pos
     if not text:
         return
 
-    # Accumulate text and surface the research citation manifest if present.
-    global _text_accum
     _text_accum += text
-    _scan_research_sources(_text_accum)
 
-    # Check for role switches (supports multiple switches if chunk is large)
-    if "## [Role Switch:" in text:
+    window_start = max(0, _text_scan_pos - _SCAN_OVERLAP)
+    window = _text_accum[window_start:]
+    _text_scan_pos = len(_text_accum)
+
+    # Surface the research citation manifest if present. Extraction uses the full
+    # contiguous buffer; `window` is the cheap trigger gate (stays O(window)).
+    _scan_research_sources(_text_accum, window)
+
+    # Role switches (dedup by role name). Require the closing ']' so a partial
+    # header still mid-stream is not emitted with a truncated role.
+    if "## [Role Switch:" in window:
         try:
-            parts = text.split("## [Role Switch:")
-            for part in parts[1:]:
+            for part in window.split("## [Role Switch:")[1:]:
+                if "]" not in part:
+                    continue
                 role = part.split("]")[0].strip()
+                if not role:
+                    continue
+                rkey = "role:" + role.lower()
+                if rkey in _seen_text_markers:
+                    continue
+                _seen_text_markers.add(rkey)
                 log_status(f"Switched agent role to: {role}.")
         except Exception:
             pass
 
-    # Check for step and workflow checkpoints
-    if "## ✅ Strategist Phase Complete" in text:
-        log_status("Strategist Phase completed: Slide outline and visual guidelines finalized.")
-    if "## ✅ Image Acquisition Phase Complete" in text:
-        log_status("Image Acquisition Phase completed: Generated visual illustrations and assets.")
-    if "## ✅ Executor Phase Complete" in text:
-        log_status("Executor Phase completed: Constructed presentation slide layouts.")
-    if "## ✅ Topic Research Complete" in text:
-        log_status("Topic research completed: Gathered information and assets successfully.")
-    if "## ✅ Template Fill Complete" in text:
-        log_status("Template fill completed successfully.")
-    if "## ✅ Customize Animations Complete" in text:
-        log_status("Custom animation overrides successfully applied.")
-    if "## ✅ Brand Saved" in text:
-        log_status("Brand guidelines and identity templates saved successfully.")
-    if "## Template Creation Complete" in text:
-        log_status("Presentation template package successfully created and registered.")
-        
-    # Topic Research Workflow detailed steps
-    if "## Step 1: Confirm topic" in text or "Confirm topic scope autonomously" in text:
-        log_status("Defining research scope and topic focus...")
-    if "## Step 2: Gather via web search" in text:
-        log_status("Initiating multi-phase web research to gather facts and details...")
-    if "Landscape phase" in text or ("Landscape" in text and "search" in text.lower() and "Step 2" in text):
-        log_status("Performing broad web landscape scan for authoritative sources...")
-    if "Deep fetch" in text or "Deep-dives" in text:
-        log_status("Extracting comprehensive content and images from high-signal sites...")
-    if "Targeted fill" in text:
-        log_status("Conducting targeted search to gather specific missing details...")
-    if "## Step 3: Save materials" in text:
-        log_status("Saving research documents and downloading relevant media assets...")
+    # One-shot phase / step / workflow checkpoints.
+    for triggers, message in _TEXT_MARKERS:
+        if message in _seen_text_markers:
+            continue
+        if any(t in window for t in triggers):
+            _seen_text_markers.add(message)
+            log_status(message)
+
+    # Landscape phase — compound condition kept verbatim, evaluated on the window.
+    if "landscape" not in _seen_text_markers:
+        if "Landscape phase" in window or (
+            "Landscape" in window and "search" in window.lower() and "Step 2" in window
+        ):
+            _seen_text_markers.add("landscape")
+            log_status("Performing broad web landscape scan for authoritative sources...")
 
 
 def _clean_topic(prompt: str) -> str:
@@ -425,7 +562,9 @@ def set_research_topic(prompt: str):
 def reset_run_state():
     """Reset per-run status state so a fresh attempt logs cleanly."""
     global _last_status, _research_started, _thought_accum, _text_accum
-    global _seen_research_headers, _research_headers_emitted, _sources_emitted
+    global _seen_research_headers, _research_headers_emitted, _emitted_source_keys
+    global _current_slide, _total_pages_seen, _sources_parsed, _thought_scan_pos
+    global _text_scan_pos, _seen_text_markers, _emitted_once, _sources_marker_open
     _active_tool_calls.clear()
     _last_status = None
     _research_started = False
@@ -433,7 +572,18 @@ def reset_run_state():
     _text_accum = ""
     _seen_research_headers = set()
     _research_headers_emitted = 0
-    _sources_emitted = False
+    _emitted_source_keys = set()
+    _sources_parsed = False
+    _sources_marker_open = False
+    _thought_scan_pos = 0
+    _text_scan_pos = 0
+    _seen_text_markers = set()
+    _emitted_once = set()
+    _designed_slides.clear()
+    _ready_slides.clear()
+    _slide_names.clear()
+    _current_slide = None
+    _total_pages_seen = None
 
 
 def _check_thought_for_status(text: str):
@@ -445,24 +595,36 @@ def _check_thought_for_status(text: str):
     one announcement naming the topic, then the model's own research sub-topics
     (its reasoning section headers), de-duplicated and capped.
     """
-    global _thought_accum, _research_started, _research_headers_emitted
+    global _thought_accum, _research_started, _research_headers_emitted, _thought_scan_pos
     if not text:
         return
     _thought_accum += text
-    low = _thought_accum.lower()
 
-    # 1) Announce the start of web research once, naming the user's topic.
-    if not _research_started and any(k in low for k in _RESEARCH_SIGNAL_KEYWORDS):
-        _research_started = True
-        if _research_topic:
-            log_status(f"Searching the web for the latest information on: '{_research_topic}'...")
-        else:
-            log_status("Searching the web for the latest facts and figures on your topic...")
+    # The incremental scans (headers, URLs) only need to look at what arrived since
+    # last time, plus a fixed overlap so a pattern split across a streaming
+    # boundary is still caught. This keeps per-delta work ~O(1) instead of
+    # re-scanning the whole (ever-growing) buffer — total cost O(n) not O(n²).
+    # Dedup (_seen_research_headers / _emitted_source_keys) makes re-matches inside
+    # the overlap harmless.
+    window_start = max(0, _thought_scan_pos - _SCAN_OVERLAP)
+    window = _thought_accum[window_start:]
+
+    # 1) Announce the start of web research once, naming the user's topic. Only
+    #    scanned until it fires — after that the (expensive) full-buffer .lower()
+    #    is skipped entirely for the rest of the run.
+    if not _research_started:
+        low = window.lower()
+        if any(k in low for k in _RESEARCH_SIGNAL_KEYWORDS):
+            _research_started = True
+            if _research_topic:
+                log_status(f"Searching the web for the latest information on: '{_research_topic}'...")
+            else:
+                log_status("Searching the web for the latest facts and figures on your topic...")
 
     # 2) Surface clean research sub-topics from reasoning section headers, e.g.
     #    **Verifying IPO Details** -> "Researching: Verifying IPO Details".
     if _research_started and _research_headers_emitted < _MAX_RESEARCH_HEADERS:
-        for raw in re.findall(r"\*\*([A-Z][^*\n]{3,60}?)\*\*", _thought_accum):
+        for raw in re.findall(r"\*\*([A-Z][^*\n]{3,60}?)\*\*", window):
             header = raw.strip().rstrip(":.").strip()
             key = header.lower()
             if not header or key in _seen_research_headers:
@@ -476,22 +638,34 @@ def _check_thought_for_status(text: str):
                 break
 
     # 3) Surface the research citation manifest if the model emitted it in thoughts.
-    _scan_research_sources(_thought_accum)
+    #    Extraction uses the full buffer (the marker + JSON block must be
+    #    contiguous); `window` is the cheap trigger gate so this stays O(window).
+    _scan_research_sources(_thought_accum, window)
+
+    # 4) Harvest bare URLs that surface only in reasoning (grounding leaves no
+    #    manifest/`## Sources` trace for some domains). Idempotent by domain;
+    #    windowed scan with overlap so URLs split across deltas are still caught.
+    _harvest_urls_from_text(window)
+
+    _thought_scan_pos = len(_thought_accum)
 
 
 def _emit_research_sources(sources: Any):
-    """Emit one clean, user-facing status line naming the research sources/domains.
+    """Stream each newly-seen research source as its own additive citation event.
 
-    Accepts a list of dicts ({name,url}) or URL strings. De-duplicates by domain,
-    caps the count, and fires at most once per run.
+    Accepts a list of dicts ({name,url}) or URL strings. Idempotent by domain:
+    every source fires at most once per run no matter how many times this is
+    called (manifest, research .md, and thought-harvest all feed here). This is
+    the streaming-safe shape — independent per-source deltas, never a growing
+    cumulative line — so on Pub/Sub a domain-keyed Firestore upsert converges to
+    the same set under at-least-once redelivery and out-of-order arrival, with no
+    superseded snapshots and no missing data.
     """
-    global _sources_emitted
-    if _sources_emitted or not isinstance(sources, list):
+    global _emitted_source_keys
+    if not isinstance(sources, list):
         return
 
     from urllib.parse import urlparse
-    parts = []
-    seen = set()
     for s in sources:
         if isinstance(s, dict):
             name = str(s.get("name") or s.get("title") or "").strip()
@@ -506,48 +680,122 @@ def _emit_research_sources(sources: Any):
             domain = urlparse(url).netloc or url
         domain = domain.replace("www.", "").strip("/")
         key = (domain or name).lower()
-        if not key or key in seen:
+        if not key or key in _emitted_source_keys:
             continue
-        seen.add(key)
+        if domain and domain.lower() in _NON_CITATION_DOMAINS:
+            continue
+        _emitted_source_keys.add(key)
 
         if name and domain:
-            short = name if len(name) <= 40 else name[:37] + "..."
-            parts.append(f"'{short}' ({domain})")
+            short = name if len(name) <= 60 else name[:57] + "..."
+            human = f"Research source captured: '{short}' ({domain})."
         elif domain:
-            parts.append(domain)
-        elif name:
-            short = name if len(name) <= 40 else name[:37] + "..."
-            parts.append(f"'{short}'")
-        if len(parts) >= 6:
-            break
+            human = f"Research source captured: {domain}."
+        else:
+            short = name if len(name) <= 60 else name[:57] + "..."
+            human = f"Research source captured: '{short}'."
 
-    if not parts:
-        return
-    _sources_emitted = True
-    remaining = len(seen) - len(parts)
-    suffix = f", +{remaining} more" if remaining > 0 else ""
-    log_status(f"Research sources gathered: {', '.join(parts)}{suffix}.")
+        log_status(
+            human,
+            event_type="citation",
+            payload={
+                "name": name,
+                "url": url,
+                "domain": domain,
+                "index": len(_emitted_source_keys),
+            },
+        )
 
 
-def _scan_research_sources(buffer: str):
-    """Detect and parse the agent's `[[RESEARCH_SOURCES]]` JSON manifest."""
-    if _sources_emitted or not buffer or _RESEARCH_SOURCES_MARKER not in buffer:
+def _harvest_urls_from_text(text: str):
+    """Capture citations that appear only as inline URLs in model reasoning.
+
+    Native Google Search grounding surfaces some domains nowhere but the thought
+    stream (no manifest entry, no `## Sources` line). Harvesting full URLs here
+    feeds them through the same idempotent, per-source citation path, so no
+    grounded domain is lost from the stream.
+    """
+    if not text:
         return
-    # Marker followed by a fenced JSON block (object or array).
-    m = re.search(
-        re.escape(_RESEARCH_SOURCES_MARKER) + r"\s*```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```",
-        buffer,
-        re.DOTALL,
-    )
-    if not m:
+    found = _URL_RE.findall(text)
+    if found:
+        _emit_research_sources([{"name": "", "url": u.rstrip('.,);]')} for u in found])
+
+
+_SOURCES_BLOCK_RE = re.compile(
+    re.escape(_RESEARCH_SOURCES_MARKER) + r"\s*```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```",
+    re.DOTALL,
+)
+
+
+def _scan_research_sources(buffer: str, recent: str | None = None):
+    """Detect and parse the agent's `[[RESEARCH_SOURCES]]` JSON manifest.
+
+    Parses ALL marker blocks in the buffer (not just the first), so an early
+    empty `{"sources": []}` does not lock out a later populated manifest — the
+    regex would otherwise always match the first block. Source emission is
+    idempotent (deduped by domain), so re-parsing earlier blocks is harmless.
+
+    Cost control: a marker arms the scan (cheap substring check on the small
+    streaming `recent` window); once armed we re-scan a bounded region from the
+    first marker on each delta until a block actually closes. We deliberately do
+    NOT keep gating on the marker still being inside `recent` — a populated block
+    is often larger than the window, so by the time its closing ``` fence streams
+    in the marker has already scrolled out. The old window-only gate skipped the
+    completed block at that moment and the sources surfaced only when a *later*
+    marker happened to re-enter the window (or never), making citations appear at
+    the very end of the run instead of right after research. Staying armed until a
+    block closes fixes that ordering. Short-circuits permanently once a NON-empty
+    manifest is emitted; disarms (until the next marker) on a closed-but-empty
+    block or a never-closing marker past the size cap.
+    """
+    global _sources_parsed, _sources_marker_open
+    if _sources_parsed or not buffer:
         return
-    try:
-        data = json.loads(m.group(1))
-    except Exception:
+
+    # Arm on first sight of the marker in the streaming window (full buffer if
+    # `recent` is not supplied, e.g. the .md result path).
+    probe = recent if recent is not None else buffer
+    if _RESEARCH_SOURCES_MARKER in probe:
+        _sources_marker_open = True
+    if not _sources_marker_open:
         return
-    sources = data.get("sources") if isinstance(data, dict) else data
-    if isinstance(sources, list):
-        _emit_research_sources(sources)
+
+    # Bounded re-scan from the first marker — not the whole (ever-growing) buffer.
+    first = buffer.find(_RESEARCH_SOURCES_MARKER)
+    if first == -1:
+        return  # marker is in the other accumulator; this buffer has nothing yet
+    region = buffer[first:first + _SOURCES_MAX_BLOCK]
+
+    marker_count = region.count(_RESEARCH_SOURCES_MARKER)
+    emitted_real = False
+    closed_count = 0
+    for m in _SOURCES_BLOCK_RE.finditer(region):
+        closed_count += 1
+        try:
+            data = json.loads(m.group(1))
+        except Exception:
+            continue
+        sources = data.get("sources") if isinstance(data, dict) else data
+        if isinstance(sources, list):
+            _emit_research_sources(sources)
+            if sources:
+                emitted_real = True
+
+    if emitted_real:
+        _sources_parsed = True       # permanent short-circuit (see top guard)
+        _sources_marker_open = False
+    elif closed_count >= marker_count:
+        # Every marker seen so far has a CLOSED block and all were empty
+        # (`{"sources": []}`) — nothing pending. Disarm until a fresh marker
+        # re-arms us; a later populated manifest then re-triggers and is matched.
+        # (We must not disarm while closed_count < marker_count: a more recent
+        # marker's block is still streaming and would otherwise be abandoned.)
+        _sources_marker_open = False
+    elif (len(buffer) - first) > _SOURCES_MAX_BLOCK:
+        # A marker has no closing ``` fence within the cap — treat as malformed and
+        # disarm so a never-closed marker can't cause O(region) work per delta.
+        _sources_marker_open = False
 
 
 def _parse_sources_from_md(file_path: str) -> list:
@@ -582,6 +830,123 @@ def _parse_sources_from_md(file_path: str) -> list:
     return sources
 
 
+def _extract_command(args: Any) -> str:
+    """Pull the shell command out of a run_command tool's args.
+
+    The SDK passes the command under the camelCase key ``commandLine`` (as seen in
+    the raw harness protocol). Older/other shapes use ``command`` / ``CommandLine``
+    or nest it under ``runCommand``. Dict ``.get`` is case-sensitive, so we check
+    each known spelling explicitly and fall back to a case-insensitive scan — a
+    miss here silently drops every run_command-derived status line.
+    """
+    if isinstance(args, str):
+        return args
+    if not isinstance(args, dict):
+        return ""
+    for k in ("commandLine", "command", "CommandLine", "cmd"):
+        v = args.get(k)
+        if isinstance(v, str) and v:
+            return v
+    rc = args.get("runCommand")
+    if isinstance(rc, dict):
+        for k in ("commandLine", "command", "CommandLine"):
+            v = rc.get(k)
+            if isinstance(v, str) and v:
+                return v
+    for k, v in args.items():
+        if isinstance(k, str) and k.lower() in ("commandline", "command", "cmd") and isinstance(v, str) and v:
+            return v
+    return ""
+
+
+def _mark_slide_ready(slide_num: int | None):
+    """Announce that a given slide's SVG is complete (idempotent per run).
+
+    Called when the agent moves on from a slide (next slide begins, or finalize/
+    export starts). Uses the page total from spec_lock when known so the wording
+    matches the paired "Designing slide N of M..." emitter.
+    """
+    global _ready_slides
+    if slide_num is None or slide_num in _ready_slides:
+        return
+    _ready_slides.add(slide_num)
+    if _total_pages_seen is not None:
+        log_status(f"Slide {slide_num} of {_total_pages_seen} is ready.")
+    else:
+        name = _slide_names.get(slide_num, "")
+        if name:
+            log_status(f"Slide ready: {name.replace('_', ' ').title()}.")
+        else:
+            log_status(f"Slide {slide_num} is ready.")
+
+
+def _mark_all_slides_ready():
+    """Flush a ready event for every designed-but-not-yet-ready slide, in order.
+
+    Invoked when finalize/export begins so the last slide (and any slide reopened
+    by a late polish edit) gets its closing "ready" event.
+    """
+    for n in sorted(_designed_slides):
+        _mark_slide_ready(n)
+
+
+def _log_status_once(message: str):
+    """Emit a status line at most once per run.
+
+    The agent re-runs some pipeline scripts (e.g. finalize/export after fixing a
+    slide), so their tool-call status lines would otherwise repeat. This caps the
+    noisy ones to a single emission without suppressing genuinely recurring steps
+    like the quality checker.
+    """
+    if message in _emitted_once:
+        return
+    _emitted_once.add(message)
+    log_status(message)
+
+
+def _extract_target_path(args: Any) -> str:
+    """Pull the target file path out of a write/edit tool's args, cleaning file:///."""
+    if isinstance(args, dict):
+        fp = (
+            args.get("filePath") or args.get("file_path") or
+            args.get("TargetFile") or args.get("target_file") or ""
+        )
+    elif isinstance(args, str):
+        fp = args
+    else:
+        fp = ""
+    if not fp:
+        return ""
+    if fp.startswith("file:///"):
+        fp = fp[8:]
+        if len(fp) > 2 and fp[1] == ":" and fp[0] == "/":
+            fp = fp[1:]
+    return fp
+
+
+def _svg_slide_info(file_path: str) -> tuple[int | None, int | None, str]:
+    """Return (slide_num, total_pages, slide_name) for an svg_output/svg_final path.
+
+    slide_num is parsed from the filename (e.g. 02_manifesto -> 2); total_pages is
+    read from the project's spec_lock page rhythm. Either may be None when not
+    determinable. Shared by the "designing"/"polishing" (tool-call) and "ready"
+    (tool-result) status emitters so the two can never disagree on numbering.
+    """
+    filename = Path(file_path).name
+    slide_name = Path(file_path).stem
+    slide_num = None
+    total_pages = None
+    match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
+    if match:
+        slide_num = int(match.group(1))
+    project_dir = _get_project_dir_from_path(file_path)
+    if project_dir:
+        pages = _get_page_rhythm_from_spec_lock(project_dir)
+        if pages:
+            total_pages = len(pages)
+    return slide_num, total_pages, slide_name
+
+
 def _check_tool_call_for_status(chunk: Any):
     """Parses tool calls to detect and log key pipeline actions."""
     if not chunk or not hasattr(chunk, "name") or not hasattr(chunk, "id"):
@@ -609,16 +974,16 @@ def _check_tool_call_for_status(chunk: Any):
         return
 
     if chunk.name == "run_command":
-        cmd = ""
-        # Inspect arguments depending on shape/type
-        if isinstance(chunk.args, dict):
-            cmd = chunk.args.get("command") or chunk.args.get("CommandLine") or ""
-        elif isinstance(chunk.args, str):
-            cmd = chunk.args
-            
+        cmd = _extract_command(chunk.args)
+
         if not cmd:
             return
-            
+
+        # Finalize / export begins → every designed slide is now complete. Emit
+        # the closing "Slide N is ready" events before the finalize/export line.
+        if "finalize_svg.py" in cmd or "svg_to_pptx.py" in cmd:
+            _mark_all_slides_ready()
+
         # Match commands against key scripts in the pipeline
         if "pdf_to_md.py" in cmd:
             log_status("Extracting content from source PDF...")
@@ -647,9 +1012,10 @@ def _check_tool_call_for_status(chunk: Any):
         elif "total_md_split.py" in cmd:
             log_status("Structuring slide content and speaker notes...")
         elif "finalize_svg.py" in cmd:
-            log_status("Finalizing slide graphics and optimizing assets...")
+            # Re-run after slide fixes; cap to one emission per run (see #1).
+            _log_status_once("Finalizing slide graphics and optimizing assets...")
         elif "svg_to_pptx.py" in cmd:
-            log_status("Exporting presentation to editable PowerPoint (.pptx)...")
+            _log_status_once("Exporting presentation to editable PowerPoint (.pptx)...")
         elif "svg_position_calculator.py" in cmd or "verify_charts" in cmd:
             log_status("Calibrating and verifying slide chart geometry...")
         elif "register_template.py" in cmd:
@@ -679,52 +1045,47 @@ def _check_tool_call_for_status(chunk: Any):
 
         file_path_norm = file_path.replace("\\", "/")
         
-        # Detect slide SVG writing
+        # Detect slide SVG writing. The first write of a slide announces
+        # "Designing slide N" and marks the PREVIOUS slide ready; a later write to
+        # the same slide is a polish pass, surfaced as "Refining slide N" (never a
+        # duplicate "Designing"). This is the only completion signal available
+        # because the SDK emits no ToolResult chunks.
         if "svg_output/" in file_path_norm and file_path_norm.endswith(".svg"):
+            global _current_slide, _total_pages_seen
             try:
-                filename = Path(file_path).name
-                slide_name = Path(file_path).stem
-                project_dir = _get_project_dir_from_path(file_path)
-                slide_num = None
-                total_pages = None
-                
-                import re
-                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
-                if match:
-                    slide_num = int(match.group(1))
-                
-                if project_dir:
-                    pages = _get_page_rhythm_from_spec_lock(project_dir)
-                    if pages:
-                        total_pages = len(pages)
-                        
-                if slide_num is not None and total_pages is not None:
-                    log_status(f"Designing slide {slide_num} of {total_pages}...")
+                slide_num, total_pages, slide_name = _svg_slide_info(file_path)
+                if total_pages is not None:
+                    _total_pages_seen = total_pages
+                if slide_num is not None:
+                    _slide_names[slide_num] = slide_name
+
+                if slide_num is not None and slide_num in _designed_slides:
+                    # Revisit / polish pass on an already-created slide.
+                    if total_pages is not None:
+                        log_status(f"Refining slide {slide_num} of {total_pages}...")
+                    else:
+                        log_status(f"Refining slide for {slide_name.replace('_', ' ').title()}...")
+                    # Reopened: it is no longer "ready" until we move on again
+                    # (a closing ready event fires at the next slide or finalize).
+                    _ready_slides.discard(slide_num)
+                    _current_slide = slide_num
                 else:
-                    formatted_slide_name = slide_name.replace("_", " ").title()
-                    log_status(f"Designing slide for {formatted_slide_name}...")
+                    # First time on this slide → the previous slide is now ready.
+                    _mark_slide_ready(_current_slide)
+                    if slide_num is not None:
+                        _designed_slides.add(slide_num)
+                    if slide_num is not None and total_pages is not None:
+                        log_status(f"Designing slide {slide_num} of {total_pages}...")
+                    else:
+                        log_status(f"Designing slide for {slide_name.replace('_', ' ').title()}...")
+                    _current_slide = slide_num
             except Exception as e:
                 logger.warning("Failed to parse slide number or total pages: %s", e)
                 log_status("Designing layout for next slide...")
-                
+
         elif "svg_final/" in file_path_norm and file_path_norm.endswith(".svg"):
             try:
-                filename = Path(file_path).name
-                slide_name = Path(file_path).stem
-                project_dir = _get_project_dir_from_path(file_path)
-                slide_num = None
-                total_pages = None
-                
-                import re
-                match = re.search(r'(?:^|slide_|P|p|slide)(\d+)', filename)
-                if match:
-                    slide_num = int(match.group(1))
-                
-                if project_dir:
-                    pages = _get_page_rhythm_from_spec_lock(project_dir)
-                    if pages:
-                        total_pages = len(pages)
-                        
+                slide_num, total_pages, slide_name = _svg_slide_info(file_path)
                 if slide_num is not None and total_pages is not None:
                     log_status(f"Polishing slide {slide_num} of {total_pages}...")
                 else:
@@ -828,11 +1189,7 @@ def _check_tool_result_for_status(chunk: Any):
     is_error = bool(getattr(chunk, "error", None) or getattr(chunk, "exception", None))
 
     if tool_name == "run_command":
-        cmd = ""
-        if isinstance(tool_args, dict):
-            cmd = tool_args.get("command") or tool_args.get("CommandLine") or ""
-        elif isinstance(tool_args, str):
-            cmd = tool_args
+        cmd = _extract_command(tool_args)
 
         if not cmd:
             return
@@ -891,6 +1248,10 @@ def _check_tool_result_for_status(chunk: Any):
             else:
                 log_status("PowerPoint presentation (.pptx) successfully assembled and exported!")
 
+    # NOTE: per-slide "Slide N is ready" events are emitted from the tool-CALL
+    # stream (see _check_tool_call_for_status / _mark_slide_ready), NOT here. This
+    # SDK does not emit ToolResult chunks, so a result-driven approach never fires.
+
     elif _is_web_search_tool(tool_name):
         if is_error:
             log_status("Web search encountered an error.")
@@ -902,7 +1263,6 @@ def _check_tool_result_for_status(chunk: Any):
             if original_query and _is_internal_query(original_query):
                 return  # Suppress results from internal technical queries
 
-            import re
             from urllib.parse import urlparse
             res_str = _get_result_text(chunk)
             results_info = []
@@ -991,7 +1351,6 @@ def _check_tool_result_for_status(chunk: Any):
             res_str = _get_result_text(chunk)
 
             # Try to extract the page title (markdown header # or Title: key)
-            import re
             title = ""
             title_match = re.search(r'^#\s+(.+)$', res_str, re.MULTILINE)
             if title_match:
@@ -1020,8 +1379,9 @@ def _check_tool_result_for_status(chunk: Any):
     elif tool_name in ("write_file", "edit_file", "write_to_file", "create_file",
                         "replace_file_content", "multi_replace_file_content"):
         # When the research document is written, surface its cited sources (the
-        # `## Sources` URLs) as a fallback if the model didn't emit the manifest.
-        if is_error or _sources_emitted:
+        # `## Sources` URLs). Idempotent by domain, so this safely augments the
+        # manifest/thought-harvest with any sources only the .md recorded.
+        if is_error:
             return
         fp = ""
         if isinstance(tool_args, dict):
