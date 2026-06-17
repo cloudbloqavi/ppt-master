@@ -198,8 +198,9 @@ def run_self_test() -> bool:
         errs, warns = lint_catalog()
         offenders = sorted({e.split(":")[0] for e in errs})
         if errs:
-            print(f"   ⚠ Catalog lint: {len(errs)} error(s) across {len(offenders)} template(s) "
-                  f"(raw PowerPoint exports — must be re-authored as clean vectors):")
+            print(f"   ℹ Catalog lint: {len(offenders)} template(s) are raw PowerPoint exports. "
+                  f"These are handled as a verbatim + runner-re-theme class "
+                  f"(retheme_enforcement.py); re-authoring them as clean vectors is optional:")
             for o in offenders:
                 print(f"      - {o}")
         else:

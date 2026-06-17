@@ -63,6 +63,19 @@ def _breakdown_from_pages(pages: list[dict]) -> tuple[Counter, Counter]:
     return fixed, remaining
 
 
+def _soft_breakdown_from_pages(pages: list[dict]) -> Counter:
+    """Tally remaining soft (D4) findings by rule, regardless of whether a
+    shrink-to-fit was attempted — D4 is now partially auto-fixable, so a
+    leftover soft finding may be "still too tight even after shrinking",
+    not merely "untouched"."""
+    soft: Counter = Counter()
+    for page in pages:
+        for finding in page.get("findings", []):
+            if finding.get("severity") == "soft":
+                soft[finding.get("rule", "?")] += 1
+    return soft
+
+
 def _format_categories(counter: Counter) -> str:
     """e.g. 'overlapping text and text running off the slide edge' — no counts,
     no rule codes, just the distinct categories involved, for a readable line."""
@@ -173,9 +186,10 @@ def _audit_project(project_dir: Path) -> dict:
         return {"project": project_dir.name, "error": "auditor_unparseable",
                 "pages": 0, "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
                 "fixed_breakdown": Counter(), "remaining_breakdown": Counter(),
-                "reexported": False}
+                "soft_breakdown": Counter(), "reexported": False}
 
     fixed_breakdown, remaining_breakdown = _breakdown_from_pages(summary.get("pages", []))
+    soft_breakdown = _soft_breakdown_from_pages(summary.get("pages", []))
     fixes = int(summary.get("total_fixes_applied", 0))
     result = {
         "project": project_dir.name,
@@ -185,6 +199,7 @@ def _audit_project(project_dir: Path) -> dict:
         "soft_remaining": int(summary.get("total_soft_findings", 0)),
         "fixed_breakdown": fixed_breakdown,
         "remaining_breakdown": remaining_breakdown,
+        "soft_breakdown": soft_breakdown,
         "reexported": False,
     }
     if fixes > 0:
@@ -204,20 +219,20 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
         logger.info("Visual review: SKIPPED (user opted out via --no-visual-review).")
         return {"ran": False, "status": "opted_out", "projects": [],
                 "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
-                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter(), "soft_breakdown": Counter()}
 
     if not _AUDITOR.is_file():
         logger.error("Visual review: auditor script not found at %s — cannot enforce.", _AUDITOR)
         return {"ran": False, "status": "error", "projects": [],
                 "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
-                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter(), "soft_breakdown": Counter()}
 
     project_dirs = _find_active_project_dirs(start_time)
     if not project_dirs:
         logger.info("Visual review: no project with svg_output/ found to audit.")
         return {"ran": False, "status": "no_project", "projects": [],
                 "fixes": 0, "hard_remaining": 0, "soft_remaining": 0,
-                "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}
+                "fixed_breakdown": Counter(), "remaining_breakdown": Counter(), "soft_breakdown": Counter()}
 
     logger.info("")
     logger.info("═" * 60)
@@ -233,9 +248,11 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
     any_error = any(p.get("error") for p in per_project)
     total_fixed_breakdown: Counter = Counter()
     total_remaining_breakdown: Counter = Counter()
+    total_soft_breakdown: Counter = Counter()
     for p in per_project:
         total_fixed_breakdown.update(p.get("fixed_breakdown", Counter()))
         total_remaining_breakdown.update(p.get("remaining_breakdown", Counter()))
+        total_soft_breakdown.update(p.get("soft_breakdown", Counter()))
     # A project that was auto-fixed but whose deck could not be rebuilt: the
     # exported PPTX still shows the defect. This must NOT be reported as "fixed
     # and rebuilt" — it would be a misleading log.
@@ -268,16 +285,22 @@ def enforce_visual_review(no_visual_review: bool, start_time: float | None) -> d
         "soft_remaining": total_soft, "reexport_failed": reexport_failed,
         "fixed_breakdown": total_fixed_breakdown,
         "remaining_breakdown": total_remaining_breakdown,
+        "soft_breakdown": total_soft_breakdown,
     }
 
 
 def _soft_suffix(result: dict) -> str:
     """Never drop soft findings from the user-facing line — they used to vanish
-    silently since only hard_remaining was ever reported."""
+    silently since only hard_remaining was ever reported. D4 is now partially
+    auto-fixable (shrink-to-fit), so name the category and say a fix was
+    attempted rather than implying nothing was done."""
     n = result.get("soft_remaining", 0)
     if not n:
         return ""
-    return f" {n} minor formatting note(s) were left as-is (not auto-fixed)."
+    cats = _format_categories(result.get("soft_breakdown", Counter()))
+    what = f" ({cats})" if cats else ""
+    return (f" {n} minor formatting note(s){what} could not be fully resolved "
+            f"even after auto-fix and were left as-is.")
 
 
 def status_line(result: dict) -> str:

@@ -114,6 +114,23 @@ python3 core-ppt-master-engine/skills/ppt-master/scripts/svg_to_pptx.py <project
 - `core-ppt-master-engine/examples/` — example projects.
 - `core-ppt-master-engine/projects/` — user project workspace.
 
+## Architecture Live Doc
+
+[ARCHITECTURE.md](ARCHITECTURE.md) is the single source of truth for the **engine/runner**
+architecture (`agent_runner/`) and the runner-enforced quality stages around the agent
+turn. It is a **live document**: it must always reflect the current code.
+
+*   **Scope**: ARCHITECTURE.md documents the runner engine and its enforcement stages, NOT
+    the presentation workflow (which `SKILL.md` owns). Keep that boundary — do not
+    duplicate SKILL.md content into ARCHITECTURE.md or vice versa.
+*   **Maintenance Rule (MANDATORY)**: any agent that adds, changes, or **reverts** an
+    architectural behavior — a runner stage, an enforcement gate, a module's
+    responsibility, the run lifecycle, or a cross-module contract — MUST update
+    ARCHITECTURE.md *in the same change*: revise the affected section, the module map,
+    and/or the lifecycle diagram, and bump the `_Last updated:_` line. A change that only
+    touches internals with no architectural effect does not require an update. When in
+    doubt, update it — a stale architecture doc is worse than a verbose one.
+
 ## Testing
 
 The `agent_runner` engine and the `ppt-master` skill scripts have fast, deterministic,

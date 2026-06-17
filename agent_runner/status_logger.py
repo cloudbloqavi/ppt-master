@@ -798,17 +798,18 @@ def _scan_research_sources(buffer: str, recent: str | None = None):
         _sources_marker_open = False
 
 
-def _parse_sources_from_md(file_path: str) -> list:
-    """Read a research markdown file and extract URLs from its `## Sources` section."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception:
-        return []
+def _parse_sources_from_md_text(content: str) -> list:
+    """Extract sources from a research markdown's `## Sources` section (string form).
 
+    Handles markdown links `[name](url)` and prose `Label: url` / `Label - url`
+    rows, capturing the leading label as the source name. Keeping the name means an
+    early brief-parse citation is as rich as the model's later `[[RESEARCH_SOURCES]]`
+    manifest, and (since both dedup by domain) the manifest does not downgrade an
+    already-named source to a bare domain.
+    """
     m = re.search(
         r"^#{1,4}\s*Sources?\b.*?$(.*?)(?=^#{1,4}\s|\Z)",
-        content,
+        content or "",
         re.MULTILINE | re.DOTALL | re.IGNORECASE,
     )
     if not m:
@@ -825,9 +826,52 @@ def _parse_sources_from_md(file_path: str) -> list:
             continue
         url = re.search(r"https?://[^\s)]+", line)
         if url:
-            sources.append({"name": "", "url": url.group(0)})
+            # Any leading "Label: url" / "Label - url" prose becomes the name.
+            name = line[:url.start()].strip().rstrip(":-–—").strip()
+            sources.append({"name": name, "url": url.group(0)})
         # Prose-only citations (no URL) are skipped — nothing to surface.
     return sources
+
+
+def _parse_sources_from_md(file_path: str) -> list:
+    """Read a research markdown file and extract URLs from its `## Sources` section."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return []
+    return _parse_sources_from_md_text(content)
+
+
+def _extract_write_content(args: Any) -> str:
+    """Best-effort extraction of the written content from a write/edit tool call.
+
+    File writes surface no ToolResult chunk, so to react at write time we read the
+    content straight from the call args — no disk round-trip, no flush race. Handles
+    the common content keys and the editFile `diffBlock` line shape; returns "" when
+    no content is present so the caller can fall back to a disk read.
+    """
+    if isinstance(args, str):
+        return args
+    if not isinstance(args, dict):
+        return ""
+    for k in ("content", "fileContent", "file_content", "contents",
+              "code_edit", "CodeEdit", "new_str", "newStr"):
+        v = args.get(k)
+        if isinstance(v, str) and v:
+            return v
+    block = args.get("diffBlock") or args.get("diff_block")
+    if isinstance(block, list):
+        lines = []
+        for b in block:
+            if not isinstance(b, dict):
+                continue
+            for ln in b.get("lines") or []:
+                if isinstance(ln, dict) and ln.get("action") != "LINE_ACTION_DELETE":
+                    lines.append(str(ln.get("text", "")))
+        if lines:
+            return "\n".join(lines)
+    return ""
 
 
 def _extract_command(args: Any) -> str:
@@ -1104,6 +1148,17 @@ def _check_tool_call_for_status(chunk: Any):
             or re.search(r"/projects/[^/]+\.md$", file_path_norm)
         ):
             log_status("Compiling gathered research into a structured source brief...")
+            # Surface the brief's cited sources NOW, at write time — not whenever the
+            # model later streams its [[RESEARCH_SOURCES]] manifest, which it may defer
+            # to the end of the turn (placing citations after the slide-design events).
+            # Writes emit no ToolResult chunk, so read the content from the call args,
+            # falling back to disk. Idempotent by domain, so the later manifest / thought
+            # harvest only adds sources this did not already surface.
+            content = _extract_write_content(chunk.args)
+            sources = (_parse_sources_from_md_text(content) if content
+                       else _parse_sources_from_md(file_path))
+            if sources:
+                _emit_research_sources(sources)
 
     elif _is_web_search_tool(chunk.name):
         query = ""

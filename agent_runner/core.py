@@ -31,10 +31,14 @@ from agent_runner.artifacts import (
     finalize_log_placement
 )
 from agent_runner.visual_enforcement import enforce_visual_review, status_line
+from agent_runner.retheme_enforcement import (
+    enforce_retheme, status_line as retheme_status_line,
+)
 from agent_runner.provenance_enforcement import (
     enforce_chart_provenance,
     status_line as provenance_status_line,
 )
+from agent_runner.catalog_match import run_catalog_match
 
 # Process start time. Used to scope warm-retry research reuse to briefs written
 # during THIS invocation, so a retry never imports a stale brief left in the
@@ -359,6 +363,22 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
     else:
         system_instructions += "\n\nVisual review is enabled by default (opt-out mode). At Step 6, after all SVGs are generated, you MUST run the deterministic layout auditor (`svg_layout_auditor.py <project_path>`) and address its findings. The runner ALSO enforces this audit after your turn and rebuilds the deck if it changed any SVG — so never report visual review as done without having actually run the auditor."
 
+    # Catalog match stage (Directive prompts only): the runner consults the
+    # company-first + stock catalogs up front via ONE normal LLM call and injects
+    # ranked per-slide candidates, so template selection cannot be silently
+    # dropped under token pressure. Fail-open — a Brief prompt or any error injects
+    # nothing and leaves selection model-driven (see agent_runner/catalog_match.py).
+    catalog_candidates = None
+    try:
+        catalog_candidates, _inject = run_catalog_match(
+            prompt_message, ARGS.model, os.environ.get("GEMINI_API_KEY", "")
+        )
+        if _inject:
+            system_instructions += "\n" + _inject
+            log_status("Matched slide visuals against the in-house template catalog...")
+    except Exception as cm_exc:  # noqa: BLE001 — never let the match stage break a run
+        logger.warning("Catalog match stage errored (non-fatal): %s", cm_exc)
+
     mcp_servers = load_mcp_servers() if use_mcp else []
     if use_mcp:
         logger.info("Enabled %d local MCP server(s).", len(mcp_servers))
@@ -609,7 +629,7 @@ async def run_agent(prompt_message: str, use_mcp: bool = False, no_visual_review
             else:
                 print("  Reason not invoked: Subagents were disabled in CapabilitiesConfig.")
             print("═" * 60 + "\n")
-            return response.usage_metadata, subagent_stats
+            return response.usage_metadata, subagent_stats, catalog_candidates
 
     except Exception as e:
         logger.error("Execution error: %s", e, exc_info=True)
@@ -721,7 +741,13 @@ def main_run() -> int:
                     no_visual_review=ARGS.no_visual_review,
                 )
             )
-            usage, subagent_stats_dict = result if isinstance(result, tuple) else (result, None)
+            catalog_candidates = None
+            if isinstance(result, tuple):
+                usage = result[0]
+                subagent_stats_dict = result[1] if len(result) > 1 else None
+                catalog_candidates = result[2] if len(result) > 2 else None
+            else:
+                usage = result
             run_status = "success"
             # Safety-net flush: emit a closing "Slide N is ready" for any slide
             # that was designed but never got its ready event. The per-slide flush
@@ -742,6 +768,20 @@ def main_run() -> int:
                     "total_tokens": usage.total_token_count,
                 }
 
+            # Raw-template re-theme (runs BEFORE visual review): some company
+            # templates are raw PPTX exports the model copies verbatim; the runner
+            # deterministically re-themes those pages (colors + typography) to the
+            # project palette and rebuilds the deck. Done first so the layout
+            # auditor below sees the final themed fonts. Never fails the run.
+            try:
+                rt_result = enforce_retheme(start_time)
+                rt_line = retheme_status_line(rt_result)
+                if rt_line:
+                    log_status(rt_line)
+            except Exception as rt_exc:  # noqa: BLE001
+                logger.error("Raw-template re-theme stage errored (non-fatal): %s",
+                             rt_exc, exc_info=True)
+
             # Enforced visual review (Part C): runs runner-side, so it cannot be
             # skipped or narrated-but-not-done by the agent. The deterministic
             # auditor auto-fixes unambiguous layout defects (text overlap, y=0
@@ -756,6 +796,20 @@ def main_run() -> int:
             except Exception as vr_exc:
                 logger.error("Enforced visual-review stage errored (non-fatal): %s",
                              vr_exc, exc_info=True)
+
+            # Persist the runner's catalog candidates into the project folder so the
+            # candidate-aware provenance check below has a ground-truth record of
+            # what was offered — independent of whether the model wrote it itself.
+            try:
+                if catalog_candidates:
+                    from agent_runner.catalog_match import persist_candidates
+                    from agent_runner.visual_enforcement import _find_active_project_dirs
+                    _dirs = _find_active_project_dirs(start_time)
+                    n = persist_candidates(_dirs, catalog_candidates)
+                    if n:
+                        logger.info("Wrote chart_candidates.json into %d project folder(s).", n)
+            except Exception as pc_exc:  # noqa: BLE001
+                logger.warning("Persisting catalog candidates failed (non-fatal): %s", pc_exc)
 
             # Chart provenance validation + structural-mimic review (advisory):
             # verifies viz slides recorded which template they used (company
