@@ -83,10 +83,10 @@ one area, run just that file; run the full suite before committing.
 | [`test_svg_doctor.py`](agent_runner/tests/test_svg_doctor.py) | 10 | `svg_doctor.py` single-SVG lint + auto-fix. Exercises both finding classes: AUTO-FIX (mechanical, rewritten by `--fix`) and REVIEW (judgment, never auto-edited). |
 | [`test_svg_to_pptx_transform.py`](agent_runner/tests/test_svg_to_pptx_transform.py) | 5 | Leaf-`<path>` affine transform baking in `svg_to_pptx` (matrix/scale/flip not collapsed to the origin — the boat-tier pyramid bug). Skips if the `svg_to_pptx` package is unavailable. |
 | [`test_status_research_sources.py`](agent_runner/tests/test_status_research_sources.py) | 4 | Research-source citation timing in `status_logger` — a populated `[[RESEARCH_SOURCES]]` manifest larger than the scan window must emit when its block closes, not only when a later marker reappears. Streaming-delta replay. |
-| [`test_svg_layout_auditor.py`](agent_runner/tests/test_svg_layout_auditor.py) | 5 | `D2_text_overlap` / `D3_out_of_bounds` auto-fixers in `svg_layout_auditor.py` — overlapping text pairs get separated and off-canvas text gets pulled back in, `process_page` commits partial progress instead of an all-or-nothing rollback, and `--no-autofix` leaves the SVG untouched. |
-| [`test_visual_enforcement.py`](agent_runner/tests/test_visual_enforcement.py) | 7 | User-facing `status_line()` in `visual_enforcement.py` — plain-language category breakdown (e.g. "overlapping text") is built from the auditor's raw JSON and never leaks rule codes, and soft (D4) findings are never silently dropped from any status. |
+| [`test_svg_layout_auditor.py`](agent_runner/tests/test_svg_layout_auditor.py) | 9 | `D2_text_overlap` / `D3_out_of_bounds` / `D4_text_overflow` auto-fixers in `svg_layout_auditor.py` — overlapping text pairs get separated, off-canvas text gets pulled back in, text overflowing a filled-`<path>`-drawn cell (not just `<rect>`) gets shrunk to fit or honestly left as a soft finding at the 60% floor, `process_page` commits partial progress instead of an all-or-nothing rollback, the D4 shrink is idempotent across repeated audits, and `--no-autofix` leaves the SVG untouched. |
+| [`test_visual_enforcement.py`](agent_runner/tests/test_visual_enforcement.py) | 9 | User-facing `status_line()` in `visual_enforcement.py` — plain-language category breakdown (e.g. "overlapping text") is built from the auditor's raw JSON and never leaks rule codes, and soft (D4) findings are never silently dropped from any status or left uncategorized. |
 
-_Total: 60 tests._ Keep the counts and the total in sync when you add or remove tests.
+_Total: 66 tests._ Keep the counts and the total in sync when you add or remove tests.
 
 ## Testing strategy / patterns
 
