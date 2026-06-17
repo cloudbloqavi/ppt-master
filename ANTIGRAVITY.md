@@ -402,7 +402,9 @@ Cloud Run containers use ephemeral storage — everything is lost when the conta
 | GCS bucket | `your-ai-builder-outputs` | For output persistence |
 | Service Account | For Cloud Run Job runtime | Optional — defaults to Compute SA |
 
-### Step 2 — Create the GCS output bucket
+### Step 2 — Create the GCS output bucket and Pub/Sub status feed
+
+#### GCS bucket (output persistence)
 
 ```bash
 # Create the bucket (outputs land here after every job run)
@@ -410,11 +412,34 @@ gcloud storage buckets create gs://your-ai-builder-outputs \
   --project=YOUR_PROJECT_ID \
   --location=us-central1
 
-# Grant Service Account objectAdmin access
+# Grant the runtime SA objectAdmin on the bucket (GCS FUSE writes)
 gcloud storage buckets add-iam-policy-binding gs://your-ai-builder-outputs \
   --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 ```
+
+> **Per-execution isolation (optional but recommended):** set `OUTPUT_ARTIFACTS_DIR=/workspace/outputs/${CLOUD_RUN_EXECUTION}` on the job so each execution writes to its own GCS prefix and runs never overwrite each other's artifacts.
+
+#### Pub/Sub status feed (live progress events)
+
+The runner publishes a real-time user-facing status feed (slide-by-slide progress, research citations) to a Pub/Sub topic when one is reachable. On Cloud Run the topic is **auto-resolved** from `GOOGLE_CLOUD_PROJECT` — no extra env var needed if you use the default topic name.
+
+```bash
+# One-time: topic + ORDER-PRESERVING subscription (consumer must also enable ordering)
+gcloud pubsub topics create status-progress --project=YOUR_PROJECT_ID
+gcloud pubsub subscriptions create status-progress-sub \
+  --topic=status-progress \
+  --project=YOUR_PROJECT_ID \
+  --enable-message-ordering          # REQUIRED for in-order delivery
+
+# Grant the runtime SA publisher access to the topic
+gcloud pubsub topics add-iam-policy-binding status-progress \
+  --project=YOUR_PROJECT_ID \
+  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+```
+
+> **Automated:** set `_BOOTSTRAP_PUBSUB=true` in `cloudbuild.yaml` substitutions on first deploy — the pipeline will create the topic and subscription idempotently so you don't need to run the commands above manually.
 
 ### Step 3 — Build and test the Docker image locally first
 

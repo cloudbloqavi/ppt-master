@@ -12,7 +12,7 @@
 > export) — that authority is [`core-ppt-master-engine/skills/ppt-master/SKILL.md`](core-ppt-master-engine/skills/ppt-master/SKILL.md).
 > When the two overlap, SKILL.md wins for workflow and this file wins for the runner.
 
-_Last updated: 2026-06-17 — added the raw-template verbatim re-theme stage._
+_Last updated: 2026-06-17 — status sink: ordered Pub/Sub (RUN_ID ordering key) + flush-on-exit + Cloud Run Jobs detection._
 
 ---
 
@@ -40,7 +40,7 @@ are not spawned). So quality-critical decisions are either *made by the runner* 
 | `retheme_enforcement.py` | **Post-turn stage.** Re-themes verbatim raw-template pages (colors + typography) via `scripts/retheme_chart_svg.py`, then rebuilds the deck (see §4.2). |
 | `visual_enforcement.py` | **Post-turn stage.** Runner-enforced deterministic layout audit + deck rebuild (see §4.3). |
 | `provenance_enforcement.py` | **Post-turn stage.** Validates `chart_provenance.json` + candidate-aware selection check + structural-mimic review (see §4.4). |
-| `status_logger.py` | Maps internal events to the non-technical end-user status feed (`--status-progress`). Never leaks internal terms. |
+| `status_logger.py` | Maps internal events to the non-technical end-user status feed (`--status-progress`). Never leaks internal terms. Pluggable sink: local file and/or GCP Pub/Sub. Pub/Sub publishes with **message ordering** keyed by `RUN_ID` (so on-topic order = emission order) and is **flushed on exit** (`close_status_logging`), so a Cloud Run Job does not drop queued events. |
 | `checkpoints.py` / `resumption.py` | Disk-checkpoint resume: detect the furthest-completed stage on disk and continue instead of cold-restarting. |
 | `artifacts.py` | Snapshots project/PPTX files, copies outputs to `OUTPUT_ARTIFACTS_DIR`, writes `run_manifest.json`, finalizes log placement. |
 | `tools.py` | Workspace self-test (`--self-test`, no API key needed). |

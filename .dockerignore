@@ -1,17 +1,180 @@
+# Build-context exclusions — keep the image small and reproducible. Mirrors the
+# non-essential paths from .gitignore plus build artifacts. Anything the Dockerfile
+# COPYs (run_agent.py, auto_resume.py, ANTIGRAVITY.md, AGENTS.md, pyproject.toml,
+# gemini_model_prices.json, agent_runner/, core-ppt-master-engine/, requirements*)
+# must NOT be excluded here.
+
+# ── Version control / CI / editor & agent metadata ──────────────────────────
 .git
 .github
+.gitignore
 .idea
 .vscode
+.agents
+.claude
+.claude-plugin
+claude-plugin
+.spec-workflow
+*.code-workspace
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── OS cruft ────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Editor temp / swap / backup ─────────────────────────────────────────────
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+*.bak
+
+# ── Python caches & build artifacts ─────────────────────────────────────────
 __pycache__
-*.pyc
-*.pyo
-*.pyd
-.env
+**/__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info
+.eggs/
+develop-eggs/
+build/
+dist/
+downloads/
+eggs/
+sdist/
+wheels/
+share/python-wheels/
+pip-wheel-metadata/
+var/
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# ── Virtual environments ────────────────────────────────────────────────────
 .venv
+.venv_wsl
 venv
 env
+ENV
+
+# ── Secrets & local config (injected at runtime, never baked into the image) ─
+.env
+.env.*
+!.env.example
+
+# ── Tests (build-time check is `run_agent.py --self-test`, not pytest) ───────
+agent_runner/tests
+
+# ── Node.js (if/when added) ─────────────────────────────────────────────────
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# ── Generated output / scratch / WIP (not needed in the image) ──────────────
 *.pptx
-core-ppt-master-engine/projects/*/svg_output
-core-ppt-master-engine/projects/*/svg_final
-core-ppt-master-engine/projects/*/backup
+*.log
+outputs/
 temp/
+test_output/
+temp_files/
+/drafts/
+/notes/
+/scratch/
+.notes/
+_verbatim_proof/
+_refined_charts_backup_*/
+_scratch_audit/
+_TEMP_ERROR_LOG.txt
+.cache/
+*.lock
+.lock
+.live_edits.jsonl
+
+# WIP project folders are recreated at runtime; ship only the placeholder README.
+core-ppt-master-engine/projects/*
+!core-ppt-master-engine/projects/README.md
+/projects/
+
+# Visual-review / Playwright-MCP scratch and stray probe screenshots
+.playwright-mcp/
+core-ppt-master-engine/projects/*/.preview/
+core-ppt-master-engine/projects/*/.review/
+/probe-*.png
+/screenshot-*.png
+/page-*.png
+
+# svg_doctor ingestion reports (artifacts, not source)
+/scripts/svg_doctor/reports/
+*.svgdoctor.md
+
+# ── Large media / archives / databases ──────────────────────────────────────
+*.psd
+*.ai
+*.sketch
+*.fig
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Docs builds & non-runtime docs ──────────────────────────────────────────
+core-ppt-master-engine/docs/_build/
+core-ppt-master-engine/docs/.doctrees/
+site/
+docs/zh
+README_CN.md
+
+# ── Root-level documentation (not read during agent execution) ──────────────
+# AGENTS.md is the dev-tool instructions file (excluded from image).
+# The runtime instructions live in agent_runner/AGENTS.RUNTIME.md and are
+# copied to ./AGENTS.md at startup by core.py (SDK auto-discovery).
+AGENTS.md
+QUICKSTART.md
+ANTIGRAVITY.md
+ARCHITECTURE.md
+TEST.md
+DEPENDENCIES.md
+SECURITY.md
+README.md
+design_replication_guide.md
+
+# ── Personal / scratch docs & input fixtures ────────────────────────────────
+TODO.md
+PERSONAL_NOTES.md
+_PROMPT_TEST.md
+_STEPS_PLAN.md
+input.md
+
+# ── Script-subsystem developer docs (agent calls scripts; these docs are for devs) ──
+# The scripts themselves (*.py) are needed; their docs/ folder is not.
+core-ppt-master-engine/skills/ppt-master/scripts/docs/
+
+# ── Source reference decks (inputs, not deliverables) ───────────────────────
+/Infographics_Library_v1.1.pptx
+/Strategic-Roadmap-Template-00.pptx
+
+subagent.pdf
+subagents_sample.py

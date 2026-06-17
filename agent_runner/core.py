@@ -21,7 +21,7 @@ from agent_runner.status_logger import (
     setup_status_logging, log_status, set_research_topic, reset_run_state,
     _check_text_for_status, _check_thought_for_status,
     _check_tool_call_for_status, _check_tool_result_for_status,
-    _mark_all_slides_ready,
+    _mark_all_slides_ready, close_status_logging,
 )
 from agent_runner.tools import run_self_test
 from agent_runner.resumption import find_and_restore_incomplete_project
@@ -675,6 +675,13 @@ def main_run() -> int:
         success = run_self_test()
         return 0 if success else 1
 
+    # Always overwrite AGENTS.md with the runtime instructions so the Antigravity SDK
+    # discovers the correct system instructions regardless of environment.
+    _runtime_src = Path(__file__).parent / "AGENTS.RUNTIME.md"
+    if _runtime_src.exists():
+        shutil.copy(_runtime_src, Path("AGENTS.md"))
+        logger.info("Copied agent_runner/AGENTS.RUNTIME.md → AGENTS.md for SDK discovery.")
+
     # Clean up any loose logs left at the artifacts root by older runner versions
     # or runs killed before cleanup, BEFORE this run creates its own logs.
     sweep_orphan_root_logs()
@@ -888,6 +895,10 @@ def main_run() -> int:
 
     log_status(f"Workflow execution finished with status: {final_status}")
     logger.info("Runner finished with status: %s", final_status)
+    # Flush the status sink before exit: a Cloud Run Job terminates as soon as this
+    # function returns, and the ordered Pub/Sub publisher batches asynchronously —
+    # without this, queued events (including the closing line above) can be dropped.
+    close_status_logging()
     # Logs were copied into the project artifacts folder during the artifact-copy
     # stage; remove the now-redundant top-level originals so they don't pile up at
     # the OUTPUT_ARTIFACTS_DIR root. Must run last — it closes the execution log
