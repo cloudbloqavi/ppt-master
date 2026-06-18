@@ -250,19 +250,34 @@ class StatusProgressLogger:
         self.file_path = file_path
         self.pubsub_topic = pubsub_topic or os.environ.get("STATUS_PUBSUB_TOPIC")
         self.pubsub_client = None
+        self._publish_futures: list = []
+        # Every event for one run shares this ordering key, so an ordering-enabled
+        # subscription delivers them in publish order (within a region). _RUN_ID is
+        # resolved by setup_status_logging() before this logger is constructed.
+        self._ordering_key = _RUN_ID or "default"
 
-        # Try to resolve default topic in production Cloud Run environments if not set
-        if not self.pubsub_topic and "K_SERVICE" in os.environ:
+        # Resolve a default topic in any Cloud Run environment if not set. NOTE:
+        # Cloud Run *Jobs* set CLOUD_RUN_JOB/CLOUD_RUN_EXECUTION (not K_SERVICE,
+        # which is Services-only) — see _in_cloud_run().
+        if not self.pubsub_topic and _in_cloud_run():
             project_id = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
             if project_id:
                 self.pubsub_topic = f"projects/{project_id}/topics/status-progress"
 
-        # Initialize Pub/Sub client if a topic is targetable
+        # Initialize an ORDER-PRESERVING Pub/Sub publisher if a topic is targetable.
         if self.pubsub_topic:
             try:
                 from google.cloud import pubsub_v1
-                self.pubsub_client = pubsub_v1.PublisherClient()
-                logger.info("Initialized Pub/Sub publisher for topic: %s", self.pubsub_topic)
+                # enable_message_ordering: the client serializes publishes per
+                # ordering key (won't send N+1 until N is acked), so on-topic order
+                # matches call order. The subscription must also enable ordering.
+                self.pubsub_client = pubsub_v1.PublisherClient(
+                    publisher_options=pubsub_v1.types.PublisherOptions(
+                        enable_message_ordering=True
+                    )
+                )
+                logger.info("Initialized ordered Pub/Sub publisher for topic: %s "
+                            "(ordering_key=%s)", self.pubsub_topic, self._ordering_key)
             except ImportError:
                 logger.warning(
                     "google-cloud-pubsub package not found. Status updates "
@@ -298,7 +313,7 @@ class StatusProgressLogger:
             except Exception as e:
                 logger.warning("Failed to write to status progress log file: %s", e)
 
-        # 2. Production GCP Pub/Sub publishing
+        # 2. Production GCP Pub/Sub publishing (ordered, per-run ordering key)
         if self.pubsub_client and self.pubsub_topic:
             try:
                 event = {
@@ -311,9 +326,56 @@ class StatusProgressLogger:
                 if payload:
                     event["data"] = payload
                 data = json.dumps(event).encode("utf-8")
-                self.pubsub_client.publish(self.pubsub_topic, data)
+                future = self.pubsub_client.publish(
+                    self.pubsub_topic, data, ordering_key=self._ordering_key
+                )
+                # Retained so close() can flush before a Cloud Run Job exits.
+                self._publish_futures.append(future)
+                future.add_done_callback(self._on_publish_done)
             except Exception as e:
                 logger.warning("Failed to publish status progress to Pub/Sub: %s", e)
+                self._resume_ordering()
+
+    def _on_publish_done(self, future):
+        """Re-open the ordering key if a publish failed.
+
+        With message ordering enabled, one failed publish latches the key closed
+        and the client rejects every later message for it — so a transient error
+        would silently truncate the rest of the run's status feed."""
+        try:
+            future.result(timeout=0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Pub/Sub publish failed (%s); resuming ordering key.", e)
+            self._resume_ordering()
+
+    def _resume_ordering(self):
+        try:
+            if self.pubsub_client and self.pubsub_topic:
+                self.pubsub_client.resume_publish(self.pubsub_topic, self._ordering_key)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to resume Pub/Sub ordering key: %s", e)
+
+    def close(self, timeout: float = 30.0):
+        """Flush in-flight Pub/Sub publishes — MUST run before the process exits.
+
+        A Cloud Run Job terminates the instant the agent finishes; the batching
+        publisher would otherwise drop events that were queued but not yet sent.
+        Resolving each retained future guarantees its message reached the topic."""
+        if not self.pubsub_client:
+            return
+        pending, self._publish_futures = self._publish_futures, []
+        for f in pending:
+            try:
+                f.result(timeout=timeout)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Pub/Sub flush: a status event failed to publish: %s", e)
+
+
+def _in_cloud_run() -> bool:
+    """True when running on Cloud Run. Jobs set CLOUD_RUN_JOB/CLOUD_RUN_EXECUTION;
+    Services set K_SERVICE — this engine deploys as a Job, so check all three."""
+    return any(k in os.environ for k in
+               ("K_SERVICE", "CLOUD_RUN_JOB", "CLOUD_RUN_EXECUTION"))
 
 
 def setup_status_logging():
@@ -329,9 +391,9 @@ def setup_status_logging():
         or datetime.now().strftime("run_%Y%m%d_%H%M%S")
     )
 
-    # Status progress updates run automatically in production (Cloud Run),
-    # or locally when the CLI flag is passed or Pub/Sub is configured.
-    is_production = "K_SERVICE" in os.environ
+    # Status progress updates run automatically in production (Cloud Run Jobs or
+    # Services), or locally when the CLI flag is passed or Pub/Sub is configured.
+    is_production = _in_cloud_run()
     opt_in = ARGS.status_progress
     has_pubsub_env = "STATUS_PUBSUB_TOPIC" in os.environ
 
@@ -375,6 +437,16 @@ def log_status(message: str, event_type: str = "progress", payload: dict | None 
 def get_status_log_file_path() -> Path | None:
     """Return the path to the active status progress log file."""
     return _STATUS_LOG_FILE_PATH
+
+
+def close_status_logging():
+    """Flush the status sink so a Cloud Run Job doesn't exit with queued Pub/Sub
+    events still in flight. No-op for the file sink and when never configured."""
+    if _STATUS_LOGGER:
+        try:
+            _STATUS_LOGGER.close()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Error while flushing status logger: %s", e)
 
 
 def _get_project_dir_from_path(file_path: str) -> Path | None:
@@ -798,17 +870,18 @@ def _scan_research_sources(buffer: str, recent: str | None = None):
         _sources_marker_open = False
 
 
-def _parse_sources_from_md(file_path: str) -> list:
-    """Read a research markdown file and extract URLs from its `## Sources` section."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception:
-        return []
+def _parse_sources_from_md_text(content: str) -> list:
+    """Extract sources from a research markdown's `## Sources` section (string form).
 
+    Handles markdown links `[name](url)` and prose `Label: url` / `Label - url`
+    rows, capturing the leading label as the source name. Keeping the name means an
+    early brief-parse citation is as rich as the model's later `[[RESEARCH_SOURCES]]`
+    manifest, and (since both dedup by domain) the manifest does not downgrade an
+    already-named source to a bare domain.
+    """
     m = re.search(
         r"^#{1,4}\s*Sources?\b.*?$(.*?)(?=^#{1,4}\s|\Z)",
-        content,
+        content or "",
         re.MULTILINE | re.DOTALL | re.IGNORECASE,
     )
     if not m:
@@ -825,9 +898,52 @@ def _parse_sources_from_md(file_path: str) -> list:
             continue
         url = re.search(r"https?://[^\s)]+", line)
         if url:
-            sources.append({"name": "", "url": url.group(0)})
+            # Any leading "Label: url" / "Label - url" prose becomes the name.
+            name = line[:url.start()].strip().rstrip(":-–—").strip()
+            sources.append({"name": name, "url": url.group(0)})
         # Prose-only citations (no URL) are skipped — nothing to surface.
     return sources
+
+
+def _parse_sources_from_md(file_path: str) -> list:
+    """Read a research markdown file and extract URLs from its `## Sources` section."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return []
+    return _parse_sources_from_md_text(content)
+
+
+def _extract_write_content(args: Any) -> str:
+    """Best-effort extraction of the written content from a write/edit tool call.
+
+    File writes surface no ToolResult chunk, so to react at write time we read the
+    content straight from the call args — no disk round-trip, no flush race. Handles
+    the common content keys and the editFile `diffBlock` line shape; returns "" when
+    no content is present so the caller can fall back to a disk read.
+    """
+    if isinstance(args, str):
+        return args
+    if not isinstance(args, dict):
+        return ""
+    for k in ("content", "fileContent", "file_content", "contents",
+              "code_edit", "CodeEdit", "new_str", "newStr"):
+        v = args.get(k)
+        if isinstance(v, str) and v:
+            return v
+    block = args.get("diffBlock") or args.get("diff_block")
+    if isinstance(block, list):
+        lines = []
+        for b in block:
+            if not isinstance(b, dict):
+                continue
+            for ln in b.get("lines") or []:
+                if isinstance(ln, dict) and ln.get("action") != "LINE_ACTION_DELETE":
+                    lines.append(str(ln.get("text", "")))
+        if lines:
+            return "\n".join(lines)
+    return ""
 
 
 def _extract_command(args: Any) -> str:
@@ -1104,6 +1220,17 @@ def _check_tool_call_for_status(chunk: Any):
             or re.search(r"/projects/[^/]+\.md$", file_path_norm)
         ):
             log_status("Compiling gathered research into a structured source brief...")
+            # Surface the brief's cited sources NOW, at write time — not whenever the
+            # model later streams its [[RESEARCH_SOURCES]] manifest, which it may defer
+            # to the end of the turn (placing citations after the slide-design events).
+            # Writes emit no ToolResult chunk, so read the content from the call args,
+            # falling back to disk. Idempotent by domain, so the later manifest / thought
+            # harvest only adds sources this did not already surface.
+            content = _extract_write_content(chunk.args)
+            sources = (_parse_sources_from_md_text(content) if content
+                       else _parse_sources_from_md(file_path))
+            if sources:
+                _emit_research_sources(sources)
 
     elif _is_web_search_tool(chunk.name):
         query = ""

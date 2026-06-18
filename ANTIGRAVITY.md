@@ -256,24 +256,28 @@ After the agent's turn (right after the visual-review enforcement, in `core.py`)
 
 > Limitation: this is **topology** comparison — it cannot see geometry-orientation or aesthetic bugs (e.g. an inverted-but-same-shapes pyramid scores ~identical). Those need a rendered look (the visual-review pass), which is why `svg_doctor` flags them rather than auto-fixing.
 
-### `svg_doctor.py` — standalone single-SVG lint & auto-fix
+### `svg_doctor/svg_doctor.py` — standalone single-SVG lint, auto-fix & sanitize
 
-Vets **any one SVG** with no project context — a hand-authored slide, or sweeping the chart catalog to find fragile templates:
+Lives in its own **repo-root** folder, [`scripts/svg_doctor/`](scripts/svg_doctor/), alongside a `reports/` subfolder that holds the generated Markdown reports (git-ignored — they are artifacts, not source, and are kept out of the template folders). It is a standalone dev/ingestion tool — not part of the runtime pipeline the runner drives — which is why it sits at the repo root rather than inside the skill bundle. Vets **any one SVG** with no project context — a hand-authored slide, an incoming third-party file, or sweeping the chart catalog to find fragile templates:
 
 ```bash
-SD=core-ppt-master-engine/skills/ppt-master/scripts/svg_doctor.py
+SD=scripts/svg_doctor/svg_doctor.py
 python3 $SD file.svg            # REVIEW (default): list issues, change nothing
 python3 $SD file.svg --fix      # FIX: apply AUTO-FIXABLE items only (REVIEW items never touched)
 python3 $SD file.svg --fix -o out.svg   # write the fixed copy elsewhere
 python3 $SD file.svg --json     # machine-readable findings (for CI / catalog sweeps)
+python3 $SD file.svg --ingest   # SANITIZE: untrusted-file gate (see "Ingesting third-party SVGs")
+python3 $SD file.svg --report r.md      # write a shareable Markdown report (verdict + next steps)
 ```
 
-Findings split into two classes. **Hard invariant: `--fix` must never change how the SVG renders** — it only repairs internal issues while leaving the visible asset pixel-identical. Anything whose safe fix is *not* visually neutral is flag-only. (Core principle: **not every fix needs AI**.)
+Findings split into four classes. **Hard invariant: `--fix` must never change how the SVG renders** — it only repairs internal issues while leaving the visible asset pixel-identical. Anything whose safe fix is *not* visually neutral is flag-only. (Core principle: **not every fix needs AI**.)
 
 | Class | Examples | Fix path |
 |:---|:---|:---|
-| **AUTO-FIX** (provably visual no-op) | add `xmlns`/`viewBox`, HTML entity → identical glyph, unescaped `&` → `&amp;`, `rgba()` → hex **+ matching `-opacity` (alpha preserved)**, strip non-rendering `<script>`/`<iframe>` | deterministic `--fix` — no AI |
-| **NEEDS REVIEW** (intent/aesthetics, OR a fix that would alter appearance) | mirrored/flipped transforms (the pyramid-inversion class), raw-export bloat, out-of-bounds, orphan baseline, heavy SVG; **plus** `<style>`/`<foreignObject>`/`<animate>`, `class=`, `<g opacity>`, `rgba` inside `style="…"` | **flag only** — fix by human/AI while preserving the look |
+| **AUTO-FIX** (provably visual no-op) | add `xmlns`/`viewBox`, HTML entity → identical glyph, unescaped `&` → `&amp;`, `rgba()` → hex **+ matching `-opacity` (alpha preserved)**, strip non-rendering `<script>`/`<iframe>`; **security:** inline event handlers (`onload=`…) and `javascript:` URLs stripped | deterministic `--fix` — no AI |
+| **SECURITY** (untrusted-content scan, always on) | `on…=` handlers, `javascript:` URLs (→ AUTO-FIX); external `http(s)` refs in `href`/`src`/`url()`, `data:` URIs, `<!DOCTYPE>`/`<!ENTITY>` (→ REVIEW) | gate via `--ingest` |
+| **NEEDS REVIEW** (intent/aesthetics, OR a fix that would alter appearance) | mirrored/flipped transforms (the pyramid-inversion class) **in a clean SVG**, out-of-bounds/orphan/heavy **in a clean SVG**; `<style>`/`<foreignObject>`/`<animate>`, `class=`, `<g opacity>`, `rgba` inside `style="…"`, external image refs | **flag only** — fix by human/AI while preserving the look |
+| **INFO** (advisory, never gates) | raw-export fingerprint, and a raw export's *intrinsic* properties — mirrored transforms, out-of-bounds, heavy element count — which we accept verbatim | none — informational |
 
 `--fix` never edits a REVIEW-class item, so it can neither break a slide nor silently change its appearance. Exit code is `1` when REVIEW findings remain (CI-gateable). Sweep the company catalog with:
 
@@ -282,7 +286,43 @@ for f in core-ppt-master-engine/skills/ppt-master/templates/charts/powerslides_i
   python3 $SD "$f" --json; done
 ```
 
-> **Catalog note (raw exports):** several company templates are raw PowerPoint exports whose geometry uses `matrix(1 0 0 -1 …)` vertical flips. Faithful mimicry reproduces them as-is, which can render inverted/jagged (the original "broken pyramid"). `svg_doctor` flags these as `mirrored_transform`; the fix is to **re-orient** the paths (flip → `translate`), not to remove them blindly — see the corrected `06_pyramid.svg` for the pattern.
+> **Catalog note (raw exports):** several company templates are raw PowerPoint exports whose geometry uses `matrix(1 0 0 -1 …)` vertical flips. Under the **verbatim + deterministic re-theme** approach these are copied as-is and the DrawingML exporter reproduces them at ~100% fidelity, so for a *raw export* `svg_doctor` now reports the flip (and out-of-bounds/heavy) as **INFO**, not a gating REVIEW. The same `mirrored_transform` in an otherwise-*clean* hand-authored SVG is still the "broken pyramid" bug → REVIEW; fix by re-orienting paths (flip → `translate`), not blind removal — see `06_pyramid.svg` for the pattern.
+
+#### Ingesting third-party SVGs (sanitization gate)
+
+When a company sends SVGs to add to the catalog on an ad-hoc basis, treat them as **untrusted** and run them through the ingestion gate before they touch the codebase. The real risk in a third-party SVG is *active and external* content, not the PPTX profile: inline event handlers, `javascript:` URLs, externally-fetched `<image>`/`<use>`, `data:` blobs, and DTDs (`<!DOCTYPE>`/`<!ENTITY>` → XXE). The gate is allowed to **reject** (unlike plain `--fix`, which only ever repairs visual no-ops):
+
+```bash
+SD=scripts/svg_doctor/svg_doctor.py
+
+# 1. Gate the file. --ingest fails (exit 1) if ANY active/external construct was
+#    present — even one auto-stripped — so a human signs off. --fix strips the
+#    safe ones (handlers, javascript:). The Markdown report defaults to the tool's
+#    own folder, scripts/svg_doctor/reports/<name>.svgdoctor.md (git-ignored, never
+#    beside the input SVG); pass --report to put it elsewhere.
+python3 $SD incoming.svg --ingest --fix --report incoming_report.md
+
+# 2. Share incoming_report.md with the engineering/UX team. It contains the
+#    ACCEPT/REJECT verdict, findings grouped by Security / Needs review / Auto-fix /
+#    Info, and the recommended next steps.
+
+# 3. Resolve every REVIEW/SECURITY item: rehost external images locally, remove
+#    data: blobs, strip DTDs, inline a banned <style>/<foreignObject>. Re-run until
+#    the verdict is ACCEPT (exit 0).
+
+# 4. Only an ACCEPT file goes into templates/charts/powerslides_infographics/ as a
+#    raw template. From there the runner takes over: verbatim copy → deterministic
+#    re-theme → layout audit → provenance check.
+```
+
+| Construct | Posture | Why |
+|:---|:---|:---|
+| `on…=` event handlers, `javascript:` URLs | **AUTO-FIX** (stripped) | executable but non-rendering → removal is a guaranteed visual no-op |
+| external `http(s)` `href`/`src`/`url()` | **REVIEW** (reject) | fetched at render time (SSRF / exfiltration); can't strip without changing the render → rehost locally |
+| `data:` URI | **REVIEW** (reject) | opaque blob; a human confirms it is an expected image, not a payload |
+| `<!DOCTYPE>` / `<!ENTITY>` | **REVIEW** (reject) | XXE / billion-laughs; no legitimate use in this profile |
+
+> The security scan runs on **every** invocation (so a stray handler is caught even in plain lint mode); `--ingest` is what makes it a hard gate that forces sign-off before an untrusted file is incorporated.
 
 ---
 
@@ -362,7 +402,9 @@ Cloud Run containers use ephemeral storage — everything is lost when the conta
 | GCS bucket | `your-ai-builder-outputs` | For output persistence |
 | Service Account | For Cloud Run Job runtime | Optional — defaults to Compute SA |
 
-### Step 2 — Create the GCS output bucket
+### Step 2 — Create the GCS output bucket and Pub/Sub status feed
+
+#### GCS bucket (output persistence)
 
 ```bash
 # Create the bucket (outputs land here after every job run)
@@ -370,11 +412,34 @@ gcloud storage buckets create gs://your-ai-builder-outputs \
   --project=YOUR_PROJECT_ID \
   --location=us-central1
 
-# Grant Service Account objectAdmin access
+# Grant the runtime SA objectAdmin on the bucket (GCS FUSE writes)
 gcloud storage buckets add-iam-policy-binding gs://your-ai-builder-outputs \
   --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 ```
+
+> **Per-execution isolation (optional but recommended):** set `OUTPUT_ARTIFACTS_DIR=/workspace/outputs/${CLOUD_RUN_EXECUTION}` on the job so each execution writes to its own GCS prefix and runs never overwrite each other's artifacts.
+
+#### Pub/Sub status feed (live progress events)
+
+The runner publishes a real-time user-facing status feed (slide-by-slide progress, research citations) to a Pub/Sub topic when one is reachable. On Cloud Run the topic is **auto-resolved** from `GOOGLE_CLOUD_PROJECT` — no extra env var needed if you use the default topic name.
+
+```bash
+# One-time: topic + ORDER-PRESERVING subscription (consumer must also enable ordering)
+gcloud pubsub topics create status-progress --project=YOUR_PROJECT_ID
+gcloud pubsub subscriptions create status-progress-sub \
+  --topic=status-progress \
+  --project=YOUR_PROJECT_ID \
+  --enable-message-ordering          # REQUIRED for in-order delivery
+
+# Grant the runtime SA publisher access to the topic
+gcloud pubsub topics add-iam-policy-binding status-progress \
+  --project=YOUR_PROJECT_ID \
+  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+```
+
+> **Automated:** set `_BOOTSTRAP_PUBSUB=true` in `cloudbuild.yaml` substitutions on first deploy — the pipeline will create the topic and subscription idempotently so you don't need to run the commands above manually.
 
 ### Step 3 — Build and test the Docker image locally first
 

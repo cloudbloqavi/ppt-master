@@ -31,42 +31,16 @@ import sys
 from pathlib import Path
 
 from agent_runner.config import logger
+# Project discovery is owned by visual_enforcement (the first post-turn stage);
+# reuse it here rather than maintaining a second identical copy.
+from agent_runner.visual_enforcement import _find_active_project_dirs
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SKILL_SCRIPTS = _REPO_ROOT / "core-ppt-master-engine" / "skills" / "ppt-master" / "scripts"
 _SKILL_DIR = _SKILL_SCRIPTS.parent
 _REVIEW = _SKILL_SCRIPTS / "chart_structural_review.py"
 
-_PROJECT_ROOTS = [
-    _REPO_ROOT / "core-ppt-master-engine" / "projects",
-    _REPO_ROOT / "projects",
-]
-
 _VALID_TIERS = {"company", "stock", "custom"}
-
-
-def _find_active_project_dirs(start_time: float | None) -> list[Path]:
-    """Project folders with svg_output/*.svg touched during this run (mirrors visual_enforcement)."""
-    found: list[Path] = []
-    for root in _PROJECT_ROOTS:
-        if not root.is_dir():
-            continue
-        for d in sorted(root.iterdir()):
-            svg_dir = d / "svg_output"
-            if not (d.is_dir() and svg_dir.is_dir()):
-                continue
-            svgs = list(svg_dir.glob("*.svg"))
-            if not svgs:
-                continue
-            if start_time is None:
-                found.append(d)
-                continue
-            try:
-                if any(s.stat().st_mtime >= start_time - 2 for s in svgs):
-                    found.append(d)
-            except OSError:
-                found.append(d)
-    return found
 
 
 def _has_page_charts(spec_lock: Path) -> bool:
@@ -91,11 +65,35 @@ def _has_page_charts(spec_lock: Path) -> bool:
     return False
 
 
+def _load_company_candidate_pages(project_dir: Path) -> dict[str, str]:
+    """Return {page_id: first_company_key} for pages the match stage found a company fit.
+
+    Reads chart_candidates.json (written when the runner's Directive catalog-match
+    stage ran). Absent/unparseable → {} (advisory degrades to the coverage warning).
+    """
+    cand_path = project_dir / "chart_candidates.json"
+    if not cand_path.is_file():
+        return {}
+    try:
+        data = json.loads(cand_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out: dict[str, str] = {}
+    for page_id, entry in (data.get("pages") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        company = entry.get("company") or []
+        if company and isinstance(company[0], dict) and company[0].get("key"):
+            out[page_id] = company[0]["key"]
+    return out
+
+
 def _validate_provenance(project_dir: Path) -> dict:
     """Structural validation of chart_provenance.json. Returns issues + page count."""
     prov_path = project_dir / "chart_provenance.json"
     spec_lock = project_dir / "spec_lock.md"
     deck_has_charts = _has_page_charts(spec_lock)
+    company_candidates = _load_company_candidate_pages(project_dir)
 
     if not prov_path.is_file():
         # Missing is only a violation when the deck actually has chart pages.
@@ -119,6 +117,16 @@ def _validate_provenance(project_dir: Path) -> dict:
         if tier not in _VALID_TIERS:
             issues.append(f"{page_id}: invalid tier {tier!r}")
             continue
+        # Candidate-aware teeth: when the runner's match stage found a company
+        # template for this page but the agent chose a non-company tier, the choice
+        # must be justified — an empty decision means the company option was dropped
+        # silently rather than rejected on purpose.
+        if tier != "company" and page_id in company_candidates:
+            if not (entry.get("decision") or "").strip():
+                issues.append(
+                    f"{page_id}: company candidate '{company_candidates[page_id]}' was "
+                    f"available but tier={tier} chosen with no decision reason"
+                )
         if tier == "custom":
             if not (entry.get("decision") or "").strip():
                 issues.append(f"{page_id}: custom page missing required decision reason")
@@ -138,8 +146,32 @@ def _validate_provenance(project_dir: Path) -> dict:
     if deck_has_charts and not pages:
         issues.append("deck has page_charts but provenance lists no pages")
 
+    # confirmed_by: Strategist must emit provenance (strategist.md §VII line 658).
+    # If every entry says "executor", the Strategist skipped the write entirely.
+    if pages:
+        all_by_executor = all(
+            (entry.get("confirmed_by") or "").strip().lower() == "executor"
+            for entry in pages.values()
+            if entry
+        )
+        if all_by_executor:
+            issues.append(
+                "strategist_skipped: all confirmed_by=executor — "
+                "Strategist must write chart_provenance.json before handoff"
+            )
+
+    # Company-catalog coverage warning (strategist.md §VII line 625):
+    # "a deck whose viz pages all fell to stock/custom … will be flagged."
+    # Advisory only — legitimate decks can have zero company pages.
+    catalog_skip_suspected = (
+        deck_has_charts
+        and bool(pages)
+        and by_tier.get("company", 0) == 0
+    )
+
     return {"present": True, "deck_has_charts": deck_has_charts, "issues": issues,
-            "entries": len(pages), "by_tier": by_tier}
+            "entries": len(pages), "by_tier": by_tier,
+            "catalog_skip_suspected": catalog_skip_suspected}
 
 
 def _run_structural_review(project_dir: Path) -> dict:
@@ -169,7 +201,8 @@ def _audit_project(project_dir: Path) -> dict:
               "deck_has_charts": validation["deck_has_charts"],
               "issues": validation["issues"],
               "entries": validation["entries"],
-              "by_tier": validation["by_tier"]}
+              "by_tier": validation["by_tier"],
+              "catalog_skip_suspected": validation.get("catalog_skip_suspected", False)}
     # Only run the structural review when provenance is present and well-formed.
     if validation["present"] and not any(
         i.startswith("unparseable") for i in validation["issues"]
@@ -217,20 +250,32 @@ def enforce_chart_provenance(start_time: float | None) -> dict:
     else:
         status = "clean"
 
+    catalog_skip_suspected = any(p.get("catalog_skip_suspected", False) for p in per_project)
+
     for p in per_project:
         if p["issues"]:
             logger.warning("  [%s] %d provenance issue(s): %s",
                            p["project"], len(p["issues"]), "; ".join(p["issues"][:6]))
+        if p.get("catalog_skip_suspected") and not any(
+            "strategist_skipped" in i for i in p["issues"]
+        ):
+            logger.warning(
+                "  [%s] company catalog advisory: 0 company-tier pages in a chart deck "
+                "— verify the Strategist consulted powerslides_infographics/ before falling through",
+                p["project"],
+            )
 
     logger.info("  Provenance result: %s | company_pages=%d structural_checked=%d "
-                "weak=%d abandoned=%d issues=%d",
-                status, total_company, total_checked, total_weak, total_abandoned, total_issues)
+                "weak=%d abandoned=%d issues=%d catalog_skip_suspected=%s",
+                status, total_company, total_checked, total_weak, total_abandoned, total_issues,
+                catalog_skip_suspected)
     logger.info("═" * 60)
     logger.info("")
 
     return {"ran": True, "status": status, "projects": per_project,
             "company_pages": total_company, "checked": total_checked,
-            "weak": total_weak, "abandoned": total_abandoned, "issues": total_issues}
+            "weak": total_weak, "abandoned": total_abandoned, "issues": total_issues,
+            "catalog_skip_suspected": catalog_skip_suspected}
 
 
 def status_line(result: dict) -> str:
@@ -251,6 +296,9 @@ def status_line(result: dict) -> str:
                 "reference template structure.")
     if status == "clean":
         n = result.get("checked", 0)
-        return (f"Chart structural review passed: {n} templated slide(s) match their reference "
+        base = (f"Chart structural review passed: {n} templated slide(s) match their reference "
                 "structure." if n else "Chart structural review passed.")
+        if result.get("catalog_skip_suspected"):
+            base += " (Note: no company-catalog slides selected — verify the Strategist consulted powerslides_infographics/.)"
+        return base
     return "Chart structural review completed."

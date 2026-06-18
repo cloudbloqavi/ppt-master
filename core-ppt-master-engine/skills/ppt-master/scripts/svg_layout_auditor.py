@@ -522,7 +522,11 @@ def audit_page(svg_path: Path, canvas: tuple[int, int],
     cw, ch = canvas
 
     texts = [e for e in elems if e.kind == "text" and e.box and e.has_fill]
-    shapes = [e for e in elems if e.kind in ("rect", "image") and e.box]
+    # Grid/card cells are often exported as filled <path> rects (e.g. calendar
+    # day cells), not <rect> — D4's container match must see those too, or
+    # text overflowing a path-drawn cell is silently never checked.
+    shapes = [e for e in elems if e.box and (
+        e.kind in ("rect", "image") or (e.kind == "path" and e.has_fill))]
 
     # D1 — orphan baseline (static, hard)
     for e in texts:
@@ -783,6 +787,86 @@ def fix_text_overlap(tree: ET.ElementTree, canvas: tuple[int, int]) -> int:
     return fixed
 
 
+def _scale_text_font(node: ET.Element, parent: ET.Element | None, scale: float) -> None:
+    """Shrink a <text> element's font-size (and any tspan that overrides it)
+    by ``scale``, writing the resolved size explicitly onto the node so the
+    shrink takes effect even when the size was only inherited from a parent
+    group — siblings sharing that parent are left untouched."""
+    fs = _to_float(_style_lookup(node, parent, "font-size"), 16.0) or 16.0
+    node.set("font-size", f"{fs * scale:.2f}")
+    for c in list(node):
+        if _localname(c.tag) != "tspan":
+            continue
+        cfs = _to_float(c.get("font-size"))
+        if cfs is not None:
+            c.set("font-size", f"{cfs * scale:.2f}")
+
+
+_D4_FIXED_MARKER = "data-d4fix"
+
+
+def fix_text_overflow(tree: ET.ElementTree, canvas: tuple[int, int]) -> int:
+    """Shrink <text> that spills past its enclosing card/cell to fit inside it.
+
+    Unlike D1-D3's rigid translations, this changes the text's visual size —
+    riskier, so the shrink is capped at _MIN_SCALE (never below 60% of the
+    original size) and skipped entirely if that floor still wouldn't fit,
+    leaving an honest unresolved finding rather than shrinking text to
+    illegibility.
+
+    Marks each shrunk node with _D4_FIXED_MARKER and never touches it again:
+    as a box shrinks its center can drift over a *different* neighboring
+    cell (the content's pen-position already straddled two cells before any
+    fix ran), which would otherwise relitigate the same element against a
+    new container on every re-run and shrink it further with no floor —
+    compounding indefinitely across repeated audits instead of converging.
+    """
+    root = tree.getroot()
+    elems = measure_elements(root, canvas)
+    shapes = [e for e in elems if e.box and (
+        e.kind in ("rect", "image") or (e.kind == "path" and e.has_fill))]
+    texts = [e for e in elems if e.kind == "text" and e.box and e.has_fill]
+    pad = 4.0
+    _MIN_SCALE = 0.6
+    fixed = 0
+
+    for t in texts:
+        if t.node.get(_D4_FIXED_MARKER) is not None:
+            continue
+        container = _enclosing_container(t, shapes)
+        if container is None:
+            continue
+        cb = container.box
+        spill = max(t.box.x2 - (cb.x2 - pad), (cb.x + pad) - t.box.x,
+                    t.box.y2 - (cb.y2 - pad), (cb.y + pad) - t.box.y)
+        if spill <= 8:
+            continue
+        # Anchor-relative fit: shrinking scales the text about its anchor point,
+        # so the fittable width is measured from that anchor to the container edge
+        # on the spilling side — NOT the full container width. The old box-vs-
+        # container ratio missed *positional* spill (text narrower than the cell
+        # but offset past its edge, e.g. a longer replacement label anchored where
+        # a short one was), yielding scale≈1.0 and declining the fix.
+        if t.x_anchor == "middle":
+            cx = t.box.x + t.box.w / 2
+            half = max(1.0, t.box.w / 2)
+            avail_w = max(1.0, min(cx - (cb.x + pad), (cb.x2 - pad) - cx))
+            scale_w = avail_w / half
+        elif t.x_anchor == "end":
+            scale_w = max(1.0, t.box.x2 - (cb.x + pad)) / (t.box.w or 1.0)
+        else:  # start
+            scale_w = max(1.0, (cb.x2 - pad) - t.box.x) / (t.box.w or 1.0)
+        avail_h = max(1.0, cb.h - 2 * pad)
+        scale_h = avail_h / t.box.h if t.box.h else 1.0
+        scale = max(_MIN_SCALE, min(1.0, scale_w, scale_h))
+        t.node.set(_D4_FIXED_MARKER, "1")
+        if scale >= 0.98:
+            continue
+        _scale_text_font(t.node, t.parent, scale)
+        fixed += 1
+    return fixed
+
+
 # ─────────────────────────── driver ───────────────────────────
 
 def _hard(findings: list[Finding]) -> list[Finding]:
@@ -797,6 +881,7 @@ _FIXERS: list[tuple[str, "callable"]] = [
     ("D1_orphan_baseline", fix_orphan_baseline),
     ("D3_out_of_bounds", fix_out_of_bounds),
     ("D2_text_overlap", fix_text_overlap),
+    ("D4_text_overflow", fix_text_overflow),
 ]
 
 
@@ -850,14 +935,30 @@ def process_page(svg_path: Path, review_dir: Path, canvas: tuple[int, int],
     backup_path = None
     fixes_applied: list[str] = []
 
+    # Verbatim raw-template pages (stamped by the runner's re-theme stage) carry a
+    # professionally-authored, dense flattened layout. D1/D2/D3 relocation fixers
+    # misread that density as overlaps/out-of-bounds and would scramble the design,
+    # so on these pages only the gentle text-shrink (D4) is allowed, and the
+    # relocation *findings* are dropped as false positives.
+    verbatim = False
+    try:
+        verbatim = _tree is not None and _tree.getroot().get("data-verbatim-template") is not None
+    except Exception:  # noqa: BLE001
+        verbatim = False
+    active_fixers = ([(r, fn) for r, fn in _FIXERS if r == "D4_text_overflow"]
+                     if verbatim else _FIXERS)
+
     if autofix:
-        for rule, fix_fn in _FIXERS:
+        for rule, fix_fn in active_fixers:
             findings, bp, label = _run_one_fixer(
                 rule, fix_fn, svg_path, review_dir, canvas, findings, measurer)
             if bp:
                 backup_path = bp
             if label:
                 fixes_applied.append(label)
+
+    if verbatim:
+        findings = [f for f in findings if f.rule.startswith("D4")]
 
     hard = _hard(findings)
     soft = [f for f in findings if f.severity == "soft"]

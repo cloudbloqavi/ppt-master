@@ -79,6 +79,27 @@ def test_status_line_unresolved_names_the_category():
     assert "overlapping text" in line
 
 
+def test_soft_breakdown_from_pages_counts_remaining_soft_findings():
+    pages = [
+        {"findings": [
+            {"rule": "D4_text_overflow", "severity": "soft"},
+            {"rule": "D2_text_overlap", "severity": "hard"},
+        ]},
+        {"findings": [{"rule": "D4_text_overflow", "severity": "soft"}]},
+    ]
+    assert ve._soft_breakdown_from_pages(pages) == Counter({"D4_text_overflow": 2})
+
+
+def test_soft_suffix_names_the_category_not_just_a_count():
+    result = {"status": "fixed", "fixes": 50, "hard_remaining": 0, "soft_remaining": 18,
+              "fixed_breakdown": Counter({"D4_text_overflow": 50}), "remaining_breakdown": Counter(),
+              "soft_breakdown": Counter({"D4_text_overflow": 18})}
+    line = ve.status_line(result)
+    assert "18 minor formatting note(s)" in line
+    assert "text crowding its card edge" in line
+    assert "D4_text_overflow" not in line
+
+
 def test_status_line_clean_with_soft_still_reports_soft():
     result = {"status": "clean", "hard_remaining": 0, "soft_remaining": 2,
               "fixed_breakdown": Counter(), "remaining_breakdown": Counter()}

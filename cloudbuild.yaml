@@ -2,10 +2,20 @@
 # Presentation Builder — Google Cloud Build Pipeline
 # ─────────────────────────────────────────────────────────────
 #
-# Builds the Docker image, pushes it to Artifact Registry, and
-# creates or updates a Cloud Run Job. GEMINI_API_KEY is pulled
-# directly from Secret Manager at both build time (for the job
-# binding) and Cloud Run Job runtime — never stored in source.
+# Fully automated CI/CD: builds the Docker image, pushes it to Artifact Registry,
+# and creates/updates a Cloud Run Job wired with Secret Manager (GEMINI_API_KEY),
+# a GCS output volume mount (artifacts persist to a bucket), and the Pub/Sub status
+# feed. GEMINI_API_KEY is read from Secret Manager — never stored in source.
+#
+# ── One-time prerequisites (NOT done by this pipeline; see ANTIGRAVITY.md) ──
+#   • Artifact Registry repo (_GAR_REPOSITORY) in _REGION
+#   • Secret Manager secret holding the Gemini key (_GEMINI_SECRET_NAME)
+#   • GCS bucket for outputs (_OUTPUT_BUCKET)
+#   • Pub/Sub topic for the status feed (default name: status-progress) + an
+#     ORDER-PRESERVING subscription (`--enable-message-ordering`)
+#   • Cloud Run RUNTIME service account (_RUNTIME_SA) granted:
+#       roles/storage.objectAdmin  on the output bucket   (GCS FUSE writes)
+#       roles/pubsub.publisher     on the status topic     (status feed)
 #
 # Trigger setup (run once per environment):
 #   gcloud builds triggers create github \
@@ -19,18 +29,14 @@
 #       _GAR_REPOSITORY=ai-builder-engine,\
 #       _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
 #       _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
-#       _GEMINI_SECRET_NAME=gemini-api-key"
+#       _GEMINI_SECRET_NAME=gemini-api-key,\
+#       _OUTPUT_BUCKET=your-ai-builder-outputs,\
+#       _RUNTIME_SA=ai-builder-run@YOUR_PROJECT.iam.gserviceaccount.com"
 #
 # Manual one-off build:
-#   gcloud builds submit . \
-#     --config=cloudbuild.yaml \
-#     --project=$PROJECT_ID \
-#     --substitutions="\
-#       _REGION=us-central1,\
-#       _GAR_REPOSITORY=ai-builder-engine,\
-#       _CLOUD_RUN_JOB_NAME=ai-builder-agent,\
-#       _OUTPUT_ARTIFACTS_DIR=/workspace/outputs,\
-#       _GEMINI_SECRET_NAME=gemini-api-key"
+#   gcloud builds submit . --config=cloudbuild.yaml --project=$PROJECT_ID \
+#     --substitutions="_REGION=us-central1,_GAR_REPOSITORY=ai-builder-engine,\
+#       _CLOUD_RUN_JOB_NAME=ai-builder-agent,_OUTPUT_BUCKET=your-ai-builder-outputs"
 #
 # Required IAM roles for the Cloud Build Service Account
 # (PROJECT_NUMBER@cloudbuild.gserviceaccount.com):
@@ -38,6 +44,7 @@
 #   roles/run.admin                     — create/update Cloud Run Jobs
 #   roles/secretmanager.secretAccessor  — read GEMINI_API_KEY at deploy time
 #   roles/iam.serviceAccountUser        — act as the Cloud Run runtime SA
+#   roles/pubsub.editor                 — ONLY when _BOOTSTRAP_PUBSUB=true (create topic/sub)
 # ─────────────────────────────────────────────────────────────
 
 # User-configurable substitutions (set in trigger or --substitutions flag).
@@ -47,7 +54,11 @@ substitutions:
   _GAR_REPOSITORY: ai-builder-engine
   _CLOUD_RUN_JOB_NAME: ai-builder-agent
   _OUTPUT_ARTIFACTS_DIR: /workspace/outputs
-  _GEMINI_SECRET_NAME: gemini-api-key   # Secret Manager secret name (not the value)
+  _GEMINI_SECRET_NAME: gemini-api-key      # Secret Manager secret name (not the value)
+  _OUTPUT_BUCKET: ''                       # GCS bucket mounted at _OUTPUT_ARTIFACTS_DIR. Empty ⇒ no mount (ephemeral, outputs lost on exit).
+  _STATUS_PUBSUB_TOPIC: ''                 # Explicit topic; empty ⇒ runner resolves projects/$PROJECT_ID/topics/status-progress on Cloud Run.
+  _RUNTIME_SA: ''                          # Cloud Run runtime SA email; empty ⇒ default Compute SA (must still hold the runtime roles above).
+  _BOOTSTRAP_PUBSUB: 'false'              # Set to 'true' on first deploy to idempotently create the Pub/Sub topic + ordered subscription.
 
 # Expose GEMINI_API_KEY from Secret Manager to Cloud Build steps that need it.
 # The secret VALUE is never written to substitutions or logs.
@@ -61,6 +72,54 @@ options:
   machineType: E2_HIGHCPU_8
 
 steps:
+  # ── Step 0 (optional): Bootstrap Pub/Sub topic + ordered subscription ───────
+  # Runs in parallel with the Docker build (waitFor: ['-']).
+  # Set _BOOTSTRAP_PUBSUB=true only on the first deploy; leave false after that.
+  # Requires roles/pubsub.editor on the Cloud Build SA when enabled.
+  - id: bootstrap-pubsub
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        if [ "$_BOOTSTRAP_PUBSUB" != "true" ]; then
+          echo "Skipping Pub/Sub bootstrap (set _BOOTSTRAP_PUBSUB=true to enable on first deploy)"
+          exit 0
+        fi
+
+        # Resolve topic: explicit override or default.  $_STATUS_PUBSUB_TOPIC and
+        # $PROJECT_ID are Cloud Build substitutions expanded before the shell runs.
+        if [ -n "$_STATUS_PUBSUB_TOPIC" ]; then
+          TOPIC_FQN="$_STATUS_PUBSUB_TOPIC"
+          TOPIC_ID=$(echo "$_STATUS_PUBSUB_TOPIC" | awk -F'/' '{print $NF}')
+        else
+          TOPIC_ID="status-progress"
+          TOPIC_FQN="projects/$PROJECT_ID/topics/$$TOPIC_ID"
+        fi
+        SUB_ID="$${TOPIC_ID}-sub"
+
+        echo "Topic:        $$TOPIC_FQN"
+        echo "Subscription: $$SUB_ID (enable-message-ordering)"
+
+        if gcloud pubsub topics describe "$$TOPIC_FQN" --project="$PROJECT_ID" --quiet 2>/dev/null; then
+          echo "Topic already exists — skipping create"
+        else
+          gcloud pubsub topics create "$$TOPIC_FQN" --project="$PROJECT_ID"
+          echo "Created topic"
+        fi
+
+        if gcloud pubsub subscriptions describe "$$SUB_ID" --project="$PROJECT_ID" --quiet 2>/dev/null; then
+          echo "Subscription already exists — skipping create"
+        else
+          gcloud pubsub subscriptions create "$$SUB_ID" \
+            --topic="$$TOPIC_FQN" \
+            --project="$PROJECT_ID" \
+            --enable-message-ordering
+          echo "Created subscription"
+        fi
+    waitFor: ['-']   # run immediately, parallel to build
+
   # ── Step 1: Build the Docker image ──────────────────────────
   - id: build
     name: gcr.io/cloud-builders/docker
@@ -94,8 +153,10 @@ steps:
     waitFor: [build]
 
   # ── Step 3: Create or update the Cloud Run Job ──────────────
-  # GEMINI_API_KEY is bound to the job from Secret Manager at deploy time.
-  # The secret value is never passed as a plain env var.
+  # GEMINI_API_KEY is bound from Secret Manager at deploy time; the GCS bucket is
+  # mounted at _OUTPUT_ARTIFACTS_DIR; GOOGLE_CLOUD_PROJECT lets the runner resolve
+  # the default Pub/Sub status topic. Bash variables use $$ so Cloud Build leaves
+  # them for the shell ($_X / $PROJECT_ID / $COMMIT_SHA are Cloud Build subs).
   - id: deploy-cloudrun-job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
@@ -108,44 +169,67 @@ steps:
         JOB_NAME="$_CLOUD_RUN_JOB_NAME"
         REGION="$_REGION"
 
-        echo "Checking if Cloud Run Job '$JOB_NAME' exists..."
-        if gcloud run jobs describe "$JOB_NAME" \
-            --region="$REGION" \
-            --project="$PROJECT_ID" \
-            --quiet > /dev/null 2>&1; then
+        echo "Checking if Cloud Run Job '$$JOB_NAME' exists..."
+        if gcloud run jobs describe "$$JOB_NAME" \
+            --region="$$REGION" --project="$PROJECT_ID" --quiet > /dev/null 2>&1; then
           OPERATION="update"
         else
           OPERATION="create"
         fi
 
-        echo "Running: gcloud run jobs $OPERATION $JOB_NAME"
+        # Always-on env. GOOGLE_CLOUD_PROJECT lets the status logger resolve the
+        # default Pub/Sub topic (projects/<id>/topics/status-progress) on Cloud Run.
+        ENV_VARS="OUTPUT_ARTIFACTS_DIR=$_OUTPUT_ARTIFACTS_DIR,GOOGLE_CLOUD_PROJECT=$PROJECT_ID"
+        if [ -n "$_STATUS_PUBSUB_TOPIC" ]; then
+          ENV_VARS="$$ENV_VARS,STATUS_PUBSUB_TOPIC=$_STATUS_PUBSUB_TOPIC"
+        fi
 
-        gcloud run jobs $OPERATION "$JOB_NAME" \
-          --image="$IMAGE" \
-          --region="$REGION" \
+        # Optional flags (values have no spaces ⇒ safe to word-split when expanded).
+        EXTRA=""
+        if [ -n "$_OUTPUT_BUCKET" ]; then
+          # On update, clear first so re-adding the same volume name is idempotent
+          # (avoids "volume already exists"). The --clear-* flags are update-only.
+          if [ "$$OPERATION" = "update" ]; then
+            EXTRA="$$EXTRA --clear-volumes --clear-volume-mounts"
+          fi
+          EXTRA="$$EXTRA --add-volume=name=gcs-output,type=cloud-storage,bucket=$_OUTPUT_BUCKET"
+          EXTRA="$$EXTRA --add-volume-mount=volume=gcs-output,mount-path=$_OUTPUT_ARTIFACTS_DIR"
+        fi
+        if [ -n "$_RUNTIME_SA" ]; then
+          EXTRA="$$EXTRA --service-account=$_RUNTIME_SA"
+        fi
+
+        echo "Running: gcloud run jobs $$OPERATION $$JOB_NAME"
+        gcloud run jobs "$$OPERATION" "$$JOB_NAME" \
+          --image="$$IMAGE" \
+          --region="$$REGION" \
           --project="$PROJECT_ID" \
           --task-timeout=3600 \
           --max-retries=1 \
           --memory=4Gi \
           --cpu=2 \
           --set-secrets="GEMINI_API_KEY=$_GEMINI_SECRET_NAME:latest" \
-          --set-env-vars="OUTPUT_ARTIFACTS_DIR=$_OUTPUT_ARTIFACTS_DIR" \
+          --set-env-vars="$$ENV_VARS" \
+          $$EXTRA \
           --quiet
 
         echo ""
         echo "════════════════════════════════════════"
         echo "  Deployment complete"
-        echo "  Job:    $JOB_NAME"
-        echo "  Region: $REGION"
-        echo "  Image:  $IMAGE"
+        echo "  Job:     $$JOB_NAME"
+        echo "  Region:  $$REGION"
+        echo "  Image:   $$IMAGE"
+        if [ -n "$_OUTPUT_BUCKET" ]; then
+          echo "  Outputs: gs://$_OUTPUT_BUCKET (mounted at $_OUTPUT_ARTIFACTS_DIR)"
+        else
+          echo "  Outputs: $_OUTPUT_ARTIFACTS_DIR (EPHEMERAL — set _OUTPUT_BUCKET to persist)"
+        fi
         echo ""
-        echo "  To execute the job:"
-        echo "  gcloud run jobs execute $JOB_NAME \\"
-        echo "    --region $REGION \\"
-        echo '    --args="--prompt,Your prompt here" \\'
-        echo "    --wait"
+        echo "  Execute on demand:"
+        echo "  gcloud run jobs execute $$JOB_NAME --region $$REGION \\"
+        echo '    --args="--prompt,Your prompt here" --wait'
         echo "════════════════════════════════════════"
-    waitFor: [push-sha, push-latest]
+    waitFor: [push-sha, push-latest, bootstrap-pubsub]
     secretEnv: [GEMINI_API_KEY]   # available inside this step if needed for validation
 
 # Final image published to Artifact Registry

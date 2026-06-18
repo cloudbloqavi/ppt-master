@@ -282,6 +282,101 @@ python3 run_agent.py --prompt "Your prompt here"
 
 ---
 
+## 📡 Status Feed → GCP Pub/Sub (Local & Hosted)
+
+The runner emits a non-technical, user-facing **status feed** (e.g. *"Designing slide 2 of 5…"*, *"Research source captured: …"*). Locally, `--status-progress` writes it to a log file. Independently, the runner **also publishes every event to GCP Pub/Sub** whenever a topic is targetable — so a frontend can show live progress.
+
+Key guarantees (why this needs setup, not just a topic):
+- **Ordered:** events publish with message ordering enabled, keyed by `RUN_ID`, so they reach the topic in emission order. **The subscription must also enable ordering** or the consumer can still receive them out of order.
+- **No lost events:** the runner flushes in-flight publishes before the process exits — important for a Cloud Run Job, which terminates the instant the agent finishes.
+- **Message shape:** JSON `{ timestamp, status, event_type ("progress"|"citation"), run_id, data? }`. `run_id` doubles as the ordering key.
+
+### Mode A — Local testing (`gcloud auth` / ADC)
+
+Publish from your own machine using Application Default Credentials. Requires the `gcloud` CLI and a GCP project (`google-cloud-pubsub` is already in `requirements.txt`).
+
+```bash
+# 0. One-time: authenticate and select a project
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+gcloud auth application-default login          # ADC the publisher client uses
+
+# 1. One-time: create the topic + an ORDER-PRESERVING subscription
+gcloud pubsub topics create status-progress
+gcloud pubsub subscriptions create status-progress-sub \
+  --topic=status-progress \
+  --enable-message-ordering                    # REQUIRED for in-order delivery
+
+# 2. Run the agent, pointed at the topic
+export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+export STATUS_PUBSUB_TOPIC=projects/$GOOGLE_CLOUD_PROJECT/topics/status-progress
+python3 run_agent.py --prompt "Create a 5-slide product overview deck."
+
+# 3. Observe the published events (a second terminal)
+gcloud pubsub subscriptions pull status-progress-sub --auto-ack --limit=50
+```
+
+> **Fully offline (no GCP, no ADC)** — use the Pub/Sub emulator. The client auto-detects `PUBSUB_EMULATOR_HOST`.
+> ```bash
+> gcloud beta emulators pubsub start --host-port=localhost:8085     # terminal 1
+> export PUBSUB_EMULATOR_HOST=localhost:8085                         # terminal 2
+> export STATUS_PUBSUB_TOPIC=projects/local-test/topics/status-progress
+> python3 run_agent.py --prompt "Create a 5-slide deck."
+> ```
+> (Emulator message-ordering support is partial — fine for smoke tests, not for verifying strict ordering.)
+
+### Mode B — Hosted (Cloud Run Job)
+
+In production the feed **auto-enables** — no CLI flag and, if you use the default topic name, no topic env var. Cloud Run Jobs set `CLOUD_RUN_JOB` / `CLOUD_RUN_EXECUTION`, which the runner detects.
+
+#### One-time prerequisites
+
+```bash
+PROJECT_ID=YOUR_PROJECT_ID
+RUNTIME_SA=YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com   # or your custom SA
+
+# 1. Pub/Sub topic + ORDER-PRESERVING subscription
+gcloud pubsub topics create status-progress --project=$PROJECT_ID
+gcloud pubsub subscriptions create status-progress-sub \
+  --topic=status-progress --project=$PROJECT_ID --enable-message-ordering
+
+# 2. Grant the runtime SA publisher access
+gcloud pubsub topics add-iam-policy-binding status-progress \
+  --project=$PROJECT_ID \
+  --member="serviceAccount:$RUNTIME_SA" \
+  --role="roles/pubsub.publisher"
+```
+
+> **Automated alternative:** set `_BOOTSTRAP_PUBSUB=true` in your `cloudbuild.yaml` trigger substitutions and these two steps run automatically on the first Cloud Build deploy — idempotent on all subsequent pushes.
+
+#### Deploy wiring
+
+The Cloud Build pipeline (`cloudbuild.yaml`) handles the full wiring. Key substitutions to set in your trigger (or `--substitutions` on a manual submit):
+
+| Substitution | What it does |
+|---|---|
+| `_OUTPUT_BUCKET` | GCS bucket mounted at `_OUTPUT_ARTIFACTS_DIR` — outputs persist across runs |
+| `_RUNTIME_SA` | Service account the job runs as (must hold `storage.objectAdmin` + `pubsub.publisher`) |
+| `_STATUS_PUBSUB_TOPIC` | Override the auto-resolved topic (leave empty to use the default `status-progress`) |
+| `_BOOTSTRAP_PUBSUB=true` | Set once, on first deploy, to auto-create the topic + ordered subscription |
+
+```bash
+# Default topic auto-resolves from GOOGLE_CLOUD_PROJECT — nothing to set.
+# OR pin an explicit topic:
+gcloud run jobs update ai-builder-agent --region=us-central1 \
+  --set-env-vars=STATUS_PUBSUB_TOPIC=projects/$PROJECT_ID/topics/status-progress
+
+# Optional: per-execution output isolation (each run writes to its own GCS prefix)
+gcloud run jobs update ai-builder-agent --region=us-central1 \
+  --set-env-vars=OUTPUT_ARTIFACTS_DIR=/workspace/outputs/'${CLOUD_RUN_EXECUTION}'
+```
+
+Notes:
+- `RUN_ID` (the Pub/Sub ordering key) defaults to `CLOUD_RUN_EXECUTION` automatically, so **each job execution is its own ordered stream** — no extra config needed.
+- For the complete build/deploy reference (Artifact Registry, Secret Manager, GCS FUSE mount, Cloud Build IAM), see **[ANTIGRAVITY.md → "Production Deployment: GCP Cloud Run Job"](ANTIGRAVITY.md)**.
+
+---
+
 ## 🎛️ CLI Arguments Reference
 
 The runner scripts support the following command-line options for control and customization.
@@ -297,7 +392,7 @@ The runner scripts support the following command-line options for control and cu
   ```
 
 #### 2. `--status-progress`
-* **Description**: Enables generating simplified, user-facing, non-technical status progress logs inside the `OUTPUT_ARTIFACTS_DIR` (e.g. `status_progress_YYYYMMDD_HHMMSS.log`). In production (Cloud Run), status updates are automatically published to GCP Pub/Sub.
+* **Description**: Enables generating simplified, user-facing, non-technical status progress logs inside the `OUTPUT_ARTIFACTS_DIR` (e.g. `status_progress_YYYYMMDD_HHMMSS.log`). Independently, status updates are published to GCP Pub/Sub whenever a topic is targetable (auto-enabled on Cloud Run). See the **"Status Feed → GCP Pub/Sub (Local & Hosted)"** section above for local and hosted setup.
 * **Script Support**: `run_agent.py`
 * **Example**:
   ```bash

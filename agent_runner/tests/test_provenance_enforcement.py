@@ -93,10 +93,76 @@ def test_company_reference_must_be_under_powerslides(tmp_path):
 def test_valid_company_provenance_is_clean(tmp_path):
     prov = {"pages": {"P01": {"tier": "company", "key": "18_swot",
                               "reference": _REF_SWOT, "viz_type": "swot",
-                              "decision": "Pick swot", "confirmed_by": "executor"}}}
+                              "decision": "Pick swot", "confirmed_by": "strategist"}}}
     v = pe._validate_provenance(_project(tmp_path, prov))
     assert v["issues"] == []
     assert v["by_tier"]["company"] == 1
+
+
+def test_all_executor_confirmed_by_flagged(tmp_path):
+    prov = {"pages": {"P01": {"tier": "company", "key": "18_swot",
+                              "reference": _REF_SWOT, "viz_type": "swot",
+                              "decision": "Pick swot", "confirmed_by": "executor"}}}
+    v = pe._validate_provenance(_project(tmp_path, prov))
+    assert any("strategist_skipped" in i for i in v["issues"])
+
+
+def test_catalog_skip_suspected_when_no_company_tier(tmp_path):
+    prov = {"pages": {"P01": {"tier": "stock", "key": "sankey_chart",
+                              "reference": "templates/charts/sankey_chart.svg",
+                              "confirmed_by": "strategist"}}}
+    # Make the stock reference exist so we don't get a disk-miss issue
+    stock_ref = _SKILL_DIR / "templates" / "charts" / "sankey_chart.svg"
+    if not stock_ref.is_file():
+        pytest.skip("stock sankey_chart.svg not present")
+    v = pe._validate_provenance(_project(tmp_path, prov))
+    assert v["catalog_skip_suspected"] is True
+
+
+def test_catalog_skip_not_suspected_when_company_tier_present(tmp_path):
+    prov = {"pages": {"P01": {"tier": "company", "key": "18_swot",
+                              "reference": _REF_SWOT, "viz_type": "swot",
+                              "confirmed_by": "strategist"}}}
+    v = pe._validate_provenance(_project(tmp_path, prov))
+    assert v["catalog_skip_suspected"] is False
+
+
+def _write_candidates(project_dir, pages):
+    (project_dir / "chart_candidates.json").write_text(
+        json.dumps({"schema": "chart_candidates/v1", "pages": pages}), encoding="utf-8")
+
+
+def test_company_candidate_skipped_without_reason_is_flagged(tmp_path):
+    # Match stage found a company option; agent chose custom with NO reason → issue.
+    prov = {"pages": {"P01": {"tier": "custom", "key": None, "reference": None,
+                              "decision": "", "confirmed_by": "strategist"}}}
+    proj = _project(tmp_path, prov)
+    _write_candidates(proj, {"P01": {"company": [{"key": "18_swot", "reason": "fits"}]}})
+    v = pe._validate_provenance(proj)
+    assert any("company candidate '18_swot' was available" in i for i in v["issues"])
+
+
+def test_company_candidate_skipped_with_reason_is_clean(tmp_path):
+    # Same situation but the agent justified the override → no candidate-aware issue.
+    prov = {"pages": {"P01": {"tier": "custom", "key": None, "reference": None,
+                              "decision": "swot didn't fit a 3x3 milestones grid",
+                              "confirmed_by": "strategist"}}}
+    proj = _project(tmp_path, prov)
+    _write_candidates(proj, {"P01": {"company": [{"key": "18_swot", "reason": "fits"}]}})
+    v = pe._validate_provenance(proj)
+    assert not any("was available but tier" in i for i in v["issues"])
+
+
+def test_stock_choice_over_company_candidate_needs_reason(tmp_path):
+    # Stock tier normally needs no decision reason, but if a company candidate
+    # existed the choice must be justified.
+    prov = {"pages": {"P01": {"tier": "stock", "key": "18_swot", "reference": _REF_SWOT,
+                              "decision": "", "confirmed_by": "strategist"}}}
+    proj = _project(tmp_path, prov)
+    _write_candidates(proj, {"P01": {"company": [{"key": "30_marketing_milestones_matrix",
+                                                  "reason": "fits"}]}})
+    v = pe._validate_provenance(proj)
+    assert any("was available but tier=stock" in i for i in v["issues"])
 
 
 def test_invalid_tier_flagged(tmp_path):
